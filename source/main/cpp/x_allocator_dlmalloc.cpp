@@ -1,21 +1,184 @@
-#include "../x_target.h"
-#include "../x_system.h"
-#include "../x_time.h"
+#include "xbase\x_target.h"
+#include "xbase\x_types.h"
+#include "xbase\x_integer.h"
+#include "xbase\x_memory_std.h"
 
-#include "x_memory_heap_dlmalloc.h"
+#include "xallocator\x_allocator.h"
 
 namespace xcore
 {
+	struct malloc_chunk
+	{
+		xsize_t					prev_foot;										///< Size of previous chunk (if free).  */
+		xsize_t					head;											///< Size and inuse bits. */
+		struct malloc_chunk*	fd;												///< double links -- used only if free. */
+		struct malloc_chunk*	bk;
+	};
+
+	typedef struct malloc_chunk  mchunk;
+	typedef struct malloc_chunk* mchunkptr;
+	typedef struct malloc_chunk* sbinptr;										///< The type of bins of chunks */
+	typedef u32 bindex_t;														///< Described below */
+	typedef u32 binmap_t;														///< Described below */
+	typedef u32 flag_t;															///< The type of various bit flag sets */
+
+	struct malloc_tree_chunk 
+	{
+		///< The first four fields must be compatible with malloc_chunk
+		xsize_t						prev_foot;
+		xsize_t						head;
+		struct malloc_tree_chunk*	fd;
+		struct malloc_tree_chunk*	bk;
+
+		struct malloc_tree_chunk*	child[2];
+		struct malloc_tree_chunk*	parent;
+		bindex_t					index;
+	};
+
+	typedef struct malloc_tree_chunk  tchunk;
+	typedef struct malloc_tree_chunk* tchunkptr;
+	typedef struct malloc_tree_chunk* tbinptr;									///< The type of bins of trees */
+
+	struct malloc_segment 
+	{
+		xbyte*					base;											///< base address */
+		xsize_t					size;											///< allocated size */
+		struct malloc_segment*	next;											///< ptr to next segment */
+		flag_t					sflags;											///< user and extern flag */
+	};
+
+	typedef struct malloc_segment  msegment;
+	typedef struct malloc_segment* msegmentptr;
+
+	#define NSMALLBINS        (32U)
+	#define NTREEBINS         (32U)
+
+	struct malloc_state
+	{
+		binmap_t			smallmap;
+		binmap_t			treemap;
+		xsize_t				dvsize;
+		xsize_t				topsize;
+		xbyte*				least_addr;
+		mchunkptr			dv;
+		mchunkptr			top;
+		xsize_t				release_checks;
+		xsize_t				magic;
+		mchunkptr			smallbins[(NSMALLBINS+1)*2];
+		tbinptr				treebins[NTREEBINS];
+		xsize_t				footprint;
+		xsize_t				max_footprint;
+		flag_t				mflags;
+		msegment			seg;
+	};
+
+	typedef struct malloc_state*    mstate;
+
+	struct malloc_params 
+	{
+		volatile xsize_t	magic;
+		xsize_t				page_size;
+		flag_t				default_mflags;
+	};
+
+	typedef				void*	(*SysAllocFunc)(xsize_t size);
+	typedef				void	(*SysFreeFunc)(void* ptrsize);
+
+	//////////////////////////////////////////////////////////////////////////
+	// A memory heap capable of managing multiple segments (based on dlmalloc)
+	struct xmem_managed_size
+	{
+		xsize_t		mMaxSystemSize;
+		xsize_t		mCurrentSystemSize;
+		xsize_t		mCurrentInuseSize;
+	};
+
+	//////////////////////////////////////////////////////////////////////////
+	// A memory heap capable of managing multiple segments (based on dlmalloc)
+	class xmem_heap_base
+	{
+	protected:
+		malloc_params		mParams;
+		mstate				mState;
+
+		SysAllocFunc		mSysAlloc;
+		SysFreeFunc			mSysFree;
+
+	public:
+		void*				__alloc(xsize_t bytes);													///< Normal allocation
+		void*				__allocA(xsize_t alignment, xsize_t size);								///< Aligned allocation
+		void*				__allocR(void* ptr, xsize_t alignment, xsize_t size);										///< Re allocation
+		void*				__allocN(xsize_t n_elements, xsize_t element_size);						///< Elements allocation
+		void**				__allocIC(xsize_t n_elements, xsize_t element_size, void** chunks);		///< Independent continues with equal sized elements
+		void**				__allocICO(xsize_t n_elements, xsize_t* element_sizes, void** chunks);	///< Independent continues with different size specified for every element
+		void				__free(void* ptr);
+
+		u32					__usable_size(void* mem);
+
+		void				__stats(xmem_managed_size& stats);
+	protected:
+		void				__internal_malloc_stats(xmem_managed_size& stats);
+		void*				__internal_realloc(mstate m, void* oldmem, xsize_t alignment, xsize_t bytes);
+		void*				__internal_memalign(xsize_t alignment, xsize_t bytes);
+		void**				__internal_ic_alloc(xsize_t n_elements, xsize_t* sizes, s32 opts, void* chunks[]);
+
+		void				__add_segment(void* tbase, xsize_t tsize, s32 sflags);
+		xsize_t				__release_unused_segments(mstate m);
+
+		void*				__tmalloc_large(mstate m, xsize_t nb);
+		void*				__tmalloc_small(mstate m, xsize_t nb);
+
+		xsize_t				__footprint();
+		xsize_t				__max_footprint();
+
+		s32					__init_mparams();
+		s32					__change_mparam(s32 param_number, s32 value);
+	};
+
+
+	//////////////////////////////////////////////////////////////////////////
+	/// xmem_space is an opaque type representing an independent region of space that supports mspace_malloc, etc.
+	class xmem_space : public xmem_heap_base
+	{
+	public:
+		void				__manage(void* mem, xsize_t size);
+		void				__destroy();
+
+	private:
+		void				__initialize(xbyte* tbase, xsize_t tsize);
+	};
+
+	//////////////////////////////////////////////////////////////////////////
+	// A memory heap capable of managing multiple segments (based on dlmalloc)
+	class xmem_heap : public xmem_heap_base
+	{
+	public:
+		void				__initialize();
+		void				__destroy();
+
+		void				__manage(void* mem, xsize_t size);
+
+		static xcore::u32	__sGetMemSize(void* mem);
+
+	private:
+		malloc_state		mStateData;
+	};
+
+
+
+
+
+
+
+
 	#define FOOTERS											1
 	#define INSECURE										0
 	#define REALLOC_ZERO_BYTES_FREES						1
 
 	#define MALLOC_ALIGNMENT								((xsize_t) X_MEMALIGN )
-#ifdef TARGET_WII
-	#define OUT_OF_MEMORY()									xsystem::FatalError("Out Of Memory : MEM2")
-#else // TARGET_WII
-	#define OUT_OF_MEMORY()									xsystem::FatalError()
-#endif //TARGET_WII
+
+	/// TODO: These should be callbacks!!!!
+	#define OUT_OF_MEMORY()									FatalError()
 
 	#define DEFAULT_GRANULARITY								((xsize_t)64U * (xsize_t)1024U)
 
@@ -33,11 +196,8 @@ namespace xcore
 	#endif  /* PROCEED_ON_ERROR */
 
 	#ifndef MALLOC_FAILURE_ACTION
-		#ifdef TARGET_WII
-			#define MALLOC_FAILURE_ACTION						xsystem::FatalError("Malloc Failure")
-		#else // TARGET_WII
-			#define MALLOC_FAILURE_ACTION						xsystem::FatalError()
-		#endif //TARGET_WII		
+		/// TODO: These should be callbacks!!!!
+		#define MALLOC_FAILURE_ACTION						FatalError()
 	#endif  /* MALLOC_FAILURE_ACTION */
 
 	#define MAX_RELEASE_CHECK_RATE							256
@@ -46,6 +206,10 @@ namespace xcore
 
 	/*------------------------------ internal #includes ---------------------- */
 
+	static void FatalError()
+	{
+	}
+
 	#if defined(TARGET_PC)
 		#pragma warning( disable : 4146 ) /* no "unsigned" warnings */
 	#endif
@@ -53,11 +217,8 @@ namespace xcore
 	#ifdef XMEM_HEAP_DEBUG
 		#if ABORT_ON_ASSERT_FAILURE
 			#undef ASSERT
-			#ifdef TARGET_WII
-				#define ASSERT(x) if(!(x)) xsystem::FatalError(#x)
-			#else // TARGET_WII
-				#define ASSERT(x) if(!(x)) xsystem::FatalError()
-			#endif //TARGET_WII	
+			/// TODO: These should be callbacks!!!!
+			#define ASSERT(x) if(!(x)) FatalError()
 		#endif
 	#else  /* XMEM_HEAP_DEBUG */
 		#ifndef ASSERT
@@ -323,19 +484,13 @@ namespace xcore
 	#else /* PROCEED_ON_ERROR */
 
 		#ifndef CORRUPTION_ERROR_ACTION
-			#ifdef TARGET_WII
-				#define CORRUPTION_ERROR_ACTION(m) xsystem::FatalError("Corruption Error: \n"#m)
-			#else // TARGET_WII
-				#define CORRUPTION_ERROR_ACTION(m) xsystem::FatalError()
-			#endif //TARGET_WII	
+			/// TODO: These should be callbacks!!!!
+			#define CORRUPTION_ERROR_ACTION(m)	FatalError()
 		#endif /* CORRUPTION_ERROR_ACTION */
 
 		#ifndef USAGE_ERROR_ACTION
-			#ifdef TARGET_WII
-				#define USAGE_ERROR_ACTION(m,p) xsystem::FatalError("Usage Error: \n\t"#m"\n\t"#p)
-			#else // TARGET_WII
-				#define USAGE_ERROR_ACTION(m,p) xsystem::FatalError()
-			#endif //TARGET_WII	
+			/// TODO: These should be callbacks!!!!
+			#define USAGE_ERROR_ACTION(m,p)		FatalError()
 		#endif /* USAGE_ERROR_ACTION */
 
 	#endif /* PROCEED_ON_ERROR */
@@ -589,11 +744,9 @@ namespace xcore
 				((gsize            & (gsize-SIZE_T_ONE))            != 0) ||
 				((psize            & (psize-SIZE_T_ONE))            != 0))
 			{
-#ifdef TARGET_WII
-				xsystem::FatalError("Heap Initialize Error");
-#else //TARGET_WII
-				xsystem::FatalError();
-#endif//TARGET_WII
+
+				// TODO: This should be a callback!!!!
+				FatalError();
 			}
 
 			mParams.page_size = psize;
@@ -1979,11 +2132,7 @@ namespace xcore
 			else if (bytes >= MAX_REQUEST)
 			{
 				/* Too big to allocate. Force failure (in sys alloc) */
-#ifdef TARGET_WII
-				xsystem::FatalError("Allocate Request Exceeded");
-#else //TARGET_WII
-				xsystem::FatalError();
-#endif//TARGET_WII
+				FatalError();
 			}
 			else 
 			{
@@ -2449,6 +2598,84 @@ namespace xcore
 	{
 		mchunkptr chunkPtr = mem2chunk(mem);
 		return chunksize(chunkPtr);
+	}
+
+
+
+
+
+
+
+
+	class x_allocator_dlmalloc : public x_iallocator
+	{
+		xmem_heap			mDlMallocHeap;
+		Callback			mOutOfMemoryCallback;
+
+	public:
+		~x_allocator_dlmalloc()
+		{
+			mDlMallocHeap.__destroy();
+		}
+
+		void					init(void* mem, s32 mem_size) 
+		{
+			mOutOfMemoryCallback = NULL;
+			mDlMallocHeap.__initialize();
+			mDlMallocHeap.__manage(mem, mem_size);
+		}
+
+		virtual void*			allocate(s32 size, s32 alignment)
+		{
+			if (alignment <= X_MEMALIGN)
+				return mDlMallocHeap.__alloc(size);
+
+			return mDlMallocHeap.__allocA(alignment, size);
+		}
+
+		virtual void*			callocate(s32 nelem, s32 elemsize)
+		{
+			return mDlMallocHeap.__allocN(nelem, elemsize);
+		}
+
+		virtual void*			reallocate(void* ptr, s32 size, s32 alignment)
+		{
+			if (alignment <= X_MEMALIGN)
+				return mDlMallocHeap.__allocR(ptr, alignment, size);
+
+				return mDlMallocHeap.__allocR(ptr, alignment, size);
+		}
+
+		virtual void			deallocate(void* ptr)
+		{
+			mDlMallocHeap.__free(ptr);
+		}
+
+		virtual u32				usable_size(void *ptr)
+		{
+			return mDlMallocHeap.__usable_size(ptr);
+		}
+
+		virtual void			set_out_of_memory_callback(Callback user_callback)
+		{
+			mOutOfMemoryCallback = user_callback;
+		}
+
+		void					stats(xmem_managed_size& stats)
+		{
+			mDlMallocHeap.__stats(stats);
+		}
+	};
+
+	x_iallocator*		gCreateDlAllocator(void* mem, s32 memsize)
+	{
+		x_allocator_dlmalloc* allocator = (x_allocator_dlmalloc*)mem;
+		
+		s32 allocator_class_size = ((sizeof(x_allocator_dlmalloc) + (8-1)) & ~(8-1)) + 8;
+		mem = (void*)((u32)mem + allocator_class_size);
+
+		allocator->init(mem, memsize - allocator_class_size);
+		return allocator;
 	}
 
 };	///< namespace xcore

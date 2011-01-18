@@ -1,17 +1,72 @@
-#include "../x_target.h"
-#include "../x_debug.h"
-#include "../x_system.h"
-#include "../x_time.h"
+#include "xbase\x_target.h"
+#include "xbase\x_types.h"
+#include "xbase\x_debug.h"
+#include "xbase\x_integer.h"
+#include "xbase\x_memory_std.h"
 
-#include "x_memory_heap_tlsf.h"
-
-#if 0
+#include "xallocator\x_allocator.h"
 
 ///< TLSF allocator
 ///< http://rtportal.upv.es/rtmalloc/
 
 namespace xcore
 {
+	#define XMEM_HEAP_DEBUG								1
+
+	//////////////////////////////////////////////////////////////////////////
+	// A memory heap capable of managing multiple segments (based on dlmalloc)
+	struct xmem_managed_size
+	{
+		xsize_t		mMaxSystemSize;
+		xsize_t		mCurrentSystemSize;
+		xsize_t		mCurrentInuseSize;
+	};
+
+	//////////////////////////////////////////////////////////////////////////
+	// A memory heap capable of managing multiple segments (based on dlmalloc)
+	class xmem_heap_base
+	{
+	protected:
+		void*				mPool;
+
+	public:
+		void*				__alloc(xsize_t bytes);													///< Normal allocation
+		void*				__allocA(xsize_t alignment, xsize_t size);								///< Aligned allocation
+		void*				__allocR(void* ptr, xsize_t size);										///< Re allocation
+		void*				__allocN(xsize_t n_elements, xsize_t element_size);						///< Elements allocation
+		void**				__allocIC(xsize_t n_elements, xsize_t element_size, void** chunks);		///< Independent continues with equal sized elements
+		void**				__allocICO(xsize_t n_elements, xsize_t* element_sizes, void** chunks);	///< Independent continues with different size specified for every element
+		void				__free(void* ptr);
+
+		u32					__usable_size(void* mem);
+		void				__stats(xmem_managed_size& stats);
+	};
+
+	//////////////////////////////////////////////////////////////////////////
+	/// xmem_space is an opaque type representing an independent region of space that supports mspace_malloc, etc.
+	class xmem_space : public xmem_heap_base
+	{
+	public:
+		void				__manage(void* mem, xsize_t size);
+		void				__destroy();
+
+	private:
+		void				__initialize(xbyte* tbase, xsize_t tsize);
+	};
+
+	//////////////////////////////////////////////////////////////////////////
+	// A memory heap capable of managing multiple segments (based on dlmalloc)
+	class xmem_heap : public xmem_heap_base
+	{
+	public:
+		void				__initialize();
+		void				__destroy();
+
+		void				__manage(void* mem, xsize_t size);
+	};
+
+
+
 	xsize_t		get_used_size(void *);
 	xsize_t		get_max_size(void *);
 	void		destroy_memory_pool(void *);
@@ -39,7 +94,7 @@ namespace xcore
 		} while(0)
 
 	/* The  debug functions  only can  be used  when _DEBUG_TLSF_  is set. */
-	#define _DEBUG_TLSF_  (1)
+	// #define _DEBUG_TLSF_  (1)
 
 
 	/*************************************************************************/
@@ -821,87 +876,80 @@ namespace xcore
 
 	#endif
 
-	void*				xmem_heap_base::__alloc(xsize_t bytes)
-	{
-		return malloc_ex(bytes, mPool);
-	}
 
-	void*				xmem_heap_base::__allocA(xsize_t alignment, xsize_t size)
+	class x_allocator_tlsf : public x_iallocator
 	{
-		return 0;
-	}
+		void*				mPool;
+		xsize_t				mPoolSize;
+		Callback			mOutOfMemoryCallback;
 
-	void*				xmem_heap_base::__allocR(void* ptr, xsize_t size)
-	{
-		return realloc_ex(ptr, size, mPool);
-
-	}
-
-	void*				xmem_heap_base::__allocN(xsize_t n_elements, xsize_t element_size)
-	{
-		return calloc_ex(n_elements, element_size, mPool);
-	}
-
-	void**				xmem_heap_base::__allocIC(xsize_t n_elements, xsize_t element_size, void** chunks)
-	{
-		for (xsize_t i=0; i<n_elements; ++i)
+	public:
+		~x_allocator_tlsf()
 		{
-			chunks[i] = __alloc(element_size);
+			destroy_memory_pool(mPool);
 		}
-		return chunks;
-	}
-	
-	void**				xmem_heap_base::__allocICO(xsize_t n_elements, xsize_t* element_sizes, void** chunks)
-	{
-		for (xsize_t i=0; i<n_elements; ++i)
+
+		void					init(void* mem, s32 mem_size) 
 		{
-			chunks[i] = __alloc(element_sizes[i]);
+			mOutOfMemoryCallback = NULL;
+			init_memory_pool(mem_size, mem, mPoolSize, mPool);
 		}
-		return chunks;
-	}
 
-	void				xmem_heap_base::__free(void* ptr)
-	{
-		free_ex(ptr, mPool);
-	}
-
-	u32					xmem_heap_base::__usable_size(void* mem)
-	{
-		bhdr_t *b = (bhdr_t *) ((char *) mem - BHDR_OVERHEAD);
-		return (b->size & BLOCK_SIZE);
-	}
-
-	void				xmem_heap_base::__stats(xmem_managed_size& stats)
-	{
-		stats.mCurrentInuseSize = get_used_size(mPool);
-		stats.mMaxSystemSize = get_max_size(mPool);
-		stats.mCurrentSystemSize = stats.mMaxSystemSize - stats.mCurrentInuseSize;
-	}
-
-	void				xmem_heap::__initialize()
-	{
-		mPool = NULL;
-	}
-
-	void				xmem_heap::__destroy()
-	{
-		destroy_memory_pool(mPool);
-		mPool = NULL;
-	}
-
-	void				xmem_heap::__manage(void* mem, xsize_t size)
-	{
-		if (mPool==NULL)
+		virtual void*			allocate(s32 size, s32 alignment)
 		{
-			xsize_t poolSize;
-			init_memory_pool(size, mem, poolSize, mPool);
+			if (alignment <= 8)
+				return malloc_ex(size, mPool);
+
+			return 0;
 		}
-		else
+
+		virtual void*			callocate(s32 nelem, s32 elemsize)
 		{
-			add_new_area(mem, size, mPool);
+			return calloc_ex(nelem, elemsize, mPool);
 		}
+
+		virtual void*			reallocate(void* ptr, s32 size, s32 alignment)
+		{
+			if (alignment <= 8)
+				return realloc_ex(ptr, size, mPool);
+
+			return 0;
+		}
+
+		virtual void			deallocate(void* ptr)
+		{
+			free_ex(ptr, mPool);
+		}
+
+		virtual u32				usable_size(void *ptr)
+		{
+			bhdr_t *b = (bhdr_t *) ((char *) ptr - BHDR_OVERHEAD);
+			return (b->size & BLOCK_SIZE);
+		}
+
+		virtual void			set_out_of_memory_callback(Callback user_callback)
+		{
+			mOutOfMemoryCallback = user_callback;
+		}
+
+		void					stats(xmem_managed_size& stats)
+		{
+			stats.mCurrentInuseSize = get_used_size(mPool);
+			stats.mMaxSystemSize = get_max_size(mPool);
+			stats.mCurrentSystemSize = stats.mMaxSystemSize - stats.mCurrentInuseSize;
+		}
+	};
+
+	x_iallocator*		gCreateTlsfAllocator(void* mem, s32 memsize)
+	{
+		x_allocator_tlsf* allocator = (x_allocator_tlsf*)mem;
+		
+		s32 allocator_class_size = ((sizeof(x_allocator_tlsf) + (8-1)) & ~(8-1)) + 8;
+		mem = (void*)((u32)mem + allocator_class_size);
+
+		allocator->init(mem, memsize - allocator_class_size);
+		return allocator;
 	}
 
 };	///< namespace xcore
 
-#endif
