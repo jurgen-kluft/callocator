@@ -110,6 +110,10 @@ namespace xcore
 		virtual void			release()
 		{
 		}
+
+		void*					operator new(u32 num_bytes, void* mem)		{ return mem; }
+		void					operator delete(void* pMem, void* ) { }
+
 	};
 
 	x_iallocator*		gCreateSystemAllocator()
@@ -125,7 +129,7 @@ namespace xcore
 			arenaLo = (void*)((u32)arenaLo + (u32)allocator_class_size);
 			OSSetMEM1ArenaLo(arenaLo);
 
-			x_allocator_wii_system* allocator = (x_allocator_wii_system*)mem;
+			x_allocator_wii_system* allocator = new (mem) x_allocator_wii_system();
 			if (allocator->init() == xTRUE)
 				return allocator;
 		}

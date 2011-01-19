@@ -932,6 +932,10 @@ namespace xcore
 			stats.mMaxSystemSize = get_max_size(mPool);
 			stats.mCurrentSystemSize = stats.mMaxSystemSize - stats.mCurrentInuseSize;
 		}
+
+		void*					operator new(u32 num_bytes, void* mem)		{ return mem; }
+		void					operator delete(void* pMem, void* ) { }
+
 	protected:
 		~x_allocator_tlsf()
 		{
@@ -941,7 +945,7 @@ namespace xcore
 
 	x_iallocator*		gCreateTlsfAllocator(void* mem, s32 memsize)
 	{
-		x_allocator_tlsf* allocator = (x_allocator_tlsf*)mem;
+		x_allocator_tlsf* allocator = new (mem) x_allocator_tlsf();
 		
 		s32 allocator_class_size = x_intu::ceilPower2(sizeof(x_allocator_tlsf));
 		mem = (void*)((u32)mem + allocator_class_size);

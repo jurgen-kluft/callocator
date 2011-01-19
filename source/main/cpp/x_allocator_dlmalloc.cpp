@@ -2647,6 +2647,11 @@ namespace xcore
 			mDlMallocHeap.__stats(stats);
 		}
 
+		
+		void*					operator new(u32 num_bytes, void* mem)		{ return mem; }
+		void					operator delete(void* pMem, void* ) { }
+
+
 	protected:
 		~x_allocator_dlmalloc()
 		{
@@ -2656,7 +2661,7 @@ namespace xcore
 
 	x_iallocator*		gCreateDlAllocator(void* mem, s32 memsize)
 	{
-		x_allocator_dlmalloc* allocator = (x_allocator_dlmalloc*)mem;
+		x_allocator_dlmalloc* allocator = new (mem) x_allocator_dlmalloc();
 
 		s32 allocator_class_size = x_intu::ceilPower2(sizeof(x_allocator_dlmalloc));
 		mem = (void*)((u32)mem + allocator_class_size);

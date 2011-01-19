@@ -17,11 +17,6 @@ namespace xcore
 			mDefaultAlignment = 4;
 		}
 
-		void*			operator new(u32 num_bytes, void* mem)
-		{
-			return mem;
-		}
-
 		virtual void*			allocate(s32 size, s32 alignment)
 		{
 			void* mem = _aligned_malloc(size, alignment);
@@ -50,7 +45,10 @@ namespace xcore
 			_aligned_free(this);
 		}
 
-		s32								mDefaultAlignment;
+		void*					operator new(u32 num_bytes, void* mem)		{ return mem; }
+		void					operator delete(void* pMem, void* ) { }
+
+		s32						mDefaultAlignment;
 	};
 
 	x_iallocator*		gCreateSystemAllocator()
