@@ -2613,11 +2613,6 @@ namespace xcore
 		Callback			mOutOfMemoryCallback;
 
 	public:
-		~x_allocator_dlmalloc()
-		{
-			mDlMallocHeap.__destroy();
-		}
-
 		void					init(void* mem, s32 mem_size) 
 		{
 			mOutOfMemoryCallback = NULL;
@@ -2661,17 +2656,28 @@ namespace xcore
 			mOutOfMemoryCallback = user_callback;
 		}
 
+		virtual void			release()
+		{
+			mDlMallocHeap.__destroy();
+			mOutOfMemoryCallback = NULL;
+		}
+
 		void					stats(xmem_managed_size& stats)
 		{
 			mDlMallocHeap.__stats(stats);
 		}
+	protected:
+		~x_allocator_dlmalloc()
+		{
+		}
+
 	};
 
 	x_iallocator*		gCreateDlAllocator(void* mem, s32 memsize)
 	{
 		x_allocator_dlmalloc* allocator = (x_allocator_dlmalloc*)mem;
-		
-		s32 allocator_class_size = ((sizeof(x_allocator_dlmalloc) + (8-1)) & ~(8-1)) + 8;
+
+		s32 allocator_class_size = x_intu::ceilPower2(sizeof(x_allocator_dlmalloc));
 		mem = (void*)((u32)mem + allocator_class_size);
 
 		allocator->init(mem, memsize - allocator_class_size);

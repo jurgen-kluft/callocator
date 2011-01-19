@@ -29,17 +29,20 @@ namespace xcore
 	class x_iallocator
 	{
 	public:
-		virtual					~x_iallocator() {}
+		virtual void*			allocate(s32 size, s32 align) = 0;				///< Allocate memory with alignment
+		virtual void*			callocate(s32 n_e, s32 e_size) = 0;				///< Specialized element allocator
+		virtual void*			reallocate(void* p, s32 size, s32 align) = 0;	///< Reallocate memory
+		virtual void			deallocate(void* p) = 0;						///< Deallocate/Free memory
 
-		virtual void*			allocate(s32 size, s32 alignment) = 0;
-		virtual void*			callocate(s32 nelem, s32 elemsize) = 0;
-		virtual void*			reallocate(void* ptr, s32 size, s32 alignment) = 0;
-		virtual void			deallocate(void* ptr) = 0;
-
-		virtual u32				usable_size(void *ptr) = 0;
+		virtual u32				usable_size(void *p) = 0;						///< Obtain the real size of the allocated block
 
 		typedef void			(*Callback)(void);
-		virtual void			set_out_of_memory_callback(Callback user_callback) = 0;
+		virtual void			set_out_of_memory_callback(Callback cb) = 0;	///< Callback that will be invoked when memory allocation failed
+
+		virtual void			release() = 0;									///< Release/Destruct this allocator
+
+	protected:
+		virtual					~x_iallocator() {}
 	};
 
 

@@ -884,11 +884,6 @@ namespace xcore
 		Callback			mOutOfMemoryCallback;
 
 	public:
-		~x_allocator_tlsf()
-		{
-			destroy_memory_pool(mPool);
-		}
-
 		void					init(void* mem, s32 mem_size) 
 		{
 			mOutOfMemoryCallback = NULL;
@@ -927,6 +922,14 @@ namespace xcore
 			return (b->size & BLOCK_SIZE);
 		}
 
+		virtual void			release()
+		{
+			destroy_memory_pool(mPool);
+			mPool = NULL;
+			mPoolSize = 0;
+			mOutOfMemoryCallback = NULL;
+		}
+
 		virtual void			set_out_of_memory_callback(Callback user_callback)
 		{
 			mOutOfMemoryCallback = user_callback;
@@ -938,13 +941,18 @@ namespace xcore
 			stats.mMaxSystemSize = get_max_size(mPool);
 			stats.mCurrentSystemSize = stats.mMaxSystemSize - stats.mCurrentInuseSize;
 		}
+	protected:
+		~x_allocator_tlsf()
+		{
+		}
+
 	};
 
 	x_iallocator*		gCreateTlsfAllocator(void* mem, s32 memsize)
 	{
 		x_allocator_tlsf* allocator = (x_allocator_tlsf*)mem;
 		
-		s32 allocator_class_size = ((sizeof(x_allocator_tlsf) + (8-1)) & ~(8-1)) + 8;
+		s32 allocator_class_size = x_intu::ceilPower2(sizeof(x_allocator_tlsf));
 		mem = (void*)((u32)mem + allocator_class_size);
 
 		allocator->init(mem, memsize - allocator_class_size);
