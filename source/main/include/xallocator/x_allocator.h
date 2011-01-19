@@ -34,17 +34,11 @@ namespace xcore
 		virtual void*			reallocate(void* p, s32 size, s32 align) = 0;	///< Reallocate memory
 		virtual void			deallocate(void* p) = 0;						///< Deallocate/Free memory
 
-		virtual u32				usable_size(void *p) = 0;						///< Obtain the real size of the allocated block
-
-		typedef void			(*Callback)(void);
-		virtual void			set_out_of_memory_callback(Callback cb) = 0;	///< Callback that will be invoked when memory allocation failed
-
 		virtual void			release() = 0;									///< Release/Destruct this allocator
 
 	protected:
 		virtual					~x_iallocator() {}
 	};
-
 
 	//==============================================================================
 	// END xCore namespace

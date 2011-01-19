@@ -9,7 +9,7 @@ namespace xcore
 	class x_allocator_ps3_system : public x_iallocator
 	{
 	public:
-		x_allocator_ps3_system() : mOutOfMemoryCallback(NULL)
+		x_allocator_ps3_system() 
 		{
 		}
 
@@ -31,18 +31,6 @@ namespace xcore
 		virtual void			deallocate(void* ptr)
 		{
 		}
-
-		virtual u32				usable_size(void *ptr)
-		{
-			return 0;
-		}
-
-		virtual void			set_out_of_memory_callback(Callback user_callback)
-		{
-			mOutOfMemoryCallback = user_callback;
-		}
-
-		Callback				mOutOfMemoryCallback;
 	};
 
 	x_iallocator*		gCreateSystemAllocator()

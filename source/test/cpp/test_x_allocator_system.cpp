@@ -40,13 +40,6 @@ UNITTEST_SUITE_BEGIN(x_allocator_system)
 			gSystemAllocator->deallocate(mem);
         }
 
-        UNITTEST_TEST(usable_size)
-        {
-			void* mem = gSystemAllocator->allocate(512, 8);
-			s32 usable_size = gSystemAllocator->usable_size(mem);
-			CHECK_TRUE(usable_size >= 512);
-			gSystemAllocator->deallocate(mem);
-        }
 	}
 }
 UNITTEST_SUITE_END

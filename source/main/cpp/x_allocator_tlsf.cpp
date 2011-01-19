@@ -881,12 +881,9 @@ namespace xcore
 	{
 		void*				mPool;
 		xsize_t				mPoolSize;
-		Callback			mOutOfMemoryCallback;
-
 	public:
 		void					init(void* mem, s32 mem_size) 
 		{
-			mOutOfMemoryCallback = NULL;
 			init_memory_pool(mem_size, mem, mPoolSize, mPool);
 		}
 
@@ -927,12 +924,6 @@ namespace xcore
 			destroy_memory_pool(mPool);
 			mPool = NULL;
 			mPoolSize = 0;
-			mOutOfMemoryCallback = NULL;
-		}
-
-		virtual void			set_out_of_memory_callback(Callback user_callback)
-		{
-			mOutOfMemoryCallback = user_callback;
 		}
 
 		void					stats(xmem_managed_size& stats)

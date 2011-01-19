@@ -16,7 +16,6 @@ namespace xcore
 	public:
 		x_allocator_wii_system() 
 			: mDefaultAlignment(4)
-			, mOutOfMemoryCallback(NULL)
 		{
 		}
 
@@ -54,9 +53,6 @@ namespace xcore
 		struct header
 		{
 			void*	real_ptr;
-			u32		real_size;
-			u32		requested_size;
-			u32		requested_alignment;
 		};
 
 		static u32				recalc_size(s32 size, s32 alignment)
@@ -111,24 +107,9 @@ namespace xcore
 			MEMFreeToAllocator(mMem2Allocator, _header->real_ptr);
 		}
 
-		virtual u32				usable_size(void *ptr)
-		{
-			header* _header = get_header(ptr);
-			return _header->requested_size;
-		}
-
 		virtual void			release()
 		{
-
-			mOutOfMemoryCallback = NULL;
 		}
-
-		virtual void			set_out_of_memory_callback(Callback user_callback)
-		{
-			mOutOfMemoryCallback = user_callback;
-		}
-
-		Callback				mOutOfMemoryCallback;
 	};
 
 	x_iallocator*		gCreateSystemAllocator()

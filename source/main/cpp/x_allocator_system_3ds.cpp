@@ -8,7 +8,7 @@ namespace xcore
 	class x_allocator_3ds_system : public x_iallocator
 	{
 	public:
-		x_allocator_3ds_system() : mOutOfMemoryCallback(NULL)
+		x_allocator_3ds_system() 
 		{
 		}
 
@@ -31,17 +31,6 @@ namespace xcore
 		{
 		}
 
-		virtual u32				usable_size(void *ptr)
-		{
-			return 0;
-		}
-
-		virtual void			set_out_of_memory_callback(Callback user_callback)
-		{
-			mOutOfMemoryCallback = user_callback;
-		}
-
-		Callback				mOutOfMemoryCallback;
 	};
 
 	x_iallocator*		gCreateSystemAllocator()

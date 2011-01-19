@@ -177,9 +177,6 @@ namespace xcore
 
 	#define MALLOC_ALIGNMENT								((xsize_t) X_MEMALIGN )
 
-	/// TODO: These should be callbacks!!!!
-	#define OUT_OF_MEMORY()									FatalError()
-
 	#define DEFAULT_GRANULARITY								((xsize_t)64U * (xsize_t)1024U)
 
 	#define DLMALLOC_VERSION								20804
@@ -194,11 +191,6 @@ namespace xcore
 	#ifndef PROCEED_ON_ERROR
 		#define PROCEED_ON_ERROR							0
 	#endif  /* PROCEED_ON_ERROR */
-
-	#ifndef MALLOC_FAILURE_ACTION
-		/// TODO: These should be callbacks!!!!
-		#define MALLOC_FAILURE_ACTION						FatalError()
-	#endif  /* MALLOC_FAILURE_ACTION */
 
 	#define MAX_RELEASE_CHECK_RATE							256
 
@@ -1720,7 +1712,6 @@ namespace xcore
 	{
 		if (bytes >= MAX_REQUEST)
 		{
-			MALLOC_FAILURE_ACTION;
 			return 0;
 		}
 
@@ -1830,7 +1821,8 @@ namespace xcore
 		{
 			if (m != 0)
 			{	/* Test isn't needed but avoids compiler warning */
-				MALLOC_FAILURE_ACTION;
+				// MALLOC_FAILURE_ACTION;
+				return NULL;
 			}
 		}
 		else
@@ -2132,7 +2124,8 @@ namespace xcore
 			else if (bytes >= MAX_REQUEST)
 			{
 				/* Too big to allocate. Force failure (in sys alloc) */
-				FatalError();
+				// FatalError();
+				return NULL;
 			}
 			else 
 			{
@@ -2602,20 +2595,13 @@ namespace xcore
 
 
 
-
-
-
-
-
 	class x_allocator_dlmalloc : public x_iallocator
 	{
 		xmem_heap			mDlMallocHeap;
-		Callback			mOutOfMemoryCallback;
 
 	public:
 		void					init(void* mem, s32 mem_size) 
 		{
-			mOutOfMemoryCallback = NULL;
 			mDlMallocHeap.__initialize();
 			mDlMallocHeap.__manage(mem, mem_size);
 		}
@@ -2651,21 +2637,16 @@ namespace xcore
 			return mDlMallocHeap.__usable_size(ptr);
 		}
 
-		virtual void			set_out_of_memory_callback(Callback user_callback)
-		{
-			mOutOfMemoryCallback = user_callback;
-		}
-
 		virtual void			release()
 		{
 			mDlMallocHeap.__destroy();
-			mOutOfMemoryCallback = NULL;
 		}
 
 		void					stats(xmem_managed_size& stats)
 		{
 			mDlMallocHeap.__stats(stats);
 		}
+
 	protected:
 		~x_allocator_dlmalloc()
 		{
