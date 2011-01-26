@@ -3,6 +3,7 @@
 #include "xbase\x_debug.h"
 #include "xbase\x_integer.h"
 #include "xbase\x_memory_std.h"
+#include "xbase\x_allocator.h"
 
 #include "xallocator\x_allocator.h"
 
@@ -882,6 +883,12 @@ namespace xcore
 		void*				mPool;
 		xsize_t				mPoolSize;
 	public:
+
+		virtual const char*		name() const
+		{
+			return "tlsf allocator";
+		}
+
 		void					init(void* mem, s32 mem_size) 
 		{
 			init_memory_pool(mem_size, mem, mPoolSize, mPool);

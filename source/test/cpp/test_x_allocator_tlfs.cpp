@@ -1,15 +1,18 @@
 #include "xbase\x_types.h"
+#include "xbase\x_allocator.h"
 #include "xallocator\x_allocator.h"
 
 #include "xunittest\xunittest.h"
 
 using namespace xcore;
 
+extern x_iallocator* gUnitTestAllocator;
+
+
 UNITTEST_SUITE_BEGIN(x_allocator_tlfs)
 {
     UNITTEST_FIXTURE(main)
     {
-		x_iallocator*	gSystemAllocator;
 
 		void*			gBlock;
 		s32				gBlockSize;
@@ -17,16 +20,15 @@ UNITTEST_SUITE_BEGIN(x_allocator_tlfs)
 
         UNITTEST_FIXTURE_SETUP()
 		{
-			gSystemAllocator = gCreateSystemAllocator();
 			gBlockSize = 128 * 1024;
-			gBlock = gSystemAllocator->allocate(gBlockSize, 8);
+			gBlock = gUnitTestAllocator->allocate(gBlockSize, 8);
 			gCustomAllocator = gCreateDlAllocator(gBlock, gBlockSize);
 		}
 
         UNITTEST_FIXTURE_TEARDOWN()
 		{
 			gCustomAllocator->release();
-			gSystemAllocator->deallocate(gBlock);
+			gUnitTestAllocator->deallocate(gBlock);
 			gBlock = NULL;
 			gBlockSize = 0;
 		}

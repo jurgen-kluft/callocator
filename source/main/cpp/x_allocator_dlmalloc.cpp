@@ -2,6 +2,7 @@
 #include "xbase\x_types.h"
 #include "xbase\x_integer.h"
 #include "xbase\x_memory_std.h"
+#include "xbase\x_allocator.h"
 
 #include "xallocator\x_allocator.h"
 
@@ -2600,6 +2601,12 @@ namespace xcore
 		xmem_heap			mDlMallocHeap;
 
 	public:
+
+		virtual const char*		name() const
+		{
+			return "dlmalloc allocator";
+		}
+
 		void					init(void* mem, s32 mem_size) 
 		{
 			mDlMallocHeap.__initialize();
