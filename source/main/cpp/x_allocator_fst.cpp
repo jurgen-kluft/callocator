@@ -1,4 +1,5 @@
 #include "xbase\x_target.h"
+#include "xbase\x_types.h"
 #include "xbase\x_debug.h"
 #include "xbase\x_memory_std.h"
 #include "xbase\x_integer.h"
@@ -114,8 +115,8 @@ namespace xcore
 		u32						getTotalCapacity() const;
 
 		///@name	Placement new/delete
-		void*					operator new(u32 num_bytes, void* mem)		{ return mem; }
-		void					operator delete(void* pMem, void* )			{ }
+		void*					operator new(xsize_t num_bytes, void* mem)		{ return mem; }
+		//void					operator delete(void* pMem, void* )			{ }
 
 	protected:
 		///@name	Grows memory pool by blockSize * blockCount

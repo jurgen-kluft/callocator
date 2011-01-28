@@ -11,101 +11,69 @@ UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_dlmalloc);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_tlfs);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_fst);
 
-class unittest_allocator : public x_iallocator
+
+x_iallocator* gUnitTestAllocator = NULL;
+
+
+class UnitTestAllocator : public UnitTest::Allocator
 {
 public:
-	unittest_allocator(x_iallocator* allocator)
-		: mAllocator(allocator)
-		, mNumAllocations(0)
+	xcore::x_iallocator*	mAllocator;
+	int						mNumAllocations;
+
+	UnitTestAllocator(xcore::x_iallocator* allocator)
+		: mNumAllocations(0)
 	{
+		mAllocator = allocator;
 	}
 
-	x_iallocator*		mAllocator;
-	int					mNumAllocations;
-
-	virtual const char*		name() const
-	{
-		return "unittest allocator";
-	}
-
-	virtual void*			allocate(s32 size, s32 alignment)
+	void*	Allocate(int size)
 	{
 		++mNumAllocations;
-		return mAllocator->allocate(size, alignment);
+		return mAllocator->allocate(size, 4);
 	}
-
-	virtual void*			callocate(s32 nelem, s32 elemsize)
-	{
-		++mNumAllocations;
-		return mAllocator->callocate(nelem, elemsize);
-	}
-
-	virtual void*			reallocate(void* ptr, s32 size, s32 alignment)
-	{
-		return mAllocator->reallocate(ptr, size, alignment);
-	}
-
-	virtual void			deallocate(void* ptr)
+	void	Deallocate(void* ptr)
 	{
 		--mNumAllocations;
-		return mAllocator->deallocate(ptr);
-	}
-
-	virtual void			release()
-	{
-		
+		mAllocator->deallocate(ptr);
 	}
 };
 
-static x_iallocator* gSystemAllocator;
-x_iallocator* gUnitTestAllocator;
 
-static UnitTest::TestReporter* gUnitTestReporter;
-static xbool sHasMemoryLeaks = xFALSE;
-
-void*	UnitTest::Allocate(int size)
+class UnitTestObserver : public UnitTest::Observer
 {
-	return gSystemAllocator->allocate(size + 10000, 4);
-}
-
-void	UnitTest::Deallocate(void* ptr)
-{
-	gSystemAllocator->deallocate(ptr);
-}
-
-static const char* sTestFilename;
-static const char* sTestSuiteName;
-static const char* sTestFixtureName;
-void	UnitTest::BeginFixture(const char* filename, const char* suite_name, const char* fixture_name)
-{
-	sTestFilename    = filename;
-	sTestSuiteName   = suite_name;
-	sTestFixtureName = fixture_name;
-}
-void	UnitTest::EndFixture()
-{
-	if (((unittest_allocator*)gUnitTestAllocator)->mNumAllocations!=0)
+public:
+	void	BeginFixture(const char* filename, const char* suite_name, const char* fixture_name)
 	{
-		sHasMemoryLeaks = xTRUE;
-		gUnitTestReporter->reportFailure(sTestFilename, 0, sTestFixtureName, "memory leaks detected!");
 	}
-}
+	void	EndFixture()
+	{
+	}
+};
+
 
 int main(int argc, char** argv)
 {
-	gSystemAllocator = gCreateSystemAllocator();
-	unittest_allocator allocator(gSystemAllocator);
-	gUnitTestAllocator = &allocator;
+	xcore::x_iallocator* systemAllocator = xcore::gCreateSystemAllocator();
+		
+	UnitTestAllocator unittestAllocator( systemAllocator );
+	UnitTestObserver unittestObserver;
+	UnitTest::SetAllocator(&unittestAllocator);
+	UnitTest::SetObserver(&unittestObserver);
+
+	gUnitTestAllocator = systemAllocator;
 
 	UnitTest::TestReporterStdout stdout_reporter;
 	UnitTest::TestReporter& reporter = stdout_reporter;
-	gUnitTestReporter = &reporter;
+
 	int r = UNITTEST_SUITE_RUN(reporter, xAllocatorUnitTest);
-	if (sHasMemoryLeaks)
+	if (unittestAllocator.mNumAllocations!=0)
+	{
+		reporter.reportFailure(__FILE__, __LINE__, __FUNCTION__, "memory leaks detected!");
 		r = -1;
+	}
 
-	gUnitTestReporter = NULL;
-
-	gSystemAllocator->release();
+	gUnitTestAllocator = NULL;
+	systemAllocator->release();
 	return r;
 }

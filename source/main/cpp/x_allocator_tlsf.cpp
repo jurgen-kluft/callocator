@@ -152,6 +152,11 @@ namespace xcore
 		# endif
 	#endif
 
+	#ifdef TARGET_WII
+		#undef ERROR_MSG
+		#define ERROR_MSG
+	#endif
+
 	typedef struct free_ptr_struct
 	{
 		struct bhdr_struct *prev;
@@ -216,8 +221,6 @@ namespace xcore
 	static void MAPPING_INSERT(xsize_t _r, s32 *_fl, s32 *_sl);
 	static bhdr_t *FIND_SUITABLE_BLOCK(tlsf_t * _tlsf, s32 *_fl, s32 *_sl);
 	static bhdr_t *process_area(void *area, xsize_t size);
-
-	static void *get_new_area(xsize_t * size);
 
 	static const s32 table[] =
 	{
@@ -552,22 +555,6 @@ namespace xcore
 		/* Searching a free block, recall that this function changes the values of fl and sl,
 		   so they are not longer valid when the function fails */
 		b = FIND_SUITABLE_BLOCK(tlsf, &fl, &sl);
-
-	#if USE_MMAP || USE_SBRK
-		if (!b)
-		{
-			xsize_t area_size;
-			void *area;															/* Growing the pool size when needed */
-			area_size = size + BHDR_OVERHEAD * 8;								/* size plus enough room for the requered headers. */
-			area_size = (area_size > DEFAULT_AREA_SIZE) ? area_size : DEFAULT_AREA_SIZE;
-			area = get_new_area(&area_size);									/* Call sbrk or mmap */
-			if (area == ((void *) ~0))
-				return NULL;													/* Not enough system memory */
-			add_new_area(area, area_size, mem_pool);
-			MAPPING_SEARCH(&size, &fl, &sl);									/* Rounding up the requested size and calculating fl and sl */
-			b = FIND_SUITABLE_BLOCK(tlsf, &fl, &sl);							/* Searching a free block */
-		}
-	#endif
 
 		if (!b)
 			return NULL;														/* Not found */
@@ -940,8 +927,8 @@ namespace xcore
 			stats.mCurrentSystemSize = stats.mMaxSystemSize - stats.mCurrentInuseSize;
 		}
 
-		void*					operator new(u32 num_bytes, void* mem)		{ return mem; }
-		void					operator delete(void* pMem, void* ) { }
+		void*					operator new(xsize_t num_bytes, void* mem)		{ return mem; }
+		//void					operator delete(void* pMem, void* ) { }
 
 	protected:
 		~x_allocator_tlsf()

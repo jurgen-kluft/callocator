@@ -6,6 +6,12 @@
 
 #include "xallocator\x_allocator.h"
 
+#ifdef TARGET_PS3
+#pragma diag_suppress=no_corresponding_delete
+//#pragma diag_warning=no_corresponding_delete
+//#pragma diag_error=no_corresponding_delete
+#endif
+
 namespace xcore
 {
 	struct malloc_chunk
@@ -2654,16 +2660,10 @@ namespace xcore
 			mDlMallocHeap.__stats(stats);
 		}
 
-		
-		void*					operator new(u32 num_bytes, void* mem)		{ return mem; }
-		void					operator delete(void* pMem, void* ) { }
-
-
-	protected:
-		~x_allocator_dlmalloc()
+		void* operator new (xsize_t size, void* mem)
 		{
+			return mem; 
 		}
-
 	};
 
 	x_iallocator*		gCreateDlAllocator(void* mem, s32 memsize)
@@ -2679,3 +2679,8 @@ namespace xcore
 
 };	///< namespace xcore
 
+#ifdef TARGET_PS3
+//#pragma diag_suppress=no_corresponding_delete
+#pragma diag_warning=no_corresponding_delete
+//#pragma diag_error=no_corresponding_delete
+#endif
