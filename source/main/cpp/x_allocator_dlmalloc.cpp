@@ -2660,10 +2660,10 @@ namespace xcore
 			mDlMallocHeap.__stats(stats);
 		}
 
-		void* operator new (xsize_t size, void* mem)
-		{
-			return mem; 
-		}
+		void*					operator new(xsize_t num_bytes)					{ return NULL; }
+		void*					operator new(xsize_t num_bytes, void* mem)		{ return mem; }
+		void					operator delete(void* pMem)						{ }
+		void					operator delete(void* pMem, void* )				{ }
 	};
 
 	x_iallocator*		gCreateDlAllocator(void* mem, s32 memsize)

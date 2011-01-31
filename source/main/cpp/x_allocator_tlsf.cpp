@@ -927,8 +927,10 @@ namespace xcore
 			stats.mCurrentSystemSize = stats.mMaxSystemSize - stats.mCurrentInuseSize;
 		}
 
+		void*					operator new(xsize_t num_bytes)					{ return NULL; }
 		void*					operator new(xsize_t num_bytes, void* mem)		{ return mem; }
-		//void					operator delete(void* pMem, void* ) { }
+		void					operator delete(void* pMem)						{ }
+		void					operator delete(void* pMem, void* )				{ }
 
 	protected:
 		~x_allocator_tlsf()

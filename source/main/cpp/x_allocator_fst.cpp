@@ -115,8 +115,10 @@ namespace xcore
 		u32						getTotalCapacity() const;
 
 		///@name	Placement new/delete
+		void*					operator new(xsize_t num_bytes)					{ return NULL; }
 		void*					operator new(xsize_t num_bytes, void* mem)		{ return mem; }
-		//void					operator delete(void* pMem, void* )			{ }
+		void					operator delete(void* pMem)						{ }
+		void					operator delete(void* pMem, void* )				{ }
 
 	protected:
 		///@name	Grows memory pool by blockSize * blockCount
