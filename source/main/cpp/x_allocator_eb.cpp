@@ -24,22 +24,28 @@ namespace xcore
 		void*			address;	// offset to the begin address
 		u32				size;
 		xbool			isFree;
-		vram_elem*	previous;
-		vram_elem*	next;
+		vram_elem*		previous;
+		vram_elem*		next;
 	};
 
-	class vram_allocator
+	class x_allocator_eb : public x_iallocator
 	{
 	public:
-		vram_allocator();
-		vram_allocator(void* beginAddress, u32 size, x_iallocator* allocator);
-		~vram_allocator();
+		x_allocator_eb();
+		x_allocator_eb(void* beginAddress, u32 size, x_iallocator* allocator);
+		~x_allocator_eb();
+
+		virtual const char*		name() const
+		{
+			return "EB allocator";
+		}
 
 		void			initialize(void* beginAddress, u32 size, x_iallocator* allocator);		
 		void			release();
 		
-		void*			alloc(u32 size, u32 alignment);
-		void*			realloc(void* ptr, u32 size, u32 alignment);
+		void*			alloc(s32 size, s32 alignment);
+		void*			callocate(s32 n_e, s32 e_size);
+		void*			reallocate(void* ptr, s32 size, s32 alignment);
 		void			dealloc(void* ptr);
 
 		u32				getTotalSize()const;
@@ -58,11 +64,11 @@ namespace xcore
 		vram_elem*		getBlock(void* ptr);
 
 		// Copy construction and assignment are forbidden
-		vram_allocator(const vram_allocator&);
-		vram_allocator& operator= (const vram_allocator&);
+		x_allocator_eb(const x_allocator_eb&);
+		x_allocator_eb& operator= (const x_allocator_eb&);
 	};
 
-	vram_allocator::vram_allocator()
+	x_allocator_eb::x_allocator_eb()
 		: mBeginAddress(NULL)
 		, mTotalSize(0)
 		, mFreeSize(0)
@@ -72,7 +78,7 @@ namespace xcore
 
 	}
 
-	vram_allocator::vram_allocator(void* beginAddress, u32 size, x_iallocator* allocator)
+	x_allocator_eb::x_allocator_eb(void* beginAddress, u32 size, x_iallocator* allocator)
 		: mBeginAddress(beginAddress)
 		, mTotalSize(size)
 		, mFreeSize(size)
@@ -82,12 +88,12 @@ namespace xcore
 		initialize(beginAddress, size, allocator);
 	}
 
-	vram_allocator::~vram_allocator()
+	x_allocator_eb::~x_allocator_eb()
 	{
 		release();
 	}
 
-	void vram_allocator::initialize(void* beginAddress, u32 size, x_iallocator* allocator)
+	void x_allocator_eb::initialize(void* beginAddress, u32 size, x_iallocator* allocator)
 	{
 		mBeginAddress = beginAddress;
 		mTotalSize = size;
@@ -100,11 +106,12 @@ namespace xcore
 		mElemListHead = block;
 	}
 
-	void vram_allocator::release()
+	void x_allocator_eb::release()
 	{
 		vram_elem* currentBlock = mElemListHead;
 		while(currentBlock != NULL)
 		{
+			mFreeSize += currentBlock->size;
 			vram_elem* block = currentBlock;
 			if(currentBlock->next != NULL)
 				currentBlock = currentBlock->next;
@@ -112,7 +119,7 @@ namespace xcore
 		}
 	}
 
-	void* vram_allocator::alloc(u32 size, u32 alignment)
+	void* x_allocator_eb::alloc(s32 size, s32 alignment)
 	{
 		vram_elem* sourceBlock = getTheBestFitBlockForAllocation(size, alignment);
 
@@ -166,7 +173,12 @@ namespace xcore
 		return (void*)((u32)(block->address) + (u32)mBeginAddress);
 	}
 
-	void* vram_allocator::realloc(void* ptr, u32 size, u32 alignment)
+	void* x_allocator_eb::callocate(s32 n_e, s32 e_size)
+	{
+		return alloc(n_e*e_size, X_MEMALIGN);
+	}
+
+	void* x_allocator_eb::reallocate(void* ptr, s32 size, s32 alignment)
 	{
 		// Since vmemcpy() have not been implemented yet, we won't use realloc now
 		ASSERT(0);
@@ -231,7 +243,7 @@ namespace xcore
 		return newPtr;
 	}
 
-	void vram_allocator::dealloc(void* ptr)
+	void x_allocator_eb::dealloc(void* ptr)
 	{
 		vram_elem* targetBlock = getBlock(ptr);
 		u32 releasedSize = targetBlock->size;
@@ -272,7 +284,7 @@ namespace xcore
 		mFreeSize += releasedSize;
 	}
 
-	vram_elem* vram_allocator::createNewVramElem(u32 addressOffset, u32 blockSize, xbool isFree)
+	vram_elem* x_allocator_eb::createNewVramElem(u32 addressOffset, u32 blockSize, xbool isFree)
 	{
 		vram_elem* block = static_cast<vram_elem*>(mAllocator->allocate(sizeof(vram_elem),X_MEMALIGN));
 		ASSERT(block != 0);
@@ -282,7 +294,7 @@ namespace xcore
 		return block;
 	}
 
-	vram_elem* vram_allocator::getTheBestFitBlockForAllocation(u32 allocSize, u32 alignment)
+	vram_elem* x_allocator_eb::getTheBestFitBlockForAllocation(u32 allocSize, u32 alignment)
 	{
 		vram_elem* currentBlock = mElemListHead;
 		u32 alignedSize = x_intu::alignUp(allocSize, alignment);
@@ -341,7 +353,7 @@ namespace xcore
 		return bestFitBlock;
 	}
 
-	vram_elem* vram_allocator::getBlock(void* ptr)
+	vram_elem* x_allocator_eb::getBlock(void* ptr)
 	{
 		vram_elem* currentBlock = mElemListHead;
 		u32 offsetAddress = (u32)ptr - (u32)mBeginAddress;
@@ -361,85 +373,26 @@ namespace xcore
 		return NULL;
 	}
 
-	u32 vram_allocator::getTotalSize()const
+	u32 x_allocator_eb::getTotalSize()const
 	{
 		return mTotalSize;
 	}
 
-	u32 vram_allocator::getFreeSize()const
+	u32 x_allocator_eb::getFreeSize()const
 	{
 		return mFreeSize;
 	}
 
-	u32 vram_allocator::getUsedSize()const
+	u32 x_allocator_eb::getUsedSize()const
 	{
 		return mTotalSize - mFreeSize;
 	}
 
 
-	class x_allocator_eb : public x_iallocator
-	{
-		vram_allocator mAllocator;
-
-	public:
-
-		virtual const char*		name() const
-		{
-			return "EB allocator";
-		}
-
-		void					init(void* mem, s32 mem_size, x_iallocator *allocator) 
-		{
-			mAllocator.initialize(mem, mem_size, allocator);
-		}
-
-		virtual void*			allocate(s32 size, s32 alignment)
-		{
-			return mAllocator.alloc(size, alignment);
-		}
-
-		virtual void*			callocate(s32 nelem, s32 elemsize)
-		{
-			return mAllocator.alloc(nelem*elemsize, X_MEMALIGN);
-		}
-
-		virtual void*			reallocate(void* ptr, s32 size, s32 alignment)
-		{
-
-			return mAllocator.realloc(ptr, size, alignment);
-		}
-
-		virtual void			deallocate(void* ptr)
-		{
-			mAllocator.dealloc(ptr);
-		}
-
-		virtual u32				getTotalSize()
-		{
-			return mAllocator.getTotalSize();
-		}
-
-		virtual u32				getFreeSize()
-		{
-			return mAllocator.getFreeSize();
-		}
-
-		virtual u32				getUsedSize()
-		{
-			return mAllocator.getUsedSize();
-		}
-
-		virtual void			release()
-		{
-			mAllocator.release();
-		}
-
-	};
-
 	x_iallocator*		gCreateEbAllocator(void* mem, s32 memsize, x_iallocator *allocator)
 	{
 		x_allocator_eb* ebAllocator = static_cast<x_allocator_eb*>(allocator->allocate(sizeof(x_allocator_eb), X_MEMALIGN));
-		ebAllocator->init(mem, memsize, allocator);
+		ebAllocator->initialize(mem, memsize, allocator);
 
 		return ebAllocator;
 	}
