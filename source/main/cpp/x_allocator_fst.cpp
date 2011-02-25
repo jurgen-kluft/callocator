@@ -113,6 +113,7 @@ namespace xcore
 		s32						getUsedItemCount() const;
 		u32						getCurrentBlockCount() const;
 		u32						getTotalCapacity() const;
+		void					stats(xmem_managed_size& stats);
 
 		///@name	Placement new/delete
 		void*					operator new(xsize_t num_bytes)					{ return NULL; }
@@ -353,6 +354,13 @@ namespace xcore
 	u32		x_allocator_fst::getTotalCapacity() const
 	{
 		return mBlockArraySize * mBlockElemCount;
+	}
+
+	void	x_allocator_fst::stats(xmem_managed_size& stats)
+	{
+		stats.mCurrentInuseSize = mUsedItems * mElemSize;
+		stats.mMaxSystemSize = mBlockArraySize * mBlockElemCount * mElemSize;
+		stats.mCurrentSystemSize = stats.mMaxSystemSize - stats.mCurrentInuseSize;
 	}
 
 	void	x_allocator_fst::release()
