@@ -26,14 +26,20 @@
 	</DirectoryStructure>
 
 	<Content>
-		<Item Src="pom.*" Dst="" />
+		<Item Src="pom.xml" Dst="" Required="True" />
+		<Item Src="pom.props" Dst="" Required="True" />
+		<Item Src="pom.targets" Dst="" Required="True" />
 		<Item Src="source\main\cpp\**\*.cpp" Dst="source\main\cpp\" />
 		<Item Src="source\main\include\**\*.h" Dst="source\main\include\" />
 		<Item Src="source\main\resources\**\*.*" Dst="source\main\resources\" />
 		<Item Src="libs\**\*.*" Dst="libs\" />
 		<Item Src="docs\**\*.*" Dst="docs\" />
 		<Item Src="tools\**\*.*" Dst="Tools\" />
-		<Item Src="target\${Name}\outdir\${Name}_*\${Name}_*_${Platform}.lib" Dst="libs\" />
+		<Item Src="target\${Name}\outdir\${Name}_DevDebug_${Platform}\${Name}_DevDebug_${Platform}.lib" Dst="libs\" Required="True"/>
+		<Item Src="target\${Name}\outdir\${Name}_DevRelease_${Platform}\${Name}_DevRelease_${Platform}.lib" Dst="libs\" Required="True"/>
+		<Item Src="target\${Name}\outdir\${Name}_DevFinal_${Platform}\${Name}_DevFinal_${Platform}.lib" Dst="libs\" Required="True"/>
+		<Item Src="target\${Name}\outdir\${Name}_TestDebug_${Platform}\${Name}_TestDebug_${Platform}.lib" Dst="libs\" Required="True"/>
+		<Item Src="target\${Name}\outdir\${Name}_TestRelease_${Platform}\${Name}_TestRelease_${Platform}.lib" Dst="libs\" Required="True"/>
 	</Content>
 
 	<Dependency Package="xbase">
