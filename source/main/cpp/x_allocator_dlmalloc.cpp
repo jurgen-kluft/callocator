@@ -93,15 +93,6 @@ namespace xcore
 
 	//////////////////////////////////////////////////////////////////////////
 	// A memory heap capable of managing multiple segments (based on dlmalloc)
-	struct xmem_managed_size
-	{
-		xsize_t		mMaxSystemSize;
-		xsize_t		mCurrentSystemSize;
-		xsize_t		mCurrentInuseSize;
-	};
-
-	//////////////////////////////////////////////////////////////////////////
-	// A memory heap capable of managing multiple segments (based on dlmalloc)
 	class xmem_heap_base
 	{
 	protected:
@@ -2655,7 +2646,7 @@ namespace xcore
 			mDlMallocHeap.__destroy();
 		}
 
-		void					stats(xmem_managed_size& stats)
+		virtual void			stats(xmem_managed_size& stats)
 		{
 			mDlMallocHeap.__stats(stats);
 		}

@@ -16,15 +16,6 @@ namespace xcore
 
 	//////////////////////////////////////////////////////////////////////////
 	// A memory heap capable of managing multiple segments (based on dlmalloc)
-	struct xmem_managed_size
-	{
-		xsize_t		mMaxSystemSize;
-		xsize_t		mCurrentSystemSize;
-		xsize_t		mCurrentInuseSize;
-	};
-
-	//////////////////////////////////////////////////////////////////////////
-	// A memory heap capable of managing multiple segments (based on dlmalloc)
 	class xmem_heap_base
 	{
 	protected:
@@ -42,6 +33,7 @@ namespace xcore
 		u32					__usable_size(void* mem);
 		void				__stats(xmem_managed_size& stats);
 	};
+
 
 	//////////////////////////////////////////////////////////////////////////
 	/// xmem_space is an opaque type representing an independent region of space that supports mspace_malloc, etc.
@@ -920,7 +912,7 @@ namespace xcore
 			mPoolSize = 0;
 		}
 
-		void					stats(xmem_managed_size& stats)
+		virtual void			stats(xmem_managed_size& stats)
 		{
 			stats.mCurrentInuseSize = get_used_size(mPool);
 			stats.mMaxSystemSize = get_max_size(mPool);

@@ -10,7 +10,7 @@ UNITTEST_SUITE_LIST(xAllocatorUnitTest);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_dlmalloc);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_tlfs);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_fst);
-
+UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_eb);
 
 x_iallocator* gUnitTestAllocator = NULL;
 

@@ -1,8 +1,9 @@
-
 #include "xbase\x_target.h"
 #include "xbase\x_types.h"
 #include "xbase\x_allocator.h"
 #include "xbase\x_integer.h"
+
+#include "xallocator\x_allocator.h"
 
 namespace xcore
 {
@@ -43,15 +44,16 @@ namespace xcore
 		void			initialize(void* beginAddress, u32 size, x_iallocator* allocator);		
 		void			release();
 		
-		void*			alloc(s32 size, s32 alignment);
-		void*			callocate(s32 n_e, s32 e_size);
-		void*			reallocate(void* ptr, s32 size, s32 alignment);
-		void			dealloc(void* ptr);
+		virtual void*	allocate(s32 size, s32 alignment);
+		virtual void*	callocate(s32 n_e, s32 e_size);
+		virtual void*	reallocate(void* ptr, s32 size, s32 alignment);
+		virtual void	deallocate(void* ptr);
+		virtual void	stats(xmem_managed_size& stats);
 
 		u32				getTotalSize()const;
 		u32				getFreeSize()const;
 		u32				getUsedSize()const;
-
+		
 	private:
 		void*			mBeginAddress;
 		u32				mTotalSize;
@@ -67,6 +69,26 @@ namespace xcore
 		x_allocator_eb(const x_allocator_eb&);
 		x_allocator_eb& operator= (const x_allocator_eb&);
 	};
+
+// 	void x_allocator_eb::outputAllBlockState()
+// 	{
+// 		OutputDebugString("==============allocator states=====================\n");
+// 		char temp[100];
+// 		sprintf(temp, "Total size = %d\n", mTotalSize);
+// 		OutputDebugString(temp);
+// 		sprintf(temp, "Used size = %d\n", mTotalSize - mFreeSize);
+// 		OutputDebugString(temp);
+// 		vram_elem* currentBlock = mElemListHead;
+// 		int i = 0;
+// 		while(currentBlock != NULL)
+// 		{
+// 			sprintf(temp, "Block %d, isFree = %s, address = %10d, size = %d\n", i, currentBlock->isFree?"True ":"False", currentBlock->address, currentBlock->size);
+// 			OutputDebugString(temp);
+// 			currentBlock = currentBlock->next;
+// 			i++;
+// 		}
+// 		OutputDebugString("===================================================\n");
+// 	}
 
 	x_allocator_eb::x_allocator_eb()
 		: mBeginAddress(NULL)
@@ -111,15 +133,19 @@ namespace xcore
 		vram_elem* currentBlock = mElemListHead;
 		while(currentBlock != NULL)
 		{
-			mFreeSize += currentBlock->size;
+			if(!currentBlock->isFree)
+				mFreeSize += currentBlock->size;
 			vram_elem* block = currentBlock;
-			if(currentBlock->next != NULL)
-				currentBlock = currentBlock->next;
+			currentBlock = currentBlock->next;
 			mAllocator->deallocate(block);
 		}
+		ASSERT(mFreeSize == mTotalSize);
+		mElemListHead = NULL;
+		mTotalSize = 0;
+		mFreeSize = 0;
 	}
 
-	void* x_allocator_eb::alloc(s32 size, s32 alignment)
+	void*	x_allocator_eb::allocate(s32 size, s32 alignment)
 	{
 		vram_elem* sourceBlock = getTheBestFitBlockForAllocation(size, alignment);
 
@@ -159,6 +185,12 @@ namespace xcore
 			sourceBlock->previous->next = firstBlock;
 			firstBlock->previous = sourceBlock->previous;
 		}
+		else // sourceBlock is the head of linked list
+		{
+			ASSERT(sourceBlock == mElemListHead);
+			mElemListHead = firstBlock;
+		}
+
 		if(sourceBlock->next != NULL)
 		{
 			sourceBlock->next->previous = lastBlock;
@@ -175,7 +207,7 @@ namespace xcore
 
 	void* x_allocator_eb::callocate(s32 n_e, s32 e_size)
 	{
-		return alloc(n_e*e_size, X_MEMALIGN);
+		return allocate(n_e*e_size, X_MEMALIGN);
 	}
 
 	void* x_allocator_eb::reallocate(void* ptr, s32 size, s32 alignment)
@@ -184,8 +216,9 @@ namespace xcore
 		ASSERT(0);
 		return ptr;
 
+		ASSERT(ptr != NULL);
 		vram_elem* targetBlock = getBlock(ptr);
-		ASSERT(targetBlock != NULL);
+		ASSERT(targetBlock != NULL && !targetBlock->isFree);
 
 		u32 alignedSize = x_intu::alignUp(size, alignment);
 		u32 neededSize = alignedSize - targetBlock->size;
@@ -220,11 +253,14 @@ namespace xcore
 					}
 					mAllocator->deallocate(nextBlock);
 				}
+
+				// update the allocator
+				mFreeSize -= neededSize;
 			}
 			else 
 			{
 				// Allocate a new block for new size
-				newPtr = alloc(size, alignment);
+				newPtr = allocate(size, alignment);
 				void* sourcePtr = (void*)((u32)(targetBlock->address) + (u32)mBeginAddress);
 				
 				// Copy the existing data from old block to the new block.
@@ -232,20 +268,21 @@ namespace xcore
 					//vmemcpy(newPtr, sourcePtr, targetBlock->size);
 
 				// deallocate target block
-				dealloc(sourcePtr);
+				deallocate(sourcePtr);
 
 			} // END IF (nextBlock != NULL && nextBlock->isFree && nextBlock->size >= neededSize)
 		}
-		
-		// update the allocator
-		mFreeSize -= neededSize;
 
 		return newPtr;
 	}
 
-	void x_allocator_eb::dealloc(void* ptr)
+	void x_allocator_eb::deallocate(void* ptr)
 	{
+		ASSERT(ptr != NULL);
+
 		vram_elem* targetBlock = getBlock(ptr);
+		ASSERT(targetBlock != NULL && !targetBlock->isFree);
+
 		u32 releasedSize = targetBlock->size;
 		targetBlock->isFree = xTRUE;
 
@@ -262,6 +299,11 @@ namespace xcore
 			if(prevBlock->previous != NULL)
 			{
 				prevBlock->previous->next = targetBlock;
+			}
+
+			if(prevBlock == mElemListHead)
+			{
+				mElemListHead = targetBlock;
 			}
 
 			mAllocator->deallocate(prevBlock);
@@ -305,7 +347,7 @@ namespace xcore
 
 		while( currentBlock != NULL)
 		{
-			if( currentBlock->isFree)
+			if( currentBlock->isFree && alignedSize<= currentBlock->size )
 			{
 				u32 unalignedAddr = (u32)(currentBlock->address) + (u32)mBeginAddress;
 				u32 alignedAddr = (u32)(x_intu::alignUp(unalignedAddr, alignment));
@@ -314,26 +356,17 @@ namespace xcore
 
 				if (neededSize <= currentBlock->size) // This block has enough room for allocation
 				{
-					u32 blockNum = 3;
+					u32 blockNum = 1;
 					u32 unusedSize = 0;
 
-					// calculate the block numbers and unused size
+					unusedSize += currentBlock->size - alignedSize;
 					if(addrOffset > 0)	// need to create a free block before the allocated block
 					{
-						unusedSize += addrOffset;
+						blockNum+=1;
 					}
-					else				// don't need to create a free block before the allocated block
-					{
-						blockNum -= 1;
-					}
-
 					if( neededSize < currentBlock->size) // need to create a free block after the allocated block
 					{
-						unusedSize += currentBlock->size - neededSize;
-					}
-					else
-					{
-						blockNum -= 1;
+						blockNum+=1;
 					}
 
 					if( (blockNum < bestFitBlockNumber) || (blockNum == bestFitBlockNumber && unusedSize < bestFitUnusedSize))
@@ -349,7 +382,7 @@ namespace xcore
 
 		} // END WHILE
 
-		ASSERT(bestFitBlock != NULL);
+		ASSERT(bestFitBlock != NULL); // Fatal error! Could not find a block for allocation. Out of memory.
 		return bestFitBlock;
 	}
 
@@ -388,11 +421,17 @@ namespace xcore
 		return mTotalSize - mFreeSize;
 	}
 
+	void x_allocator_eb::stats(xmem_managed_size& stats)
+	{
+		stats.mCurrentInuseSize = mTotalSize - mFreeSize;
+		stats.mMaxSystemSize = mTotalSize;
+		stats.mCurrentSystemSize = mFreeSize;
+	}
 
 	x_iallocator*		gCreateEbAllocator(void* mem, s32 memsize, x_iallocator *allocator)
 	{
 		x_allocator_eb* ebAllocator = static_cast<x_allocator_eb*>(allocator->allocate(sizeof(x_allocator_eb), X_MEMALIGN));
-		ebAllocator->initialize(mem, memsize, allocator);
+		ebAllocator->x_allocator_eb::x_allocator_eb(mem, memsize, allocator);
 
 		return ebAllocator;
 	}
