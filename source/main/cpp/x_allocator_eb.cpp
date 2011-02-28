@@ -49,6 +49,7 @@ namespace xcore
 		virtual void*	reallocate(void* ptr, s32 size, s32 alignment);
 		virtual void	deallocate(void* ptr);
 		virtual void	stats(xmem_managed_size& stats);
+		virtual u32		usable_size(void *ptr);
 
 		u32				getTotalSize()const;
 		u32				getFreeSize()const;
@@ -419,6 +420,11 @@ namespace xcore
 	u32 x_allocator_eb::getUsedSize()const
 	{
 		return mTotalSize - mFreeSize;
+	}
+
+	u32	x_allocator_eb::usable_size(void *ptr)
+	{
+		return getBlock(ptr)->size;
 	}
 
 	void x_allocator_eb::stats(xmem_managed_size& stats)
