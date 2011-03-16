@@ -55,6 +55,11 @@ namespace xcore
 		u32				getFreeSize()const;
 		u32				getUsedSize()const;
 		
+		void*					operator new(xsize_t num_bytes)					{ return NULL; }
+		void*					operator new(xsize_t num_bytes, void* mem)		{ return mem; }
+		void					operator delete(void* pMem)						{ }
+		void					operator delete(void* pMem, void* )				{ }
+
 	private:
 		void*			mBeginAddress;
 		u32				mTotalSize;
@@ -436,9 +441,8 @@ namespace xcore
 
 	x_iallocator*		gCreateEbAllocator(void* mem, s32 memsize, x_iallocator *allocator)
 	{
-		x_allocator_eb* ebAllocator = static_cast<x_allocator_eb*>(allocator->allocate(sizeof(x_allocator_eb), X_MEMALIGN));
-		ebAllocator->x_allocator_eb::x_allocator_eb(mem, memsize, allocator);
-
+		void* memForEBallocator = allocator->allocate(sizeof(x_allocator_eb), X_MEMALIGN);
+		x_allocator_eb* ebAllocator = new (mem) x_allocator_eb(mem, memsize, allocator);
 		return ebAllocator;
 	}
 

@@ -227,6 +227,8 @@ namespace xcore
 		#define malloc_getpagesize 65536
 	#elif defined(TARGET_360)
 		#define malloc_getpagesize 65536
+	#elif defined(TARGET_3DS)
+		#define malloc_getpagesize 65536
 	#endif
 
 	/* ------------------- xsize_t and alignment properties -------------------- */

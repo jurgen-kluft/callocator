@@ -357,18 +357,6 @@ namespace xcore
 		return mBlockArraySize * mBlockElemCount;
 	}
 
-	void	x_allocator_fst::stats(xmem_managed_size& stats)
-	{
-		stats.mCurrentInuseSize = mUsedItems * mElemSize;
-		stats.mMaxSystemSize = mBlockArraySize * mBlockElemCount * mElemSize;
-		stats.mCurrentSystemSize = stats.mMaxSystemSize - stats.mCurrentInuseSize;
-	}
-
-	u32		x_allocator_fst::usable_size(void *ptr)
-	{
-		return mElemSize;
-	}
-
 	void	x_allocator_fst::release()
 	{
 		ASSERT(mUsedItems == 0);

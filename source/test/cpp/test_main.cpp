@@ -51,9 +51,14 @@ public:
 	}
 };
 
-
+#ifdef TARGET_3DS
+extern "C" int nnMain()
+{
+#else
 int main(int argc, char** argv)
 {
+#endif
+
 	xcore::x_iallocator* systemAllocator = xcore::gCreateSystemAllocator();
 		
 	UnitTestAllocator unittestAllocator( systemAllocator );
