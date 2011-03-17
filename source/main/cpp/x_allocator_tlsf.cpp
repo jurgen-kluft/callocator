@@ -899,24 +899,11 @@ namespace xcore
 			free_ex(ptr, mPool);
 		}
 
-		virtual u32				usable_size(void *ptr)
-		{
-			bhdr_t *b = (bhdr_t *) ((char *) ptr - BHDR_OVERHEAD);
-			return (b->size & BLOCK_SIZE);
-		}
-
 		virtual void			release()
 		{
 			destroy_memory_pool(mPool);
 			mPool = NULL;
 			mPoolSize = 0;
-		}
-
-		virtual void			stats(xmem_managed_size& stats)
-		{
-			stats.mCurrentInuseSize = get_used_size(mPool);
-			stats.mMaxSystemSize = get_max_size(mPool);
-			stats.mCurrentSystemSize = stats.mMaxSystemSize - stats.mCurrentInuseSize;
 		}
 
 		void*					operator new(xsize_t num_bytes)					{ return NULL; }

@@ -2638,19 +2638,9 @@ namespace xcore
 			mDlMallocHeap.__free(ptr);
 		}
 
-		virtual u32				usable_size(void *ptr)
-		{
-			return mDlMallocHeap.__usable_size(ptr);
-		}
-
 		virtual void			release()
 		{
 			mDlMallocHeap.__destroy();
-		}
-
-		virtual void			stats(xmem_managed_size& stats)
-		{
-			mDlMallocHeap.__stats(stats);
 		}
 
 		void*					operator new(xsize_t num_bytes)					{ return NULL; }
