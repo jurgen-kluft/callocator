@@ -426,10 +426,10 @@ namespace xcore
 	}
 
 
-	x_iallocator*		gCreateEbAllocator(void* mem, s32 memsize, x_iallocator *allocator, void** ebMem)
+	x_iallocator*		gCreateEbAllocator(void* mem, s32 memsize, x_iallocator *allocator)
 	{
-		*ebMem = allocator->allocate(sizeof(x_allocator_eb), X_MEMALIGN);
-		x_allocator_eb* ebAllocator = new (*ebMem) x_allocator_eb(mem, memsize, allocator);
+		void* memEBstruct = allocator->allocate(sizeof(x_allocator_eb), X_MEMALIGN);
+		x_allocator_eb* ebAllocator = new (memEBstruct) x_allocator_eb(mem, memsize, allocator);
 		return ebAllocator;
 	}
 
