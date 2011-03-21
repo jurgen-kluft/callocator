@@ -52,6 +52,12 @@ public:
 };
 
 #ifdef TARGET_3DS
+
+s32 gGetHeapMemorySize()
+{
+	return 40*1024*1024;
+}
+
 extern "C" int nnMain()
 {
 #else
