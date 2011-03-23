@@ -134,19 +134,7 @@ namespace xcore
 
 	void x_allocator_eb::release()
 	{
-		vram_elem* currentBlock = mElemListHead;
-		while(currentBlock != NULL)
-		{
-			if(!currentBlock->isFree)
-				mFreeSize += currentBlock->size;
-			vram_elem* block = currentBlock;
-			currentBlock = currentBlock->next;
-			mAllocator->deallocate(block);
-		}
-		ASSERT(mFreeSize == mTotalSize);
-		mElemListHead = NULL;
-		mTotalSize = 0;
-		mFreeSize = 0;
+		mAllocator->deallocate(this);
 	}
 
 	void*	x_allocator_eb::allocate(s32 size, s32 alignment)
