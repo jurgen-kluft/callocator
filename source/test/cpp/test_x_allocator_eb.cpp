@@ -28,7 +28,6 @@ UNITTEST_SUITE_BEGIN(x_allocator_eb)
 		{
 			gCustomAllocator->release();
 			gUnitTestAllocator->deallocate(gBlock);
-			gUnitTestAllocator->deallocate(gCustomAllocator);
 			gBlock = NULL;
 			gBlockSize = 0;
 		}
