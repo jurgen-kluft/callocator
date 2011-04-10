@@ -113,9 +113,7 @@ namespace xcore
 
 		u32					__usable_size(void* mem);
 
-		void				__stats(xmem_managed_size& stats);
 	protected:
-		void				__internal_malloc_stats(xmem_managed_size& stats);
 		void*				__internal_realloc(mstate m, void* oldmem, xsize_t alignment, xsize_t bytes);
 		void*				__internal_memalign(xsize_t alignment, xsize_t bytes);
 		void**				__internal_ic_alloc(xsize_t n_elements, xsize_t* sizes, s32 opts, void* chunks[]);
@@ -1065,48 +1063,48 @@ namespace xcore
 
 	/* ----------------------------- statistics ------------------------------ */
 
-	void xmem_heap_base::__internal_malloc_stats(xmem_managed_size& stats)
-	{
-		mstate m = mState;
-
-		ensure_initialization();
-		if (!PREACTION(m))
-		{
-			xsize_t maxfp = 0;
-			xsize_t fp = 0;
-			xsize_t used = 0;
-			check_malloc_state(m, mParams);
-			if (is_initialized(m))
-			{
-				msegmentptr s = &m->seg;
-				maxfp = m->max_footprint;
-				fp = m->footprint;
-				used = fp - (m->topsize + TOP_FOOT_SIZE);
-
-				while (s != 0)
-				{
-					mchunkptr q = align_as_chunk(s->base);
-					while (segment_holds(s, q) && q != m->top && q->head != FENCEPOST_HEAD)
-					{
-						if (!is_inuse(q))
-							used -= chunksize(q);
-						q = next_chunk(q);
-					}
-					s = s->next;
-				}
-			}
-
-			stats.mCurrentInuseSize = used;
-			stats.mCurrentSystemSize = fp;
-			stats.mMaxSystemSize = maxfp;
+//	void xmem_heap_base::__internal_malloc_stats(xmem_managed_size& stats)
+//	{
+//		mstate m = mState;
+//
+//		ensure_initialization();
+//		if (!PREACTION(m))
+//		{
+//			xsize_t maxfp = 0;
+//			xsize_t fp = 0;
+//			xsize_t used = 0;
+//			check_malloc_state(m, mParams);
+//			if (is_initialized(m))
+//			{
+//				msegmentptr s = &m->seg;
+//				maxfp = m->max_footprint;
+//				fp = m->footprint;
+//				used = fp - (m->topsize + TOP_FOOT_SIZE);
+//
+//				while (s != 0)
+//				{
+//					mchunkptr q = align_as_chunk(s->base);
+//					while (segment_holds(s, q) && q != m->top && q->head != FENCEPOST_HEAD)
+//					{
+//						if (!is_inuse(q))
+//							used -= chunksize(q);
+//						q = next_chunk(q);
+//					}
+//					s = s->next;
+//				}
+//			}
+//
+//			stats.mCurrentInuseSize = used;
+//			stats.mCurrentSystemSize = fp;
+//			stats.mMaxSystemSize = maxfp;
 // 			xconsole::writeLine("max system bytes = %10lu", x_va_list((u32)(maxfp)));
 // 			xconsole::writeLine("system bytes     = %10lu", x_va_list((u32)(fp)));
 // 			xconsole::writeLine("in use bytes     = %10lu", x_va_list((u32)(used)));
-
-			POSTACTION(m);
-		}
-	}
-
+//
+//			POSTACTION(m);
+//		}
+//	}
+//
 	/* ----------------------- Operations on smallbins ----------------------- */
 
 	/*
@@ -2458,18 +2456,18 @@ namespace xcore
 		return result;
 	}
 
-	void xmem_heap_base::__stats(xmem_managed_size& stats)
-	{
-		mstate ms = mState;
-		if (ok_magic(ms))
-		{
-			__internal_malloc_stats(stats);
-		}
-		else
-		{
-			USAGE_ERROR_ACTION(ms,ms);
-		}
-	}
+//	void xmem_heap_base::__stats(xmem_managed_size& stats)
+//	{
+//		mstate ms = mState;
+//		if (ok_magic(ms))
+//		{
+//			__internal_malloc_stats(stats);
+//		}
+//		else
+//		{
+//			USAGE_ERROR_ACTION(ms,ms);
+//		}
+//	}
 
 
 
@@ -2648,10 +2646,10 @@ namespace xcore
 			mDlMallocHeap.__destroy();
 		}
 
-		virtual void			stats(xmem_managed_size& stats)
-		{
-			mDlMallocHeap.__stats(stats);
-		}
+//		virtual void			stats(xmem_managed_size& stats)
+//		{
+//			mDlMallocHeap.__stats(stats);
+//		}
 
 		void*					operator new(xsize_t num_bytes)					{ return NULL; }
 		void*					operator new(xsize_t num_bytes, void* mem)		{ return mem; }

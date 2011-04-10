@@ -31,7 +31,6 @@ namespace xcore
 		void				__free(void* ptr);
 
 		u32					__usable_size(void* mem);
-		void				__stats(xmem_managed_size& stats);
 	};
 
 
@@ -910,13 +909,6 @@ namespace xcore
 			destroy_memory_pool(mPool);
 			mPool = NULL;
 			mPoolSize = 0;
-		}
-
-		virtual void			stats(xmem_managed_size& stats)
-		{
-			stats.mCurrentInuseSize = get_used_size(mPool);
-			stats.mMaxSystemSize = get_max_size(mPool);
-			stats.mCurrentSystemSize = stats.mMaxSystemSize - stats.mCurrentInuseSize;
 		}
 
 		void*					operator new(xsize_t num_bytes)					{ return NULL; }

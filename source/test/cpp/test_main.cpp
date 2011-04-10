@@ -14,7 +14,6 @@ UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_eb);
 
 x_iallocator* gUnitTestAllocator = NULL;
 
-
 class UnitTestAllocator : public UnitTest::Allocator
 {
 public:
@@ -39,37 +38,14 @@ public:
 	}
 };
 
-
-class UnitTestObserver : public UnitTest::Observer
+bool gRunUnitTest(UnitTest::TestReporter& reporter)
 {
-public:
-	void	BeginFixture(const char* filename, const char* suite_name, const char* fixture_name)
-	{
-	}
-	void	EndFixture()
-	{
-	}
-};
-
-#ifdef TARGET_3DS
-extern "C" int nnMain()
-{
-#else
-int main(int argc, char** argv)
-{
-#endif
-
 	xcore::x_iallocator* systemAllocator = xcore::gCreateSystemAllocator();
 		
 	UnitTestAllocator unittestAllocator( systemAllocator );
-	UnitTestObserver unittestObserver;
 	UnitTest::SetAllocator(&unittestAllocator);
-	UnitTest::SetObserver(&unittestObserver);
 
 	gUnitTestAllocator = systemAllocator;
-
-	UnitTest::TestReporterStdout stdout_reporter;
-	UnitTest::TestReporter& reporter = stdout_reporter;
 
 	int r = UNITTEST_SUITE_RUN(reporter, xAllocatorUnitTest);
 	if (unittestAllocator.mNumAllocations!=0)
@@ -80,5 +56,5 @@ int main(int argc, char** argv)
 
 	gUnitTestAllocator = NULL;
 	systemAllocator->release();
-	return r;
+	return r==0;
 }
