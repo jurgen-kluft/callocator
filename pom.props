@@ -1,0 +1,8 @@
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PackageDir>$(MSBuildProjectDirectory)</PackageDir>
+    <PackagePlatform>Win32</PackagePlatform>
+    <PackageSolution>xallocator.sln</PackageSolution>
+    <PackageProjectGroup>Main</PackageProjectGroup>
+  </PropertyGroup>
+</Project>
