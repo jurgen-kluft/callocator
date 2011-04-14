@@ -2530,68 +2530,13 @@ namespace xcore
 			USAGE_ERROR_ACTION(ms,ms);
 		}
 		mState = 0;
-//		return freed;
 	}
-
-
-#ifdef TARGET_PC
-
-	static char sTestMemory[10*1024];
-	static char sTestMemory2[1*1024*1024];
-	xmem_heap sMainHeap;
-
-	void xmemory_heap_test()
-	{
-		sMainHeap.__initialize();
-		sMainHeap.__manage(sTestMemory, sizeof(sTestMemory));
-		sMainHeap.__manage(sTestMemory2, sizeof(sTestMemory2));
-
-		s32 idx[20] = 
-		{
-			3,
-			15,
-			17,
-			1,
-			11,
-			4,
-			13,
-			16,
-			8,
-			5,
-			14,
-			7,
-			2,
-			9,
-			0,
-			10,
-			12,
-			18,
-			6,
-			19,
-		};
-
-		void* p[20];
-		for (s32 i=0; i<20; ++i)
-			p[i] = NULL;
-
-		for (s32 i=0; i<20; ++i)
-			p[i] = sMainHeap.__alloc(8192 + idx[i]);
-
-		for (s32 i=0; i<20; ++i)
-			sMainHeap.__free(p[idx[i]]);
-		for (s32 i=0; i<20; ++i)
-			p[i] = NULL;
-	}
-#endif
-
 
 	xcore::u32	xmem_heap::__sGetMemSize(void* mem)
 	{
 		mchunkptr chunkPtr = mem2chunk(mem);
 		return chunksize(chunkPtr);
 	}
-
-
 
 	class x_allocator_dlmalloc : public x_iallocator
 	{
@@ -2636,20 +2581,11 @@ namespace xcore
 			mDlMallocHeap.__free(ptr);
 		}
 
-		virtual u32				usable_size(void *ptr)
-		{
-			return mDlMallocHeap.__usable_size(ptr);
-		}
 
 		virtual void			release()
 		{
 			mDlMallocHeap.__destroy();
 		}
-
-//		virtual void			stats(xmem_managed_size& stats)
-//		{
-//			mDlMallocHeap.__stats(stats);
-//		}
 
 		void*					operator new(xsize_t num_bytes)					{ return NULL; }
 		void*					operator new(xsize_t num_bytes, void* mem)		{ return mem; }

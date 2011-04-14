@@ -20,6 +20,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_eb)
 		{
 			gBlockSize = 128 * 1024;
 			gBlock = gUnitTestAllocator->allocate(gBlockSize, 8);
+			
 			gCustomAllocator = gCreateEbAllocator(gBlock, gBlockSize, gUnitTestAllocator);
 		}
 

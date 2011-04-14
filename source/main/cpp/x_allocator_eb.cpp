@@ -11,9 +11,9 @@ namespace xcore
 	class vram_elem
 	{
 	public:
-		vram_elem()	{}
+							vram_elem()	{}
 
-		void			initialize(void* Addr, u32 Size, xbool IsFree)
+		void				initialize(void* Addr, u32 Size, xbool IsFree)
 		{
 			address = Addr;
 			size = Size;
@@ -22,57 +22,53 @@ namespace xcore
 			next = NULL;
 		}
 
-		void*			address;	// offset to the begin address
-		u32				size;
-		xbool			isFree;
-		vram_elem*		previous;
-		vram_elem*		next;
+		void*				address;	// offset to the begin address
+		u32					size;
+		xbool				isFree;
+		vram_elem*			previous;
+		vram_elem*			next;
 	};
 
 	class x_allocator_eb : public x_iallocator
 	{
 	public:
-		x_allocator_eb();
-		x_allocator_eb(void* beginAddress, u32 size, x_iallocator* allocator);
-		~x_allocator_eb();
+							x_allocator_eb();
+							x_allocator_eb(void* beginAddress, u32 size, x_iallocator* allocator);
+							~x_allocator_eb();
 
-		virtual const char*		name() const
-		{
-			return "EB allocator";
-		}
+		virtual const char*	name() const									{ return "EB allocator"; }
 
-		void			initialize(void* beginAddress, u32 size, x_iallocator* allocator);		
-		void			release();
+		void				initialize(void* beginAddress, u32 size, x_iallocator* allocator);		
+		void				release();
 		
-		virtual void*	allocate(s32 size, s32 alignment);
-		virtual void*	callocate(s32 n_e, s32 e_size);
-		virtual void*	reallocate(void* ptr, s32 size, s32 alignment);
-		virtual void	deallocate(void* ptr);
-		virtual u32		usable_size(void *ptr);
+		virtual void*		allocate(s32 size, s32 alignment);
+		virtual void*		callocate(s32 n_e, s32 e_size);
+		virtual void*		reallocate(void* ptr, s32 size, s32 alignment);
+		virtual void		deallocate(void* ptr);
 
-		u32				getTotalSize()const;
-		u32				getFreeSize()const;
-		u32				getUsedSize()const;
+		u32					getTotalSize()const;
+		u32					getFreeSize()const;
+		u32					getUsedSize()const;
 		
-		void*					operator new(xsize_t num_bytes)					{ return NULL; }
-		void*					operator new(xsize_t num_bytes, void* mem)		{ return mem; }
-		void					operator delete(void* pMem)						{ }
-		void					operator delete(void* pMem, void* )				{ }
+		void*				operator new(xsize_t num_bytes)					{ return NULL; }
+		void*				operator new(xsize_t num_bytes, void* mem)		{ return mem; }
+		void				operator delete(void* pMem)						{ }
+		void				operator delete(void* pMem, void* )				{ }
 
 	private:
-		void*			mBeginAddress;
-		u32				mTotalSize;
-		u32				mFreeSize;
-		x_iallocator*	mAllocator;		// for vram_elem
-		vram_elem*		mElemListHead;	// head of vram_elem linked list 
+		void*				mBeginAddress;
+		u32					mTotalSize;
+		u32					mFreeSize;
+		x_iallocator*		mAllocator;		// for vram_elem
+		vram_elem*			mElemListHead;	// head of vram_elem linked list 
 
-		vram_elem*		createNewVramElem(u32 addressOffset, u32 blockSize, xbool isFree);
-		vram_elem*		getTheBestFitBlockForAllocation(u32 allocSize, u32 alignment);
-		vram_elem*		getBlock(void* ptr);
+		vram_elem*			createNewVramElem(u32 addressOffset, u32 blockSize, xbool isFree);
+		vram_elem*			getTheBestFitBlockForAllocation(u32 allocSize, u32 alignment);
+		vram_elem*			getBlock(void* ptr);
 
 		// Copy construction and assignment are forbidden
-		x_allocator_eb(const x_allocator_eb&);
-		x_allocator_eb& operator= (const x_allocator_eb&);
+							x_allocator_eb(const x_allocator_eb&);
+							x_allocator_eb& operator= (const x_allocator_eb&);
 	};
 
 // 	void x_allocator_eb::outputAllBlockState()
@@ -135,19 +131,7 @@ namespace xcore
 
 	void x_allocator_eb::release()
 	{
-		vram_elem* currentBlock = mElemListHead;
-		while(currentBlock != NULL)
-		{
-			if(!currentBlock->isFree)
-				mFreeSize += currentBlock->size;
-			vram_elem* block = currentBlock;
-			currentBlock = currentBlock->next;
-			mAllocator->deallocate(block);
-		}
-		ASSERT(mFreeSize == mTotalSize);
-		mElemListHead = NULL;
-		mTotalSize = 0;
-		mFreeSize = 0;
+		mAllocator->deallocate(this);
 	}
 
 	void*	x_allocator_eb::allocate(s32 size, s32 alignment)
@@ -426,10 +410,6 @@ namespace xcore
 		return mTotalSize - mFreeSize;
 	}
 
-	u32	x_allocator_eb::usable_size(void *ptr)
-	{
-		return getBlock(ptr)->size;
-	}
 
 	x_iallocator*		gCreateEbAllocator(void* mem, s32 memsize, x_iallocator *allocator)
 	{

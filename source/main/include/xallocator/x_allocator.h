@@ -18,10 +18,11 @@ namespace xcore
 	/// Forward declares
 	class x_iallocator;
 
-	/// The custom allocators
+	/// The custom allocators, Dlmalloc and Tlfs allocator
 	extern x_iallocator*		gCreateDlAllocator(void* mem, s32 memsize);
 	extern x_iallocator*		gCreateTlsfAllocator(void* mem, s32 memsize);
 
+	/// External block allocator, manages external memory like Texture Memory, Sound Memory by putting bookkeeping data in seperate memory
 	extern x_iallocator*		gCreateEbAllocator(void* mem, s32 memsize, x_iallocator *allocator);
 	
 	/// The fixed sized type allocator

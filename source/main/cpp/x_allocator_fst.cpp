@@ -113,7 +113,6 @@ namespace xcore
 		s32						getUsedItemCount() const;
 		u32						getCurrentBlockCount() const;
 		u32						getTotalCapacity() const;
-		u32						usable_size(void *ptr);
 
 		///@name	Placement new/delete
 		void*					operator new(xsize_t num_bytes)					{ return NULL; }

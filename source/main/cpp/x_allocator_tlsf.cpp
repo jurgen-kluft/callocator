@@ -898,12 +898,6 @@ namespace xcore
 			free_ex(ptr, mPool);
 		}
 
-		virtual u32				usable_size(void *ptr)
-		{
-			bhdr_t *b = (bhdr_t *) ((char *) ptr - BHDR_OVERHEAD);
-			return (b->size & BLOCK_SIZE);
-		}
-
 		virtual void			release()
 		{
 			destroy_memory_pool(mPool);
