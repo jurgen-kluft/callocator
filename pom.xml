@@ -87,186 +87,186 @@
 					<ProjectGuid>{${GUID_Main}}</ProjectGuid>
 				</PropertyGroup>
 				<ImportGroup Label="TargetDirs">
-					<Import Project="$(SolutionDir)target\xallocator\xallocator.$(Platform).props" Condition="exists('$(SolutionDir)target\xallocator\xallocator.$(Platform).props')" Label="xallocator_TargetDir" />
+					<Import Project="$(SolutionDir)target\${Name}\${Name}.$(Platform).props" Condition="exists('$(SolutionDir)target\${Name}\${Name}.$(Platform).props')" Label="${Name}_TargetDir" />
 				</ImportGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DevDebug|Win32'">
 					<ClCompile>
-						<AdditionalIncludeDirectories>$(xallocator_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+						<AdditionalIncludeDirectories>$(${Name}_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>#xallocator_DevDebug_Win32.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>#${Name}_DevDebug_Win32.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DevRelease|Win32'">
 					<ClCompile>
-						<AdditionalIncludeDirectories>$(xallocator_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+						<AdditionalIncludeDirectories>$(${Name}_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>#xallocator_DevRelease_Win32.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>#${Name}_DevRelease_Win32.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DevFinal|Win32'">
 					<ClCompile>
-						<AdditionalIncludeDirectories>$(xallocator_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+						<AdditionalIncludeDirectories>$(${Name}_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>#xallocator_DevFinal_Win32.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>#${Name}_DevFinal_Win32.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='TestDebug|Win32'">
 					<ClCompile>
-						<AdditionalIncludeDirectories>$(xallocator_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+						<AdditionalIncludeDirectories>$(${Name}_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>#xallocator_TestDebug_Win32.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>#${Name}_TestDebug_Win32.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='TestRelease|Win32'">
 					<ClCompile>
-						<AdditionalIncludeDirectories>$(xallocator_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+						<AdditionalIncludeDirectories>$(${Name}_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>#xallocator_TestRelease_Win32.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>#${Name}_TestRelease_Win32.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DevDebug|PS3'">
 					<ClCompile>
-						<AdditionalIncludeDirectories>$(xallocator_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+						<AdditionalIncludeDirectories>$(${Name}_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>#xallocator_DevDebug_PS3.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>#${Name}_DevDebug_PS3.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DevRelease|PS3'">
 					<ClCompile>
-						<AdditionalIncludeDirectories>$(xallocator_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+						<AdditionalIncludeDirectories>$(${Name}_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>#xallocator_DevRelease_PS3.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>#${Name}_DevRelease_PS3.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DevFinal|PS3'">
 					<ClCompile>
-						<AdditionalIncludeDirectories>$(xallocator_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+						<AdditionalIncludeDirectories>$(${Name}_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>#xallocator_DevFinal_PS3.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>#${Name}_DevFinal_PS3.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='TestDebug|PS3'">
 					<ClCompile>
-						<AdditionalIncludeDirectories>$(xallocator_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+						<AdditionalIncludeDirectories>$(${Name}_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>#xallocator_TestDebug_PS3.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>#${Name}_TestDebug_PS3.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='TestRelease|PS3'">
 					<ClCompile>
-						<AdditionalIncludeDirectories>$(xallocator_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+						<AdditionalIncludeDirectories>$(${Name}_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>#xallocator_TestRelease_PS3.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>#${Name}_TestRelease_PS3.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DevDebug|Xbox 360'">
 					<ClCompile>
-						<AdditionalIncludeDirectories>$(xallocator_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+						<AdditionalIncludeDirectories>$(${Name}_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>#xallocator_DevDebug_Xbox 360.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>#${Name}_DevDebug_Xbox 360.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DevRelease|Xbox 360'">
 					<ClCompile>
-						<AdditionalIncludeDirectories>$(xallocator_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+						<AdditionalIncludeDirectories>$(${Name}_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>#xallocator_DevRelease_Xbox 360.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>#${Name}_DevRelease_Xbox 360.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DevFinal|Xbox 360'">
 					<ClCompile>
-						<AdditionalIncludeDirectories>$(xallocator_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+						<AdditionalIncludeDirectories>$(${Name}_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>#xallocator_DevFinal_Xbox 360.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>#${Name}_DevFinal_Xbox 360.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='TestDebug|Xbox 360'">
 					<ClCompile>
-						<AdditionalIncludeDirectories>$(xallocator_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+						<AdditionalIncludeDirectories>$(${Name}_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>#xallocator_TestDebug_Xbox 360.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>#${Name}_TestDebug_Xbox 360.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='TestRelease|Xbox 360'">
 					<ClCompile>
-						<AdditionalIncludeDirectories>$(xallocator_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+						<AdditionalIncludeDirectories>$(${Name}_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>#xallocator_TestRelease_Xbox 360.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>#${Name}_TestRelease_Xbox 360.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DevDebug|WII'">
 					<ClCompile>
-						<AdditionalIncludeDirectories>$(xallocator_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+						<AdditionalIncludeDirectories>$(${Name}_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>#xallocator_DevDebug_WII.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>#${Name}_DevDebug_WII.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DevRelease|WII'">
 					<ClCompile>
-						<AdditionalIncludeDirectories>$(xallocator_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+						<AdditionalIncludeDirectories>$(${Name}_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>#xallocator_DevRelease_WII.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>#${Name}_DevRelease_WII.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DevFinal|WII'">
 					<ClCompile>
-						<AdditionalIncludeDirectories>$(xallocator_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+						<AdditionalIncludeDirectories>$(${Name}_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>#xallocator_DevFinal_WII.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>#${Name}_DevFinal_WII.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='TestDebug|WII'">
 					<ClCompile>
-						<AdditionalIncludeDirectories>$(xallocator_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+						<AdditionalIncludeDirectories>$(${Name}_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>#xallocator_TestDebug_WII.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>#${Name}_TestDebug_WII.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='TestRelease|WII'">
 					<ClCompile>
-						<AdditionalIncludeDirectories>$(xallocator_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+						<AdditionalIncludeDirectories>$(${Name}_IncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>#xallocator_TestRelease_WII.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>#${Name}_TestRelease_WII.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DevDebug|N3DS'">
@@ -319,7 +319,6 @@
 						<AdditionalDependencies>#${Name}_TestRelease_$(Platform).lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
-				
 				<ItemGroup>
 					<ClCompile Include="source\main\cpp\**\*.cpp" />
 				</ItemGroup>
@@ -382,8 +381,8 @@
 						<AdditionalIncludeDirectories>$(${Name}_TargetDir)\source\test\include</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>xallocator_$(Configuration)_$(Platform).lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>${Name}_$(Configuration)_$(Platform).lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='TestRelease|Win32'">
@@ -391,8 +390,8 @@
 						<AdditionalIncludeDirectories>$(${Name}_TargetDir)\source\test\include</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>xallocator_$(Configuration)_$(Platform).lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>${Name}_$(Configuration)_$(Platform).lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='TestDebug|PS3'">
@@ -400,8 +399,8 @@
 						<AdditionalIncludeDirectories>$(${Name}_TargetDir)\source\test\include</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>xallocator_$(Configuration)_PS3.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>${Name}_$(Configuration)_PS3.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='TestRelease|PS3'">
@@ -409,8 +408,8 @@
 						<AdditionalIncludeDirectories>$(${Name}_TargetDir)\source\test\include</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>xallocator_$(Configuration)_PS3.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>${Name}_$(Configuration)_PS3.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='TestDebug|Xbox 360'">
@@ -418,8 +417,8 @@
 						<AdditionalIncludeDirectories>$(${Name}_TargetDir)\source\test\include</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>xallocator_$(Configuration)_Xbox 360.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>${Name}_$(Configuration)_Xbox 360.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='TestRelease|Xbox 360'">
@@ -427,8 +426,8 @@
 						<AdditionalIncludeDirectories>$(${Name}_TargetDir)\source\test\include</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>xallocator_$(Configuration)_Xbox 360.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>${Name}_$(Configuration)_Xbox 360.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='TestDebug|WII'">
@@ -436,8 +435,8 @@
 						<AdditionalIncludeDirectories>$(${Name}_TargetDir)\source\test\include</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>xallocator_$(Configuration)_WII.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>${Name}_$(Configuration)_WII.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='TestRelease|WII'">
@@ -445,8 +444,8 @@
 						<AdditionalIncludeDirectories>$(${Name}_TargetDir)\source\test\include</AdditionalIncludeDirectories>
 					</ClCompile>
 					<Link>
-						<AdditionalLibraryDirectories>$(xallocator_LibraryDir)</AdditionalLibraryDirectories>
-						<AdditionalDependencies>xallocator_$(Configuration)_WII.lib</AdditionalDependencies>
+						<AdditionalLibraryDirectories>$(${Name}_LibraryDir)</AdditionalLibraryDirectories>
+						<AdditionalDependencies>${Name}_$(Configuration)_WII.lib</AdditionalDependencies>
 					</Link>
 				</ItemDefinitionGroup>
 				<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='TestDebug|N3DS'">
