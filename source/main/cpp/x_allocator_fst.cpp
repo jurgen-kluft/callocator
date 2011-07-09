@@ -104,9 +104,8 @@ namespace xcore
 		///@name	Resets allocator
 		void					reset(xbool inRestoreToInitialSize = xFALSE);
 
-		void*					allocate(s32 size, s32 alignment);
-		void*					callocate(s32 n_e, s32 e_size);
-		void*					reallocate(void* p, s32 size, s32 alignment);
+		void*					allocate(u32 size, u32 alignment);
+		void*					reallocate(void* p, u32 size, u32 alignment);
 		void					deallocate(void* p);
 
 		///@name	Statistics
@@ -134,7 +133,7 @@ namespace xcore
 
 		// Save initial parameters
 		u32						mElemSize;
-		s32						mElemAlignment;
+		u32						mElemAlignment;
 		u32 					mBlockElemCount;
 		u32 					mBlockInitialCount;
 		u32 					mBlockGrowthCount;
@@ -237,7 +236,7 @@ namespace xcore
 		mUsedItems = 0;
 	}
 
-	void*		x_allocator_fst::allocate(s32 size, s32 alignment)
+	void*		x_allocator_fst::allocate(u32 size, u32 alignment)
 	{
 		ASSERT((u32)size <= mElemSize);
 
@@ -255,13 +254,7 @@ namespace xcore
 		return element->getObject();
 	}
 
-	void*		x_allocator_fst::callocate(s32 n_e, s32 e_size)
-	{
-		ASSERT((u32)n_e == 1);
-		return allocate(e_size, 0);
-	}
-
-	void*		x_allocator_fst::reallocate(void* inObject, s32 size, s32 alignment)
+	void*		x_allocator_fst::reallocate(void* inObject, u32 size, u32 alignment)
 	{
 		ASSERT((u32)size <= mElemSize);
 		ASSERT(alignment <= mElemAlignment);
