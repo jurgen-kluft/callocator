@@ -2555,20 +2555,15 @@ namespace xcore
 			mDlMallocHeap.__manage(mem, mem_size);
 		}
 
-		virtual void*			allocate(s32 size, s32 alignment)
+		virtual void*			allocate(u32 size, u32 alignment)
 		{
 			if (alignment <= X_MEMALIGN)
 				return mDlMallocHeap.__alloc(size);
 
 			return mDlMallocHeap.__allocA(alignment, size);
 		}
-
-		virtual void*			callocate(s32 nelem, s32 elemsize)
-		{
-			return mDlMallocHeap.__allocN(nelem, elemsize);
-		}
-
-		virtual void*			reallocate(void* ptr, s32 size, s32 alignment)
+		
+		virtual void*			reallocate(void* ptr, u32 size, u32 alignment)
 		{
 			if (alignment <= X_MEMALIGN)
 				return mDlMallocHeap.__allocR(ptr, alignment, size);

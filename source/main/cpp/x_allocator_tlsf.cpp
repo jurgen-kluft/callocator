@@ -872,7 +872,7 @@ namespace xcore
 			init_memory_pool(mem_size, mem, mPoolSize, mPool);
 		}
 
-		virtual void*			allocate(s32 size, s32 alignment)
+		virtual void*			allocate(u32 size, u32 alignment)
 		{
 			if (alignment <= 8)
 				return malloc_ex(size, mPool);
@@ -880,12 +880,7 @@ namespace xcore
 			return 0;
 		}
 
-		virtual void*			callocate(s32 nelem, s32 elemsize)
-		{
-			return calloc_ex(nelem, elemsize, mPool);
-		}
-
-		virtual void*			reallocate(void* ptr, s32 size, s32 alignment)
+		virtual void*			reallocate(void* ptr, u32 size, u32 alignment)
 		{
 			if (alignment <= 8)
 				return realloc_ex(ptr, size, mPool);

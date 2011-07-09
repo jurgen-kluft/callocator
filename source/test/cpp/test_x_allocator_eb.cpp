@@ -16,12 +16,22 @@ UNITTEST_SUITE_BEGIN(x_allocator_eb)
 		s32				gBlockSize;
 		x_iallocator*	gCustomAllocator;
 
+		class external_mem_access : public x_iextmem
+		{
+		public:
+			virtual void	copy(void const* src, u32 src_size, void* dst, u32 dst_size)
+			{
+
+			}
+		};
+		external_mem_access	gExternalMemCpy;
+
         UNITTEST_FIXTURE_SETUP()
 		{
 			gBlockSize = 128 * 1024;
 			gBlock = gUnitTestAllocator->allocate(gBlockSize, 8);
 			
-			gCustomAllocator = gCreateEbAllocator(gBlock, gBlockSize, gUnitTestAllocator);
+			gCustomAllocator = gCreateEbAllocator(gBlock, gBlockSize, gUnitTestAllocator, &gExternalMemCpy);
 		}
 
         UNITTEST_FIXTURE_TEARDOWN()
@@ -60,22 +70,6 @@ UNITTEST_SUITE_BEGIN(x_allocator_eb)
 			gCustomAllocator->deallocate(mem9);
 
         }
-
-//         UNITTEST_TEST(alloc_realloc_free)
-//         {
-// 			void* mem1 = gCustomAllocator->allocate(512, 8);
-// 			void* mem2 = gCustomAllocator->allocate(1024, 16);
-// 			void* mem3 = gCustomAllocator->allocate(512, 32);
-// 			void* mem4 = gCustomAllocator->allocate(1024, 1024);
-// 
-// 			mem3 = gCustomAllocator->reallocate(mem3, 2024, 16);
-// 			mem1 = gCustomAllocator->reallocate(mem1, 10240, 1024);
-// 
-// 			gCustomAllocator->deallocate(mem1);
-// 			gCustomAllocator->deallocate(mem2);
-// 			gCustomAllocator->deallocate(mem3);
-// 			gCustomAllocator->deallocate(mem4);
-//         }
 
 	}
 }
