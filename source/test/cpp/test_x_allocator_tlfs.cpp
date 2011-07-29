@@ -6,7 +6,7 @@
 
 using namespace xcore;
 
-extern x_iallocator* gUnitTestAllocator;
+extern x_iallocator* gSystemAllocator;
 
 
 UNITTEST_SUITE_BEGIN(x_allocator_tlfs)
@@ -21,14 +21,14 @@ UNITTEST_SUITE_BEGIN(x_allocator_tlfs)
         UNITTEST_FIXTURE_SETUP()
 		{
 			gBlockSize = 128 * 1024;
-			gBlock = gUnitTestAllocator->allocate(gBlockSize, 8);
+			gBlock = gSystemAllocator->allocate(gBlockSize, 8);
 			gCustomAllocator = gCreateDlAllocator(gBlock, gBlockSize);
 		}
 
         UNITTEST_FIXTURE_TEARDOWN()
 		{
 			gCustomAllocator->release();
-			gUnitTestAllocator->deallocate(gBlock);
+			gSystemAllocator->deallocate(gBlock);
 			gBlock = NULL;
 			gBlockSize = 0;
 		}

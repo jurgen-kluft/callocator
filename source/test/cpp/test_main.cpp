@@ -11,8 +11,10 @@ UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_dlmalloc);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_tlfs);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_fst);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_eb);
+UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_idx_allocator_array);
+UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_idx_allocator_pool);
 
-x_iallocator* gUnitTestAllocator = NULL;
+xcore::x_iallocator* gSystemAllocator;
 
 class UnitTestAllocator : public UnitTest::Allocator
 {
@@ -45,7 +47,7 @@ bool gRunUnitTest(UnitTest::TestReporter& reporter)
 	UnitTestAllocator unittestAllocator( systemAllocator );
 	UnitTest::SetAllocator(&unittestAllocator);
 
-	gUnitTestAllocator = systemAllocator;
+	gSystemAllocator = systemAllocator;
 
 	int r = UNITTEST_SUITE_RUN(reporter, xAllocatorUnitTest);
 	if (unittestAllocator.mNumAllocations!=0)
@@ -54,7 +56,7 @@ bool gRunUnitTest(UnitTest::TestReporter& reporter)
 		r = -1;
 	}
 
-	gUnitTestAllocator = NULL;
+	gSystemAllocator = NULL;
 	systemAllocator->release();
 	return r==0;
 }
