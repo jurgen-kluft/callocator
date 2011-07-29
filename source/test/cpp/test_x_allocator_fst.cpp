@@ -7,7 +7,7 @@
 
 using namespace xcore;
 
-extern x_iallocator* gUnitTestAllocator;
+extern x_iallocator* gSystemAllocator;
 
 
 UNITTEST_SUITE_BEGIN(x_allocator_fst)
@@ -32,7 +32,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_fst)
 			gBlockGrowthCount = 1;
 			gBlockMaximumCount = 2;
 
-			gCustomAllocator = gCreateFstAllocator(gUnitTestAllocator, gElemSize, gElemAlignment, gBlockElemCount, gBlockInitialCount, gBlockGrowthCount, gBlockMaximumCount);
+			gCustomAllocator = gCreateFstAllocator(gSystemAllocator, gElemSize, gElemAlignment, gBlockElemCount, gBlockInitialCount, gBlockGrowthCount, gBlockMaximumCount);
 		}
 
         UNITTEST_FIXTURE_TEARDOWN()

@@ -6,7 +6,7 @@
 
 using namespace xcore;
 
-extern x_iallocator* gUnitTestAllocator;
+extern x_iallocator* gSystemAllocator;
 
 UNITTEST_SUITE_BEGIN(x_allocator_eb)
 {
@@ -29,15 +29,15 @@ UNITTEST_SUITE_BEGIN(x_allocator_eb)
         UNITTEST_FIXTURE_SETUP()
 		{
 			gBlockSize = 128 * 1024;
-			gBlock = gUnitTestAllocator->allocate(gBlockSize, 8);
+			gBlock = gSystemAllocator->allocate(gBlockSize, 8);
 			
-			gCustomAllocator = gCreateEbAllocator(gBlock, gBlockSize, gUnitTestAllocator, &gExternalMemCpy);
+			gCustomAllocator = gCreateEbAllocator(gBlock, gBlockSize, gSystemAllocator, &gExternalMemCpy);
 		}
 
         UNITTEST_FIXTURE_TEARDOWN()
 		{
 			gCustomAllocator->release();
-			gUnitTestAllocator->deallocate(gBlock);
+			gSystemAllocator->deallocate(gBlock);
 			gBlock = NULL;
 			gBlockSize = 0;
 		}
