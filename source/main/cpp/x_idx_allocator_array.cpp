@@ -164,12 +164,14 @@ namespace xcore
 	{
 		if (idx == NILL_IDX)
 			return NULL;
+		ASSERT(mObjectArray!=NULL && idx < mObjectArraySize);
 		void* p = (void*)((u32)mObjectArray + (mSizeOfObject * idx));
 		return p;
 	}
 
 	u32			x_indexed_array_allocator::to_idx(void const* p) const
 	{
+		ASSERT(mObjectArray!=NULL && mObjectArrayEnd!=NULL);
 		if ((xbyte*)p >= mObjectArray && (xbyte*)p < mObjectArrayEnd)
 		{
 			u32 idx = ((u32)p - (u32)mObjectArray) / mSizeOfObject;
