@@ -90,7 +90,7 @@ namespace xcore
 		// @inBlockGrowthCount	Number of blocks by which it will grow if all space is used
 		// @inElemAlignment		Alignment of the start of each pool (can be 0, which creates fixed size memory pool)
 								x_allocator_fst(x_iallocator* allocator, u32 inElemSize, u32 inBlockElemCnt, u32 inInitialBlockCount, u32 inBlockGrowthCount, u32 inElemAlignment = 0);
-								~x_allocator_fst();
+		virtual					~x_allocator_fst();
 
 		virtual const char*		name() const
 		{
@@ -104,9 +104,9 @@ namespace xcore
 		///@name	Resets allocator
 		void					reset(xbool inRestoreToInitialSize = xFALSE);
 
-		void*					allocate(u32 size, u32 alignment);
-		void*					reallocate(void* p, u32 size, u32 alignment);
-		void					deallocate(void* p);
+		virtual void*			allocate(u32 size, u32 alignment);
+		virtual void*			reallocate(void* p, u32 size, u32 alignment);
+		virtual void			deallocate(void* p);
 
 		///@name	Statistics
 		s32						getUsedItemCount() const;
@@ -122,7 +122,7 @@ namespace xcore
 	protected:
 		///@name	Grows memory pool by blockSize * blockCount
 		void					extend (u32 inBlockCount);
-		void					release ();
+		virtual void			release ();
 
 	protected:
 		x_iallocator*			mAllocator;
@@ -152,9 +152,9 @@ namespace xcore
 		, mBlockArray(0)
 		, mBlockArraySize(0)
 		, mBlockArrayCapacity(0)
+		, mFirstFreeElement(0)
 		, mElemSize(4)
 		, mElemAlignment(X_ALIGNMENT_DEFAULT)
-		, mFirstFreeElement(0)
 		, mBlockElemCount(0)
 		, mBlockInitialCount(0)
 		, mBlockGrowthCount(0)
@@ -167,9 +167,9 @@ namespace xcore
 		, mBlockArray(0)
 		, mBlockArraySize(0)
 		, mBlockArrayCapacity(0)
+		, mFirstFreeElement(0)
 		, mElemSize(inElemSize)
 		, mElemAlignment(inElemAlignment)
-		, mFirstFreeElement(0)
 		, mBlockElemCount(inBlockElemCnt)
 		, mBlockInitialCount(inBlockInitialCount)
 		, mBlockGrowthCount(inBlockGrowthCount)

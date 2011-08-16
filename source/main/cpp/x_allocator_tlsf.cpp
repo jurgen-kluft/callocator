@@ -702,7 +702,8 @@ namespace xcore
 			}
 		}
 
-		if (!(ptr_aux = malloc_ex(new_size, mem_pool)))
+		ptr_aux = malloc_ex(new_size, mem_pool);
+		if (ptr_aux == NULL)
 		{
 			return NULL;
 		}      
@@ -724,7 +725,8 @@ namespace xcore
 		if (nelem <= 0 || elem_size <= 0)
 			return NULL;
 
-		if (!(ptr = malloc_ex(nelem * elem_size, mem_pool)))
+		ptr = malloc_ex(nelem * elem_size, mem_pool);
+		if (ptr == NULL)
 			return NULL;
 
 		x_memset(ptr, 0, nelem * elem_size);
@@ -906,9 +908,7 @@ namespace xcore
 		void					operator delete(void* pMem, void* )				{ }
 
 	protected:
-		~x_allocator_tlsf()
-		{
-		}
+		virtual					~x_allocator_tlsf()								{ }
 
 	};
 

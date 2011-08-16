@@ -12,7 +12,7 @@ namespace xcore
 	public:
 							x_allocator_eb();
 							x_allocator_eb(void* beginAddress, u32 size, x_iallocator* allocator, x_iextmem *extmem_access);
-							~x_allocator_eb();
+		virtual				~x_allocator_eb();
 
 
 		// bookkeeping data head
@@ -40,7 +40,7 @@ namespace xcore
 		virtual const char*	name() const									{ return "EB allocator"; }
 
 		void				initialize(void* beginAddress, u32 size, x_iallocator* allocator);		
-		void				release();
+		virtual void		release();
 		
 		virtual void*		allocate(u32 size, u32 alignment);
 		virtual void*		reallocate(void* ptr, u32 size, u32 alignment);
@@ -419,3 +419,4 @@ namespace xcore
 	}
 
 };
+
