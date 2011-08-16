@@ -41,3 +41,4 @@ namespace xcore
 };
 
 #endif	/// __X_ALLOCATOR_H__
+

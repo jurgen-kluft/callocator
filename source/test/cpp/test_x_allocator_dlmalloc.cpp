@@ -53,3 +53,4 @@ UNITTEST_SUITE_BEGIN(x_allocator_dlmalloc)
 	}
 }
 UNITTEST_SUITE_END
+
