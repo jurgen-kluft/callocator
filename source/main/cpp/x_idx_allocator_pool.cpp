@@ -71,7 +71,8 @@ namespace xcore
 
 		struct xblock
 		{
-			xbyte*				mData;
+			xbyte*				mItemsData;
+			u32					mItemsTotalCnt;
 
 			// We need to use indices here (relative) since this block will
 			// move in memory when the block array grows or shrinks.
@@ -82,7 +83,8 @@ namespace xcore
 
 			u32					to_idx(xbyte* ptr, u32 size_of_item)
 			{
-				u32 idx = (ptr - mData) / size_of_item;
+				u32 idx = (ptr - mItemsData) / size_of_item;
+				ASSERT(idx < mItemsTotalCnt);
 				return idx;
 			}
 
@@ -91,40 +93,46 @@ namespace xcore
 				if (NILL_IDX == mFreeListHead)
 					return NULL;
 
-				u32* p = (u32*)(mData + (mFreeListHead * size_of_item));
+				u32* p = (u32*)(mItemsData + (mFreeListHead * size_of_item));
 				mFreeListHead = *p;
 				--mFreeListCnt;
+				ASSERT(mFreeListCnt<mItemsTotalCnt);
 				return (xbyte*)p;
 			}
 
 			void				push_free_item(u32 idx, u32 size_of_item)
 			{
-				u32* ptr = (u32*)(mData + (idx * size_of_item));
+				ASSERT(idx<mItemsTotalCnt);
+				u32* ptr = (u32*)(mItemsData + (idx * size_of_item));
 				*ptr = mFreeListHead;
 				mFreeListHead = idx;
+				ASSERT(mFreeListCnt<mItemsTotalCnt);
 				++mFreeListCnt;
 			}
 
 			void				init(x_iallocator* allocator, u32 size_of_object, u32 align_of_object, u32 items_per_block)
 			{
-				mData = (xbyte*)allocator->allocate(size_of_object * items_per_block, align_of_object);
+				mItemsData = (xbyte*)allocator->allocate(size_of_object * items_per_block, align_of_object);
 				make_freelist(items_per_block, size_of_object);
 			}
 
 			void				dealloc_data(x_iallocator* allocator)
 			{
-				allocator->deallocate(mData);
-				mData = NULL;
+				allocator->deallocate(mItemsData);
+				mItemsData = NULL;
+				mItemsTotalCnt = 0;
 				mFreeListCnt = 0;
 				mFreeListHead = NILL_IDX;
 			}
 
 			void				make_freelist(u32 items_per_block, u32 size_of_item)
 			{
+				mItemsTotalCnt = items_per_block;
+
 				mFreeListCnt = items_per_block;
 				mFreeListHead = 0;
 
-				xbyte* data_ptr = mData;
+				xbyte* data_ptr = mItemsData;
 				for (u32 i=1; i<items_per_block; ++i)
 				{
 					u32* item_ptr = (u32*)data_ptr;
@@ -146,6 +154,8 @@ namespace xcore
 
 				for (u32 i=mNumBlocks; i<num_blocks; ++i)
 				{
+					new_blocks[i].mItemsData = NULL;
+					new_blocks[i].mItemsTotalCnt = 0;
 					new_blocks[i].mFreeListCnt = 0;
 					new_blocks[i].mFreeListHead = NILL_IDX;
 					new_blocks[i].mNext = NILL_IDX;
@@ -168,6 +178,19 @@ namespace xcore
 		{
 			if (NILL_IDX == idx)
 				return;
+
+#ifdef X_DEBUG
+			bool is_in_alloc_list = false;
+			block_idx_t it = mBlockHeadAlloc;
+			while (it != NILL_IDX)
+			{
+				is_in_alloc_list = (it == idx);
+				if (is_in_alloc_list)
+					break;
+				it = mBlocks[it].mNext;
+			}
+			ASSERT(is_in_alloc_list);
+#endif
 
 			block_idx_t next = mBlocks[idx].mNext;
 			block_idx_t prev = mBlocks[idx].mPrev;
@@ -195,7 +218,7 @@ namespace xcore
 			//      This is only valid when the user is allocating
 			//      and deallocating, once the user is only deallocating
 			//      it does not really matter what we do here.
-
+			ASSERT(mBlocks[block_idx].mNext==NILL_IDX && mBlocks[block_idx].mPrev==NILL_IDX);
 			if (NILL_IDX == mBlockTailAlloc)
 			{
 				mBlockHeadAlloc = block_idx;
@@ -227,6 +250,39 @@ namespace xcore
 				mBlocks[block_idx].mNext = mBlockHeadFree;
 				mBlockHeadFree = block_idx;
 			}
+		}
+
+		void			unlink_free_block(block_idx_t idx)
+		{
+			if (NILL_IDX == idx)
+				return;
+#ifdef X_DEBUG
+			bool is_in_free_list = false;
+			block_idx_t it = mBlockHeadFree;
+			while (it != NILL_IDX)
+			{
+				is_in_free_list = (it == idx);
+				if (is_in_free_list)
+					break;
+				it = mBlocks[it].mNext;
+			}
+			ASSERT(is_in_free_list);
+#endif
+
+			block_idx_t next = mBlocks[idx].mNext;
+			block_idx_t prev = mBlocks[idx].mPrev;
+			mBlocks[idx].mNext = NILL_IDX;
+			mBlocks[idx].mPrev = NILL_IDX;
+
+			if (NILL_IDX != prev)
+				mBlocks[prev].mNext = next;
+			if (NILL_IDX != next)
+				mBlocks[next].mPrev = prev;
+
+			if (idx == mBlockHeadFree)
+				mBlockTailAlloc = prev;
+			if (idx == mBlockHeadFree)
+				mBlockHeadFree = next;
 		}
 
 		block_idx_t		pop_free_blocks(u32 count)
@@ -264,7 +320,7 @@ namespace xcore
 			bool shrink = true;
 			for (block_idx_t i=1; i<=mShrinkNumBlocks; ++i)
 			{
-				if (mBlocks[mNumBlocks - i].mData != NULL)
+				if (mBlocks[mNumBlocks - i].mItemsData != NULL)
 				{
 					shrink = false;
 					break;
@@ -286,7 +342,8 @@ namespace xcore
 
 			for (u32 i=num_blocks; i<mNumBlocks; ++i)
 			{
-				ASSERT(mBlocks[i].mData == NULL);
+				unlink_free_block(i);
+				ASSERT(mBlocks[i].mItemsData == NULL);
 			}
 
 			if (NULL!=mBlocks)
@@ -312,8 +369,8 @@ namespace xcore
 				// Deallocate block data
 				for (block_idx_t i=0; i<mNumBlocks; ++i)
 				{
-					if (mBlocks[i].mData != NULL)
-						mObjectArrayAllocator->deallocate(mBlocks[i].mData);
+					if (mBlocks[i].mItemsData != NULL)
+						mObjectArrayAllocator->deallocate(mBlocks[i].mItemsData);
 				}
 				
 				// Deallocate block array
@@ -392,8 +449,11 @@ namespace xcore
 			if (NILL_IDX != idx) 
 			{
 				block_idx_t block_idx = idx >> mBlockIndexBitShift;
+				ASSERT(block_idx < mNumBlocks);
 				xblock* block = &mBlocks[block_idx];
-				block->push_free_item(idx & mItemsPerBlockBitMask, mSizeOfItem);
+				u32 const itemIdx = idx & mItemsPerBlockBitMask;
+
+				block->push_free_item(itemIdx, mSizeOfItem);
 
 				--mAllocCount;
 
@@ -417,6 +477,9 @@ namespace xcore
 				}
 				else if (1 == block->mFreeListCnt)
 				{
+					// Link this block back into the list of blocks that can be used to
+					// allocate an item. Before this block was full, now it has space
+					// for one item again.
 					ASSERT(block->mNext == NILL_IDX && block->mPrev == NILL_IDX);
 					link_alloc_block(block_idx);
 				}
@@ -433,7 +496,7 @@ namespace xcore
 				if (item_idx < mItemsPerBlock)
 				{
 					xblock* block = &mBlocks[block_idx];
-					xbyte* item = block->mData + (mSizeOfItem * item_idx);
+					xbyte* item = block->mItemsData + (mSizeOfItem * item_idx);
 					return item;
 				}
 			}
@@ -449,9 +512,9 @@ namespace xcore
 			for (block_idx_t i=0; i<mNumBlocks; ++i)
 			{
 				xblock& block = mBlocks[i];
-				if (ptr>=block.mData && ptr<(block.mData + mSizeOfBlockData))
+				if (ptr>=block.mItemsData && ptr<(block.mItemsData + mSizeOfBlockData))
 				{
-					u32 item_idx = (ptr - block.mData) / mSizeOfItem;
+					u32 item_idx = (ptr - block.mItemsData) / mSizeOfItem;
 					return (u32)(i << mBlockIndexBitShift) | item_idx;
 				}
 			}
