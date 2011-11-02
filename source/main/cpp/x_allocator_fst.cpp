@@ -10,13 +10,13 @@
 namespace xcore
 {
 	/**
-	@brief		Fixed size type, element
-	@desc		It implements linked list behavior for free elements in the block.
-	**/
+	 * @brief		Fixed size type, element
+	 * @desc		It implements linked list behavior for free elements in the block.
+	 */
 	class x_fst_elem
 	{
 	public:
-		// This part is a little bit dirty...
+		/// This part is a little bit dirty...
 		x_fst_elem*			getNext()							{ return *reinterpret_cast<x_fst_elem**>(&mData); }
 		void				setNext(x_fst_elem* next)			{ x_fst_elem** temp = reinterpret_cast<x_fst_elem**>(&mData); *temp = next; }
 		void*				getObject()							{ return (void*)&mData; }
@@ -26,11 +26,11 @@ namespace xcore
 
 
 	/**
-	@brief	x_fst_block contains an array of x_fst_elem objects. This is the smallest
-			memory chunk which is allocated from system (via allocated/deallocator) and is the
-			smallest unit by which the allocator can grow. The inElemSize and inNumElements 
-			parameter sent to init function determines the size of the block.
-	**/
+	 * @brief	x_fst_block contains an array of x_fst_elem objects. This is the smallest
+	 *		memory chunk which is allocated from system (via allocated/deallocator) and is the
+	 *		smallest unit by which the allocator can grow. The inElemSize and inNumElements 
+	 *		parameter sent to init function determines the size of the block.
+	 */
 	class x_fst_block
 	{
 	public:
@@ -67,28 +67,30 @@ namespace xcore
 	}
 
 	/**
-	@brief	x_allocator_fst is a fast allocator for objects of fixed size.
+	 * @brief	x_allocator_fst is a fast allocator for objects of fixed size.
 
-	@desc	It preallocates (from @allocator) @inInitialBlockCount blocks with @inBlockSize T elements.
-			By calling Allocate an application can fetch one T object. By calling Deallocate
-			an application returns one T object to pool.
-			When all objects on the pool are used, pool can grow to accommodate new requests.
-			@inGrowthCount specifies by how many blocks the pool will grow.
-			Reset reclaims all objects and reinitializes the pool. The parameter RestoreToInitialSize
-			can be used to resize the pool to initial size in case it grew.
+	 * @desc	It preallocates (from @allocator) @inInitialBlockCount blocks with @inBlockSize T elements.
+	 * 		By calling Allocate an application can fetch one T object. By calling Deallocate
+	 * 		an application returns one T object to pool.
+	 * 		When all objects on the pool are used, pool can grow to accommodate new requests.
+	 * 		@inGrowthCount specifies by how many blocks the pool will grow.
+	 * 		Reset reclaims all objects and reinitializes the pool. The parameter RestoreToInitialSize
+	 * 		can be used to resize the pool to initial size in case it grew.
 
-	@note	This allocator does not guarantee that two objects allocated sequentially are sequential in memory.
-	**/
+	 * @note	This allocator does not guarantee that two objects allocated sequentially are sequential in memory.
+	 */
 	class x_allocator_fst : public x_iallocator
 	{
 	public:
 								x_allocator_fst();
 
-		// @inElemSize			This determines the size in bytes of an element
-		// @inBlockElemCnt		This determines the number of elements that are part of a block
-		// @inInitialBlockCount	Initial number of blocks in the memory pool
-		// @inBlockGrowthCount	Number of blocks by which it will grow if all space is used
-		// @inElemAlignment		Alignment of the start of each pool (can be 0, which creates fixed size memory pool)
+        /**
+		 * @inElemSize			This determines the size in bytes of an element
+		 * @inBlockElemCnt		This determines the number of elements that are part of a block
+		 * @inInitialBlockCount	Initial number of blocks in the memory pool
+		 * @inBlockGrowthCount	Number of blocks by which it will grow if all space is used
+		 * @inElemAlignment		Alignment of the start of each pool (can be 0, which creates fixed size memory pool)
+		 */
 								x_allocator_fst(x_iallocator* allocator, u32 inElemSize, u32 inBlockElemCnt, u32 inInitialBlockCount, u32 inBlockGrowthCount, u32 inElemAlignment = 0);
 		virtual					~x_allocator_fst();
 
@@ -97,8 +99,10 @@ namespace xcore
 			return "fixed size allocator";
 		}
 
-		///@name	Should be called when created with default constructor
-		//			Parameters are the same as for constructor with parameters
+		/**
+		 * @name	Should be called when created with default constructor
+		 *			Parameters are the same as for constructor with parameters
+		 */
 		void					init(x_iallocator* allocator, u32 inElemSize, u32 inBlockElemCnt, u32 inInitialBlockCount, u32 inBlockGrowthCount, u32 inElemAlignment);
 
 		///@name	Resets allocator
@@ -128,21 +132,23 @@ namespace xcore
 		x_iallocator*			mAllocator;
 		x_fst_block*			mBlockArray;
 		u32						mBlockArraySize;
-		u32						mBlockArrayCapacity;		// Real size of the block array (to avoid excessive reallocation)
-		x_fst_elem*				mFirstFreeElement;			// First free element in the free list
+		u32						mBlockArrayCapacity;		///< Real size of the block array (to avoid excessive reallocation)
+		x_fst_elem*				mFirstFreeElement;			///< First free element in the free list
 
-		// Save initial parameters
+		/**
+		 * Save initial parameters
+		 */
 		u32						mElemSize;
 		u32						mElemAlignment;
 		u32 					mBlockElemCount;
 		u32 					mBlockInitialCount;
 		u32 					mBlockGrowthCount;
 
-		// Helper members
+		/// Helper members
 		s32						mUsedItems;
 
 	private:
-		// Copy construction and assignment are forbidden
+		/// Copy construction and assignment are forbidden
 								x_allocator_fst(const x_allocator_fst&);
 		x_allocator_fst&		operator= (const x_allocator_fst&);
 	};

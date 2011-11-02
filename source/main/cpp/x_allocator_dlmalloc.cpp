@@ -91,8 +91,9 @@ namespace xcore
 	typedef				void*	(*SysAllocFunc)(xsize_t size);
 	typedef				void	(*SysFreeFunc)(void* ptrsize);
 
-	//////////////////////////////////////////////////////////////////////////
-	// A memory heap capable of managing multiple segments (based on dlmalloc)
+	/**
+	 * A memory heap capable of managing multiple segments (based on dlmalloc)
+	 */
 	class xmem_heap_base
 	{
 	protected:
@@ -132,8 +133,9 @@ namespace xcore
 	};
 
 
-	//////////////////////////////////////////////////////////////////////////
-	/// xmem_space is an opaque type representing an independent region of space that supports mspace_malloc, etc.
+	/**
+	 * xmem_space is an opaque type representing an independent region of space that supports mspace_malloc, etc.
+	 */
 	class xmem_space : public xmem_heap_base
 	{
 	public:
@@ -144,8 +146,9 @@ namespace xcore
 		void				__initialize(xbyte* tbase, xsize_t tsize);
 	};
 
-	//////////////////////////////////////////////////////////////////////////
-	// A memory heap capable of managing multiple segments (based on dlmalloc)
+	/**
+	 * A memory heap capable of managing multiple segments (based on dlmalloc)
+	 */
 	class xmem_heap : public xmem_heap_base
 	{
 	public:
@@ -177,16 +180,16 @@ namespace xcore
 
 	#define DLMALLOC_VERSION								20804
 
-	/* The maximum possible xsize_t value has all bits set */
+	/// The maximum possible xsize_t value has all bits set
 	#define MAX_SIZE_T										(~(xsize_t)0)
 
 	#ifndef ABORT_ON_ASSERT_FAILURE
 		#define ABORT_ON_ASSERT_FAILURE						1
-	#endif  /* ABORT_ON_ASSERT_FAILURE */
+	#endif  ///< ABORT_ON_ASSERT_FAILURE
 
 	#ifndef PROCEED_ON_ERROR
 		#define PROCEED_ON_ERROR							0
-	#endif  /* PROCEED_ON_ERROR */
+	#endif  ///< PROCEED_ON_ERROR
 
 	#define MAX_RELEASE_CHECK_RATE							256
 
@@ -199,7 +202,7 @@ namespace xcore
 	}
 
 	#if defined(TARGET_PC)
-		#pragma warning( disable : 4146 ) /* no "unsigned" warnings */
+		#pragma warning( disable : 4146 ) ///< no "unsigned" warnings
 	#endif
 
 	#ifdef XMEM_HEAP_DEBUG
@@ -208,12 +211,15 @@ namespace xcore
 			/// TODO: These should be callbacks!!!!
 			#define ASSERT(x) if(!(x)) FatalError()
 		#endif
-	#else  /* XMEM_HEAP_DEBUG */
+	/**
+     * XMEM_HEAP_DEBUG 
+	 */
+	#else  
 		#ifndef ASSERT
 			#define ASSERT(x) ((void*)0)
 		#endif
 		#define XMEM_HEAP_DEBUG 0
-	#endif /* XMEM_HEAP_DEBUG */
+	#endif
 
 	#if defined(TARGET_PC)
 		#define malloc_getpagesize 65536
@@ -231,12 +237,16 @@ namespace xcore
 
 	/* ------------------- xsize_t and alignment properties -------------------- */
 
-	/* The byte and bit size of a xsize_t */
+	/**
+	 * The byte and bit size of a xsize_t 
+	 */
 	#define SIZE_T_SIZE					(sizeof(xsize_t))
 	#define SIZE_T_BITSIZE				(sizeof(xsize_t) << 3)
 
-	/* Some constants coerced to xsize_t */
-	/* Annoying but necessary to avoid errors on some platforms */
+	/**
+	 * Some constants coerced to xsize_t
+	 * Annoying but necessary to avoid errors on some platforms
+	 */
 	#define SIZE_T_ZERO					((xsize_t)0)
 	#define SIZE_T_ONE 					((xsize_t)1)
 	#define SIZE_T_TWO 					((xsize_t)2)
@@ -246,64 +256,93 @@ namespace xcore
 	#define SIX_SIZE_T_SIZES			(FOUR_SIZE_T_SIZES+TWO_SIZE_T_SIZES)
 	#define HALF_MAX_SIZE_T				(MAX_SIZE_T / 2U)
 
-	/* The bit mask value corresponding to MALLOC_ALIGNMENT */
+	/**
+	 * The bit mask value corresponding to MALLOC_ALIGNMENT 
+	 */
 	#define CHUNK_ALIGN_MASK			(MALLOC_ALIGNMENT - SIZE_T_ONE)
 
-	/* True if address a has acceptable alignment */
+	/**
+	 * True if address a has acceptable alignment
+	 */
 	#define is_aligned(A)				(((xsize_t)((A)) & (CHUNK_ALIGN_MASK)) == 0)
 
-	/* the number of bytes to offset an address to align it */
+	/**
+	 * the number of bytes to offset an address to align it 
+	 */
 	#define align_offset(A)				((((xsize_t)(A) & CHUNK_ALIGN_MASK) == 0)? 0 : ((MALLOC_ALIGNMENT - ((xsize_t)(A) & CHUNK_ALIGN_MASK)) & CHUNK_ALIGN_MASK))
 
-	/* -------------------------- MMAP preliminaries ------------------------- */
+	/**
+	 * -------------------------- MMAP preliminaries -------------------------
+	 */
 
 	#define USER_BIT					(4U)
 	#define EXTERN_BIT					(8U)
 
 
 
-	/* ------------------- Chunks sizes and alignments ----------------------- */
+	/**
+	 * ------------------- Chunks sizes and alignments ----------------------- 
+	 */
 
 	#define MCHUNK_SIZE						(sizeof(mchunk))
 
 	#if FOOTERS
 		#define CHUNK_OVERHEAD					(TWO_SIZE_T_SIZES)
-	#else /* FOOTERS */
-		#define CHUNK_OVERHEAD					(SIZE_T_SIZE)
-	#endif /* FOOTERS */
 
-	/* The smallest size we can malloc is an aligned minimal chunk */
+	/**
+	 * FOOTERS
+	 */
+	#else 
+		#define CHUNK_OVERHEAD					(SIZE_T_SIZE)
+	#endif
+
+	/**
+	 * The smallest size we can malloc is an aligned minimal chunk
+	 */
 	#define MIN_CHUNK_SIZE\
 		((MCHUNK_SIZE + CHUNK_ALIGN_MASK) & ~CHUNK_ALIGN_MASK)
 
-	/* conversion from malloc headers to user pointers, and back */
+    /**
+	 * conversion from malloc headers to user pointers, and back 
+	 */
 	#define chunk2mem(p)					((void*)((xbyte*)(p)       + TWO_SIZE_T_SIZES))
 	#define mem2chunk(mem)					((mchunkptr)((xbyte*)(mem) - TWO_SIZE_T_SIZES))
-	/* chunk associated with aligned address A */
+
+    /**
+	 * chunk associated with aligned address A 
+	 */
 	#define align_as_chunk(A)				(mchunkptr)((A) + align_offset(chunk2mem(A)))
 
-	/* Bounds on request (not chunk) sizes. */
+    /**
+	 * Bounds on request (not chunk) sizes. 
+	 */
 	#define ONE_GIGA_BYTE					1*1024*1024*1024
 	#define MAX_REQUEST						(ONE_GIGA_BYTE - MIN_CHUNK_SIZE)
 	#define MIN_REQUEST						(MIN_CHUNK_SIZE - CHUNK_OVERHEAD - SIZE_T_ONE)
 
-	/* pad request bytes into a usable size */
+    /**
+	 * pad request bytes into a usable size 
+	 */
 	#define pad_request(req) \
 		(((req) + CHUNK_OVERHEAD + CHUNK_ALIGN_MASK) & ~CHUNK_ALIGN_MASK)
 
-	/* pad request, checking for minimum (but not maximum) */
+    /**
+	 * pad request, checking for minimum (but not maximum) 
+	 */
 	#define request2size(req) \
 		(((req) < MIN_REQUEST)? MIN_CHUNK_SIZE : pad_request(req))
 
 
-	/* ------------------ Operations on head and foot fields ----------------- */
+    /**
+	 * ------------------ Operations on head and foot fields ----------------- 
+	 */
 
 	/*
-	The head field of a chunk is or'ed with PINUSE_BIT when previous
-	adjacent chunk in use, and or'ed with CINUSE_BIT if this chunk is in
-	use.
-
-	FLAG4_BIT is not used by this malloc, but might be useful in extensions.
+	 * The head field of a chunk is or'ed with PINUSE_BIT when previous
+	 * adjacent chunk in use, and or'ed with CINUSE_BIT if this chunk is in
+	 * use.
+	 *
+     * FLAG4_BIT is not used by this malloc, but might be useful in extensions.
 	*/
 
 	#define PINUSE_BIT						(SIZE_T_ONE)
@@ -312,10 +351,14 @@ namespace xcore
 	#define INUSE_BITS						(PINUSE_BIT|CINUSE_BIT)
 	#define FLAG_BITS 						(PINUSE_BIT|CINUSE_BIT|FLAG4_BIT)
 
-	/* Head value for fence posts */
+    /**
+	 * Head value for fence posts 
+	 */
 	#define FENCEPOST_HEAD					(INUSE_BITS|SIZE_T_SIZE)
-
-	/* extraction of fields from head words */
+  
+    /**
+	 * extraction of fields from head words 
+	 */
 	#define cinuse(p)						((p)->head & CINUSE_BIT)
 	#define pinuse(p)						((p)->head & PINUSE_BIT)
 	#define is_inuse(p)						(((p)->head & INUSE_BITS) != PINUSE_BIT)
@@ -324,37 +367,55 @@ namespace xcore
 
 	#define clear_pinuse(p)					((p)->head &= ~PINUSE_BIT)
 
-	/* Treat space at ptr +/- offset as a chunk */
+    /**
+	 * Treat space at ptr +/- offset as a chunk 
+	 */
 	#define chunk_plus_offset(p, s)			((mchunkptr)(((xbyte*)(p)) + (s)))
 	#define chunk_minus_offset(p, s)		((mchunkptr)(((xbyte*)(p)) - (s)))
 
-	/* Ptr to next or previous physical malloc_chunk. */
+    /**
+	 * Ptr to next or previous physical malloc_chunk. 
+	 */
 	#define next_chunk(p)					((mchunkptr)( ((xbyte*)(p)) + ((p)->head & ~FLAG_BITS)))
 	#define prev_chunk(p)					((mchunkptr)( ((xbyte*)(p)) - ((p)->prev_foot) ))
 
-	/* extract next chunk's pinuse bit */
+    /**
+	 * extract next chunk's pinuse bit 
+	 */
 	#define next_pinuse(p)					((next_chunk(p)->head) & PINUSE_BIT)
 
-	/* Get/set size at footer */
+    /**
+	 * Get/set size at footer 
+	 */
 	#define get_foot(p, s)					(((mchunkptr)((xbyte*)(p) + (s)))->prev_foot)
 	#define set_foot(p, s)					(((mchunkptr)((xbyte*)(p) + (s)))->prev_foot = (s))
-
-	/* Set size, pinuse bit, and foot */
+ 
+    /**
+	 * Set size, pinuse bit, and foot
+	 */
 	#define set_size_and_pinuse_of_free_chunk(p, s)\
 		((p)->head = (s|PINUSE_BIT), set_foot(p, s))
 
-	/* Set size, pinuse bit, foot, and clear next pinuse */
+    /**
+	 * Set size, pinuse bit, foot, and clear next pinuse 
+	 */
 	#define set_free_with_pinuse(p, s, n)\
 		(clear_pinuse(n), set_size_and_pinuse_of_free_chunk(p, s))
 
-	/* Get the internal overhead associated with chunk p */
+    /**
+	 * Get the internal overhead associated with chunk p 
+	 */
 	#define overhead_for(p)					(CHUNK_OVERHEAD)
 
-	/* Return true if malloced space is not necessarily cleared */
+    /**
+	 * Return true if malloced space is not necessarily cleared 
+	 */
 	#define calloc_must_clear(p)			(1)
 
 
-	/* A little helper macro for trees */
+    /**
+	 * A little helper macro for trees 
+	 */
 	#define leftmost_child(t)				((t)->child[0] != 0? (t)->child[0] : (t)->child[1])
 
 
@@ -363,7 +424,9 @@ namespace xcore
 
 
 
-	/* Bin types, widths and sizes */
+    /**
+	 * Bin types, widths and sizes 
+	 */
 	#define SMALLBIN_SHIFT    (3U)
 	#define SMALLBIN_WIDTH    (SIZE_T_ONE << SMALLBIN_SHIFT)
 	#define TREEBIN_SHIFT     (8U)
@@ -372,33 +435,47 @@ namespace xcore
 	#define MAX_SMALL_REQUEST (MAX_SMALL_SIZE - CHUNK_ALIGN_MASK - CHUNK_OVERHEAD)
 
 
-	/* ------------- Global malloc_state and malloc_params ------------------- */
+    /**
+	 * ------------- Global malloc_state and malloc_params ------------------- 
+	 */
 
-	/*
-		malloc_params holds global properties, including those that can be
-		dynamically set using mallopt. There is a single instance, mparams,
-		initialized in init_mparams. Note that the non-zeroness of "magic"
-		also serves as an initialization flag.
-	*/
+	/**
+	 *	malloc_params holds global properties, including those that can be
+	 *	dynamically set using mallopt. There is a single instance, mparams,
+	 *	initialized in init_mparams. Note that the non-zeroness of "magic"
+	 *	also serves as an initialization flag.
+	 */
 
 
-	/* Ensure mparams initialized */
+    /**
+	 * Ensure mparams initialized 
+	 */
 	#define ensure_initialization()			(void)(mParams.magic != 0 || __init_mparams())
 	#define is_initialized(M)				((M)->top != 0)
 
 
-	/* -------------------------- system alloc setup ------------------------- */
+    /**
+	 * -------------------------- system alloc setup ------------------------- 
+	 */
 
-	/* Operations on mflags */
+    /**
+	 * Operations on mflags 
+	 */
 
-	/* For sys_alloc, enough padding to ensure can malloc request on success */
+    /**
+	 * For sys_alloc, enough padding to ensure can malloc request on success 
+	 */
 	#define SYS_ALLOC_PADDING (TOP_FOOT_SIZE + MALLOC_ALIGNMENT)
 
-	/*  True if segment S holds address A */
+    /**
+	 *  True if segment S holds address A 
+	 */
 	#define segment_holds(S, A)\
 		((xbyte*)(A) >= S->base && (xbyte*)(A) < S->base + S->size)
 
-	/* Return segment holding given address */
+    /**
+	 * Return segment holding given address 
+	 */
 	static msegmentptr segment_holding(mstate m, xbyte* addr)
 	{
 		msegmentptr sp = &m->seg;
@@ -412,7 +489,9 @@ namespace xcore
 	}
 
 #if 0
-	/* Return true if segment contains a segment link */
+	/**
+	 * Return true if segment contains a segment link 
+	 */
 	static s32 has_segment_link(mstate m, msegmentptr ss) 
 	{
 		msegmentptr sp = &m->seg;
@@ -426,22 +505,24 @@ namespace xcore
 	}
 #endif
 
-	/*
-		TOP_FOOT_SIZE is padding at the end of a segment, including space
-		that may be needed to place segment records and fence posts when new
-		noncontiguous segments are added.
-	*/
+	/**
+	 *	TOP_FOOT_SIZE is padding at the end of a segment, including space
+	 *	that may be needed to place segment records and fence posts when new
+	 *	noncontiguous segments are added.
+	 */
 	#define TOP_FOOT_SIZE\
 		(align_offset(chunk2mem(0))+pad_request(sizeof(struct malloc_segment))+MIN_CHUNK_SIZE)
 
 
-	/* -------------------------------  Hooks -------------------------------- */
+	/**
+	 * -------------------------------  Hooks -------------------------------- 
+	 */
 
-	/*
-		PREACTION should be defined to return 0 on success, and nonzero on
-		failure. If you are not using locking, you can redefine these to do
-		anything you like.
-	*/
+	/**
+	 *	PREACTION should be defined to return 0 on success, and nonzero on
+	 *	failure. If you are not using locking, you can redefine these to do
+	 *	anything you like.
+	 */
 
 	#ifndef PREACTION
 		#define PREACTION(M) (0)
@@ -452,38 +533,45 @@ namespace xcore
 	#endif  /* POSTACTION */
 
 
-	/*
-		CORRUPTION_ERROR_ACTION is triggered upon detected bad addresses.
-		USAGE_ERROR_ACTION is triggered on detected bad frees and reallocs.
-		The argument p is an address that might have triggered the fault.
-		It is ignored by the two predefined actions, but might be
-		useful in custom actions that try to help diagnose errors.
-	*/
+	/**
+	 *	CORRUPTION_ERROR_ACTION is triggered upon detected bad addresses.
+	 *	USAGE_ERROR_ACTION is triggered on detected bad frees and reallocs.
+	 *	The argument p is an address that might have triggered the fault.
+	 *	It is ignored by the two predefined actions, but might be
+	 *	useful in custom actions that try to help diagnose errors.
+	 */
 
 	#if PROCEED_ON_ERROR
 
-		/* A count of the number of corruption errors causing resets */
+	    /**
+		 * A count of the number of corruption errors causing resets
+		 */
 		s32 malloc_corruption_error_count;
-
-		/* default corruption action */
+		/**
+		 * default corruption action 
+		 */
 		static void reset_on_error(mstate m);
 
 		#define CORRUPTION_ERROR_ACTION(m)  reset_on_error(m)
 		#define USAGE_ERROR_ACTION(m, p)
 
-	#else /* PROCEED_ON_ERROR */
-
+    /**
+     * PROCEED_ON_ERROR 
+	 */
+	#else 
+	    
+	    ///CORRUPTION_ERROR_ACTION
 		#ifndef CORRUPTION_ERROR_ACTION
 			/// TODO: These should be callbacks!!!!
 			#define CORRUPTION_ERROR_ACTION(m)	FatalError()
-		#endif /* CORRUPTION_ERROR_ACTION */
+		#endif ///< CORRUPTION_ERROR_ACTION
 
 		#ifndef USAGE_ERROR_ACTION
 			/// TODO: These should be callbacks!!!!
 			#define USAGE_ERROR_ACTION(m,p)		FatalError()
-		#endif /* USAGE_ERROR_ACTION */
+		#endif ///< USAGE_ERROR_ACTION 
 
-	#endif /* PROCEED_ON_ERROR */
+	#endif ///< PROCEED_ON_ERROR
 
 	/* -------------------------- Debugging setup ---------------------------- */
 
@@ -495,7 +583,8 @@ namespace xcore
 		#define check_malloced_chunk(M,R,P,N)	
 		#define check_malloc_state(M,R)			
 
-	#else /* XMEM_HEAP_DEBUG */
+	/// XMEM_HEAP_DEBUG
+	#else 
 
 		#define check_free_chunk(M,P)			do_check_free_chunk(M,P)
 		#define check_inuse_chunk(M,R,P)		do_check_inuse_chunk(M,R,P)
@@ -514,7 +603,7 @@ namespace xcore
 		static void   do_check_malloc_state(mstate m, malloc_params& mparams);
 		static s32    bin_find(mstate m, mchunkptr x);
 		static xsize_t traverse_and_check(mstate m, malloc_params& mparams);
-	#endif /* XMEM_HEAP_DEBUG */
+	#endif ///< XMEM_HEAP_DEBUG
 
 	/* ---------------------------- Indexing Bins ---------------------------- */
 
@@ -523,7 +612,9 @@ namespace xcore
 	#define small_index2size(i) ((i)  << SMALLBIN_SHIFT)
 	#define MIN_SMALL_INDEX     (small_index(MIN_CHUNK_SIZE))
 
-	/* addressing by index. See above about small bin repositioning */
+	/**
+	 * addressing by index. See above about small bin repositioning 
+	 */
 	#define smallbin_at(M, i)   ((sbinptr)((xbyte*)&((M)->smallbins[(i)<<1])))
 	#define treebin_at(M,i)     (&((M)->treebins[i]))
 
@@ -547,16 +638,22 @@ namespace xcore
 	}
 
 
-	/* Bit representing maximum resolved size in a treebin at i */
+	/**
+	 * Bit representing maximum resolved size in a treebin at i 
+	 */
 	#define bit_for_tree_index(i) \
 		(i == NTREEBINS-1)? (SIZE_T_BITSIZE-1) : (((i) >> 1) + TREEBIN_SHIFT - 2)
 
-	/* Shift placing maximum resolved bit in a treebin at i as sign bit */
+	/**
+	 * Shift placing maximum resolved bit in a treebin at i as sign bit 
+	 */
 	#define leftshift_for_tree_index(i) \
 		((i == NTREEBINS-1)? 0 : \
 		((SIZE_T_BITSIZE-SIZE_T_ONE) - (((i) >> 1) + TREEBIN_SHIFT - 2)))
 
-	/* The size of the smallest chunk held in bin with index i */
+	/**
+	 * The size of the smallest chunk held in bin with index i 
+	 */
 	#define minsize_for_tree_index(i) \
 		((SIZE_T_ONE << (((i) >> 1) + TREEBIN_SHIFT)) |  \
 		(((xsize_t)((i) & SIZE_T_ONE)) << (((i) >> 1) + TREEBIN_SHIFT - 1)))
@@ -567,7 +664,9 @@ namespace xcore
 	/* bit corresponding to given index */
 	#define idx2bit(i)              ((binmap_t)(1) << (i))
 
-	/* Mark/Clear bits with given index */
+	/**
+	 * Mark/Clear bits with given index 
+	 */
 	#define mark_smallmap(M,i)      ((M)->smallmap |=  idx2bit(i))
 	#define clear_smallmap(M,i)     ((M)->smallmap &= ~idx2bit(i))
 	#define smallmap_is_marked(M,i) ((M)->smallmap &   idx2bit(i))
@@ -576,16 +675,24 @@ namespace xcore
 	#define clear_treemap(M,i)      ((M)->treemap  &= ~idx2bit(i))
 	#define treemap_is_marked(M,i)  ((M)->treemap  &   idx2bit(i))
 
-	/* isolate the least set bit of a bitmap */
+	/**
+	 * isolate the least set bit of a bitmap 
+	 */
 	#define least_bit(x)         ((x) & -(x))
 
-	/* mask with all bits to left of least bit of x on */
+	/**
+	 * mask with all bits to left of least bit of x on 
+	 */
 	#define left_bits(x)         ((x<<1) | -(x<<1))
 
-	/* mask with all bits to left of or equal to least bit of x on */
+	/**
+	 * mask with all bits to left of or equal to least bit of x on 
+	 */
 	#define same_or_left_bits(x) ((x) | -(x))
 
-	/* index corresponding to given bit. */
+	/**
+	 * index corresponding to given bit. 
+	 */
 	#define compute_bit2idx(X, I)\
 	{\
 		u32 Y = X - 1;\
@@ -599,90 +706,116 @@ namespace xcore
 	}
 
 
-	/* ----------------------- Runtime Check Support ------------------------- */
+	/**
+     * ----------------------- Runtime Check Support ------------------------- 
+	 */
 
-	/*
-		For security, the main invariant is that malloc/free/etc never
-		writes to a static address other than malloc_state, unless static
-		malloc_state itself has been corrupted, which cannot occur via
-		malloc (because of these checks). In essence this means that we
-		believe all pointers, sizes, maps etc held in malloc_state, but
-		check all of those linked or offsetted from other embedded data
-		structures. These checks are interspersed with main code in a way
-		that tends to minimize their run-time cost.
-
-		When FOOTERS is defined, in addition to range checking, we also
-		verify footer fields of inuse chunks, which can be used guarantee
-		that the mstate controlling malloc/free is intact.  This is a
-		streamlined version of the approach described by William Robertson
-		et al in "Run-time Detection of Heap-based Overflows" LISA'03
-		http://www.usenix.org/events/lisa03/tech/robertson.html The footer
-		of an inuse chunk holds the xor of its mstate and a random seed,
-		that is checked upon calls to free() and realloc().  This is
-		(probablistically) unguessable from outside the program, but can be
-		computed by any code successfully malloc'ing any chunk, so does not
-		itself provide protection against code that has already broken
-		security through some other means.  Unlike Robertson et al, we
-		always dynamically check addresses of all offset chunks (previous,
-		next, etc). This turns out to be cheaper than relying on hashes.
-	*/
+    /**
+	 *	For security, the main invariant is that malloc/free/etc never
+	 *	writes to a static address other than malloc_state, unless static
+	 *	malloc_state itself has been corrupted, which cannot occur via
+	 *	malloc (because of these checks). In essence this means that we
+	 *	believe all pointers, sizes, maps etc held in malloc_state, but
+	 *	check all of those linked or offsetted from other embedded data
+	 *	structures. These checks are interspersed with main code in a way
+	 *	that tends to minimize their run-time cost.
+	 *
+	 *	When FOOTERS is defined, in addition to range checking, we also
+	 *	verify footer fields of inuse chunks, which can be used guarantee
+	 *	that the mstate controlling malloc/free is intact.  This is a
+	 *	streamlined version of the approach described by William Robertson
+	 *	et al in "Run-time Detection of Heap-based Overflows" LISA'03
+	 *	http: *www.usenix.org/events/lisa03/tech/robertson.html The footer
+	 *	of an inuse chunk holds the xor of its mstate and a random seed,
+	 *	that is checked upon calls to free() and realloc().  This is
+	 *	(probablistically) unguessable from outside the program, but can be
+	 *	computed by any code successfully malloc'ing any chunk, so does not
+	 *	itself provide protection against code that has already broken
+	 *	security through some other means.  Unlike Robertson et al, we
+	 *	always dynamically check addresses of all offset chunks (previous,
+	 *	next, etc). This turns out to be cheaper than relying on hashes.
+	 */
 
 	#if !INSECURE
-		/* Check if address a is at least as high as any from MORECORE or MMAP */
+        /**
+		 * Check if address a is at least as high as any from MORECORE or MMAP 
+		 */
 		#define ok_address(M, a) ((xbyte*)(a) >= (M)->least_addr)
-		/* Check if address of next chunk n is higher than base chunk p */
+        /**
+		 * Check if address of next chunk n is higher than base chunk p 
+		 */
 		#define ok_next(p, n)    ((xbyte*)(p) < (xbyte*)(n))
-		/* Check if p has inuse status */
+        /**
+		 * Check if p has inuse status 
+		 */
 		#define ok_inuse(p)     is_inuse(p)
-		/* Check if p has its pinuse bit on */
+        /**
+		 * Check if p has its pinuse bit on 
+		 */
 		#define ok_pinuse(p)     pinuse(p)
 	#else /* !INSECURE */
 		#define ok_address(M, a) (1)
 		#define ok_next(b, n)    (1)
 		#define ok_inuse(p)      (1)
 		#define ok_pinuse(p)     (1)
-	#endif /* !INSECURE */
+	#endif ///< !INSECURE
 
 	#if (FOOTERS && !INSECURE)
-		/* Check if (alleged) mstate m has expected magic field */
+        /**
+		 * Check if (alleged) mstate m has expected magic field 
+		 */
 		#define ok_magic(M)      ((M)->magic == mParams.magic)
 	#else  /* (FOOTERS && !INSECURE) */
 		#define ok_magic(M)      (1)
-	#endif /* (FOOTERS && !INSECURE) */
+	#endif /// (FOOTERS && !INSECURE)
 
 
-	/* In gcc, use __builtin_expect to minimize impact of checks */
+    /**
+	 * In gcc, use __builtin_expect to minimize impact of checks 
+	 */
 	#if !INSECURE
 		#define RTCHECK(e)  (e)
 	#else /* !INSECURE */
 		#define RTCHECK(e)  (1)
-	#endif /* !INSECURE */
+	#endif ///< !INSECURE
 
-	/* macros to set up inuse chunks with or without footers */
+    /**
+	 * macros to set up inuse chunks with or without footers 
+	 */
 
 	#if !FOOTERS
 
 		#define mark_inuse_foot(M,p,s)
 
-		/* Macros for setting head/foot of non-mmapped chunks */
+        /**
+		 * Macros for setting head/foot of non-mmapped chunks 
+		 */
 
-		/* Set cinuse bit and pinuse bit of next chunk */
+        /**
+		 * Set cinuse bit and pinuse bit of next chunk 
+		 */
 		#define set_inuse(M,p,s)\
 			((p)->head = (((p)->head & PINUSE_BIT)|s|CINUSE_BIT),\
 			((mchunkptr)(((xbyte*)(p)) + (s)))->head |= PINUSE_BIT)
 
-		/* Set cinuse and pinuse of this chunk and pinuse of next chunk */
+        /**
+		 * Set cinuse and pinuse of this chunk and pinuse of next chunk 
+		 */
 		#define set_inuse_and_pinuse(M,p,s)\
 			((p)->head = (s|PINUSE_BIT|CINUSE_BIT),\
 			((mchunkptr)(((xbyte*)(p)) + (s)))->head |= PINUSE_BIT)
 
-		/* Set size, cinuse and pinuse bit of this chunk */
+        /**
+		 * Set size, cinuse and pinuse bit of this chunk 
+		 */
 		#define set_size_and_pinuse_of_inuse_chunk(M, p, s)\
 			((p)->head = (s|PINUSE_BIT|CINUSE_BIT))
 
 	#else /* FOOTERS */
 
-		/* Set foot of inuse chunk to be xor of mstate and seed */
+        /**
+		 * Set foot of inuse chunk to be xor of mstate and seed 
+		 */
 		#define mark_inuse_foot(M,p,s)\
 			(((mchunkptr)((xbyte*)(p) + (s)))->prev_foot = ((xsize_t)(M) ^ mParams.magic))
 
@@ -704,7 +837,7 @@ namespace xcore
 			((p)->head = (s|PINUSE_BIT|CINUSE_BIT),\
 			mark_inuse_foot(M, p, s))
 
-	#endif /* !FOOTERS */
+	#endif ///< !FOOTERS
 
 	/* ---------------------------- setting malloc_params -------------------------- */
 
@@ -719,12 +852,12 @@ namespace xcore
 			psize = malloc_getpagesize;
 			gsize = ((DEFAULT_GRANULARITY != 0)? DEFAULT_GRANULARITY : psize);
 
-			/* Sanity-check configuration:
-			xsize_t must be unsigned and as wide as pointer type.
-			ints must be at least 4 bytes.
-			alignment must be at least 8.
-			Alignment, min chunk size, and page size must all be powers of 2.
-			*/
+			/** Sanity-check configuration:
+			 *  xsize_t must be unsigned and as wide as pointer type.
+			 *  ints must be at least 4 bytes.
+			 *  alignment must be at least 8.
+			 *  Alignment, min chunk size, and page size must all be powers of 2.
+			 */
 			if ((sizeof(xsize_t) != sizeof(xbyte*)) ||
 				(MAX_SIZE_T < MIN_CHUNK_SIZE)  ||
 				(sizeof(s32) < 4)  ||
@@ -741,13 +874,15 @@ namespace xcore
 
 			mParams.page_size = psize;
 
-			/* Set up lock for main malloc area */
+			/**
+			 * Set up lock for main malloc area 
+			 */
 			mState->mflags = mParams.default_mflags;
 
 			{
 				magic = (xsize_t)((xsize_t)&mParams ^ (xsize_t)0x55555555U);
-				magic |= (xsize_t)8U;    /* ensure nonzero */
-				magic &= ~(xsize_t)7U;   /* improve chances of fault for bad values */
+				magic |= (xsize_t)8U;    ///< ensure nonzero
+				magic &= ~(xsize_t)7U;   ///< improve chances of fault for bad values
 				mParams.magic = magic;
 			}
 		}
@@ -755,7 +890,9 @@ namespace xcore
 		return 1;
 	}
 
-	/* support for mallopt */
+	/**
+	 * support for mallopt 
+	 */
 	s32 xmem_heap_base::__change_mparam(s32 param_number, s32 value)
 	{
 		xsize_t val;
@@ -776,20 +913,26 @@ namespace xcore
 	}
 
 #if XMEM_HEAP_DEBUG
-	/* ------------------------- Debugging Support --------------------------- */
+	/**
+	 * ------------------------- Debugging Support --------------------------- 
+	 */
 
-	/* Check properties of any chunk, whether free, inuse, mmapped etc  */
+	/**
+	 * Check properties of any chunk, whether free, inuse, mmapped etc  
+	 */
 	static void do_check_any_chunk(mstate m, mchunkptr p) 
 	{
 		ASSERT((is_aligned(chunk2mem(p))) || (p->head == FENCEPOST_HEAD));
 		ASSERT(ok_address(m, p));
 	}
 
-	/* Check properties of top chunk */
+	/**
+	 * Check properties of top chunk 
+	 */
 	static void do_check_top_chunk(mstate m, mchunkptr p) 
 	{
 		msegmentptr sp = segment_holding(m, (xbyte*)p);
-		xsize_t  sz = p->head & ~INUSE_BITS; /* third-lowest bit can be set! */
+		xsize_t  sz = p->head & ~INUSE_BITS; ///< third-lowest bit can be set!
 		ASSERT(sp != 0);
 		ASSERT((is_aligned(chunk2mem(p))) || (p->head == FENCEPOST_HEAD));
 		ASSERT(ok_address(m, p));
@@ -800,17 +943,23 @@ namespace xcore
 		ASSERT(!pinuse(chunk_plus_offset(p, sz)));
 	}
 
-	/* Check properties of inuse chunks */
+	/**
+	 * Check properties of inuse chunks 
+	 */
 	static void do_check_inuse_chunk(mstate m, malloc_params& mparams, mchunkptr p) 
 	{
 		do_check_any_chunk(m, p);
 		ASSERT(is_inuse(p));
 		ASSERT(next_pinuse(p));
-		/* If not pinuse and not mmapped, previous chunk has OK offset */
+		/**
+		 * If not pinuse and not mmapped, previous chunk has OK offset 
+		 */
 		ASSERT(pinuse(p) || next_chunk(prev_chunk(p)) == p);
 	}
 
-	/* Check properties of free chunks */
+	/**
+	 * Check properties of free chunks
+	 */
 	static void do_check_free_chunk(mstate m, mchunkptr p)
 	{
 		xsize_t sz = chunksize(p);
@@ -830,12 +979,18 @@ namespace xcore
 				ASSERT(p->fd->bk == p);
 				ASSERT(p->bk->fd == p);
 			}
-			else  /* markers are always of size SIZE_T_SIZE */
+			
+			/**
+			 * markers are always of size SIZE_T_SIZE
+			 */
+			else  
 				ASSERT(sz == SIZE_T_SIZE);
 		}
 	}
 
-	/* Check properties of malloced chunks at the point they are malloced */
+	/**
+	 * Check properties of malloced chunks at the point they are malloced 
+	 */
 	static void do_check_malloced_chunk(mstate m, malloc_params& mparams, void* mem, xsize_t s)
 	{
 		if (mem != 0)
@@ -846,12 +1001,14 @@ namespace xcore
 			ASSERT((sz & CHUNK_ALIGN_MASK) == 0);
 			ASSERT(sz >= MIN_CHUNK_SIZE);
 			ASSERT(sz >= s);
-			/* unless mmapped, size is less than MIN_CHUNK_SIZE more than request */
+			/// unless mmapped, size is less than MIN_CHUNK_SIZE more than request
 			ASSERT(sz < (s + MIN_CHUNK_SIZE));
 		}
 	}
 
-	/* Check a tree and its subtrees.  */
+	/**
+	 * Check a tree and its subtrees.
+	 */
 	static void do_check_tree(mstate m, tchunkptr t) 
 	{
 		tchunkptr head = 0;
@@ -907,7 +1064,9 @@ namespace xcore
 		ASSERT(head != 0);
 	}
 
-	/*  Check all the chunks in a treebin.  */
+	/**
+	 *  Check all the chunks in a treebin.  
+	 */
 	static void do_check_treebin(mstate m, bindex_t i)
 	{
 		tbinptr* tb = treebin_at(m, i);
@@ -919,7 +1078,9 @@ namespace xcore
 			do_check_tree(m, t);
 	}
 
-	/*  Check all the chunks in a smallbin.  */
+	/**
+	 *  Check all the chunks in a smallbin.  
+	 */
 	static void do_check_smallbin(mstate m, malloc_params& mparams, bindex_t i)
 	{
 		sbinptr b = smallbin_at(m, i);
@@ -934,12 +1095,18 @@ namespace xcore
 			{
 				xsize_t size = chunksize(p);
 				mchunkptr q;
-				/* each chunk claims to be free */
+				/**
+				 * each chunk claims to be free 
+				 */
 				do_check_free_chunk(m, p);
-				/* chunk belongs in bin */
+				/**
+				 * chunk belongs in bin 
+				 */
 				ASSERT(small_index(size) == i);
 				ASSERT(p->bk == b || chunksize(p->bk) == chunksize(p));
-				/* chunk is followed by an inuse chunk */
+				/**
+				 * chunk is followed by an inuse chunk 
+				 */
 				q = next_chunk(p);
 				if (q->head != FENCEPOST_HEAD)
 					do_check_inuse_chunk(m, mparams, q);
@@ -947,7 +1114,9 @@ namespace xcore
 		}
 	}
 
-	/* Find x in a bin. Used in other check functions. */
+	/**
+	 * Find x in a bin. Used in other check functions. 
+	 */
 	static s32 bin_find(mstate m, mchunkptr x)
 	{
 		xsize_t size = chunksize(x);
@@ -992,7 +1161,9 @@ namespace xcore
 		return 0;
 	}
 
-	/* Traverse each chunk and check it; return total */
+	/**
+	 * Traverse each chunk and check it; return total 
+	 */
 	static xsize_t traverse_and_check(mstate m, malloc_params& mparams)
 	{
 		xsize_t sum = 0;
@@ -1027,7 +1198,9 @@ namespace xcore
 		return sum;
 	}
 
-	/* Check all properties of malloc_state. */
+	/**
+	 * Check all properties of malloc_state. 
+	 */
 	static void do_check_malloc_state(mstate m, malloc_params& mparams) 
 	{
 		bindex_t i;
@@ -1105,16 +1278,20 @@ namespace xcore
 //		}
 //	}
 //
-	/* ----------------------- Operations on smallbins ----------------------- */
+	/**
+	 * ----------------------- Operations on smallbins ----------------------- 
+	 */
 
-	/*
-	Various forms of linking and unlinking are defined as macros.  Even
-	the ones for trees, which are very long but have very short typical
-	paths.  This is ugly but reduces reliance on inlining support of
-	compilers.
-	*/
+	/**
+	 *Various forms of linking and unlinking are defined as macros.  Even
+	 *the ones for trees, which are very long but have very short typical
+	 *paths.  This is ugly but reduces reliance on inlining support of
+	 *compilers.
+	 */
 
-	/* Link a free chunk into a small bin  */
+	/**
+	 * Link a free chunk into a small bin  
+	 */
 	#define insert_small_chunk(M, P, S) {\
 		bindex_t I  = small_index(S);\
 		mchunkptr B = smallbin_at(M, I);\
@@ -1133,7 +1310,9 @@ namespace xcore
 		P->bk = B;\
 	}
 
-	/* Unlink a chunk from a small bin  */
+	/**
+	 * Unlink a chunk from a small bin  
+	 */
 	#define unlink_small_chunk(M, P, S) {\
 		mchunkptr F = P->fd;\
 		mchunkptr B = P->bk;\
@@ -1152,7 +1331,9 @@ namespace xcore
 		}\
 	}
 
-	/* Unlink the first chunk from a small bin */
+    /**
+	 * Unlink the first chunk from a small bin 
+	 */
 	#define unlink_first_small_chunk(M, B, P, I) {\
 		mchunkptr F = P->fd;\
 		ASSERT(P != B);\
@@ -1171,8 +1352,10 @@ namespace xcore
 
 
 
-	/* Replace dv node, binning the old one */
-	/* Used only when dvsize known to be small */
+    /**
+	 * Replace dv node, binning the old one
+	 * Used only when dvsize known to be small 
+	 */
 	#define replace_dv(M, P, S) {\
 		xsize_t DVS = M->dvsize;\
 		if (DVS != 0) {\
@@ -1184,9 +1367,13 @@ namespace xcore
 		M->dv = P;\
 	}
 
-	/* ------------------------- Operations on trees ------------------------- */
+    /**
+	 * ------------------------- Operations on trees ------------------------- 
+	 */
 
-	/* Insert chunk into tree */
+    /**
+	 * Insert chunk into tree 
+	 */
 	#define insert_large_chunk(M, X, S) {\
 		tbinptr* H;\
 		bindex_t I;\
@@ -1238,22 +1425,22 @@ namespace xcore
 		}\
 	}
 
-	/*
-	Unlink steps:
-
-	1. If x is a chained node, unlink it from its same-sized fd/bk links
-	and choose its bk node as its replacement.
-	2. If x was the last node of its size, but not a leaf node, it must
-	be replaced with a leaf node (not merely one with an open left or
-	right), to make sure that lefts and rights of descendents
-	correspond properly to bit masks.  We use the rightmost descendent
-	of x.  We could use any other leaf, but this is easy to locate and
-	tends to counteract removal of leftmosts elsewhere, and so keeps
-	paths shorter than minimally guaranteed.  This doesn't loop much
-	because on average a node in a tree is near the bottom.
-	3. If x is the base of a chain (i.e., has parent links) relink
-	x's parent and children to x's replacement (or null if none).
-	*/
+	/** 
+	 * Unlink steps:
+	 * 
+	 * 1. If x is a chained node, unlink it from its same-sized fd/bk links
+	 * and choose its bk node as its replacement.
+	 * 2. If x was the last node of its size, but not a leaf node, it must
+	 * be replaced with a leaf node (not merely one with an open left or
+	 * right), to make sure that lefts and rights of descendents
+	 * correspond properly to bit masks.  We use the rightmost descendent
+	 * of x.  We could use any other leaf, but this is easy to locate and
+	 * tends to counteract removal of leftmosts elsewhere, and so keeps
+	 * paths shorter than minimally guaranteed.  This doesn't loop much
+	 * because on average a node in a tree is near the bottom.
+	 * 3. If x is the base of a chain (i.e., has parent links) relink
+	 * x's parent and children to x's replacement (or null if none).
+	 */
 
 	#define unlink_large_chunk(M, X) {\
 		tchunkptr XP = X->parent;\
@@ -1324,7 +1511,9 @@ namespace xcore
 		}\
 	}
 
-	/* Relays to large vs small bin operations */
+    /**
+	 * Relays to large vs small bin operations 
+	 */
 
 	#define insert_chunk(M, P, S)\
 		if (is_small(S)) insert_small_chunk(M, P, S)\
@@ -1338,12 +1527,18 @@ namespace xcore
 	/* Relays to internal calls to malloc/free from realloc, memalign etc */
 
 	
-	/* -------------------------- xmem_space management -------------------------- */
+    /**
+	 * -------------------------- xmem_space management -------------------------- 
+	 */
 
-	/* Initialize top chunk and its size */
+    /**
+	 * Initialize top chunk and its size 
+	 */
 	static void init_top(mstate m, mchunkptr p, xsize_t psize) 
 	{
-		/* Ensure alignment */
+		/**
+		 * Ensure alignment 
+		 */
 		xsize_t offset = align_offset(chunk2mem(p));
 		p = (mchunkptr)((xbyte*)p + offset);
 		psize -= offset;
@@ -1351,14 +1546,20 @@ namespace xcore
 		m->top = p;
 		m->topsize = psize;
 		p->head = psize | PINUSE_BIT;
-		/* set size of fake trailing chunk holding overhead space only once */
+		/**
+		 * set size of fake trailing chunk holding overhead space only once 
+		 */
 		chunk_plus_offset(p, psize)->head = TOP_FOOT_SIZE;
 	}
 
-	/* Initialize bins for a new mstate that is otherwise zeroed out */
+	/**
+	 * Initialize bins for a new mstate that is otherwise zeroed out 
+	 */
 	static void init_bins(mstate m)
 	{
-		/* Establish circular links for smallbins */
+		/**
+		 * Establish circular links for smallbins 
+		 */
 		bindex_t i;
 		for (i = 0; i < NSMALLBINS; ++i)
 		{
@@ -1369,12 +1570,16 @@ namespace xcore
 
 	#if PROCEED_ON_ERROR
 
-	/* default corruption action */
+	/**
+	 * default corruption action 
+	 */
 	static void reset_on_error(mstate m) 
 	{
 		s32 i;
 		++malloc_corruption_error_count;
-		/* Reinitialize fields to forget about all memory */
+		/**
+		 * Reinitialize fields to forget about all memory 
+		 */
 		m->smallbins = m->treebins = 0;
 		m->dvsize = m->topsize = 0;
 		m->seg.base = 0;
@@ -1386,9 +1591,11 @@ namespace xcore
 		init_bins(m);
 	}
 
-	#endif /* PROCEED_ON_ERROR */
+	#endif ///< PROCEED_ON_ERROR
 
-	/* Add a segment to hold a new noncontiguous region */
+	/**
+	 * Add a segment to hold a new noncontiguous region 
+	 */
 	void xmem_heap_base::__add_segment(void* tbase, xsize_t tsize, s32 sflags)
 	{
 		mstate m = mState;
@@ -1408,19 +1615,25 @@ namespace xcore
 		mchunkptr p = tnext;
 		s32 nfences = 0;
 
-		/* reset top to new space */
+		/**
+		 * reset top to new space 
+		 */
 		init_top(m, (mchunkptr)tbase, tsize - TOP_FOOT_SIZE);
 
-		/* Set up segment record */
+		/**
+		 * Set up segment record 
+		 */
 		ASSERT(is_aligned(ss));
 		set_size_and_pinuse_of_inuse_chunk(m, sp, ssize);
-		*ss = m->seg; /* Push current record */
+		*ss = m->seg; ///< Push current record
 		m->seg.base = (xbyte*)tbase;
 		m->seg.size = tsize;
 		m->seg.next = ss;
 		m->seg.sflags = sflags;
 
-		/* Insert trailing fenceposts */
+		/**
+		 * Insert trailing fenceposts 
+		 */
 		for (;;)
 		{
 			mchunkptr nextp = chunk_plus_offset(p, SIZE_T_SIZE);
@@ -1433,7 +1646,9 @@ namespace xcore
 		}
 		ASSERT(nfences >= 2);
 
-		/* Insert the rest of old top into a bin as an ordinary free chunk */
+		/**
+		 * Insert the rest of old top into a bin as an ordinary free chunk 
+		 */
 		if (csp != old_top)
 		{
 			mchunkptr q = (mchunkptr)old_top;
@@ -1499,17 +1714,21 @@ namespace xcore
 			sp = next;
 		}
 
-		/* Reset check counter */
+		/**
+		 * Reset check counter 
+		 */
 		m->release_checks = ((nsegs > MAX_RELEASE_CHECK_RATE) ? nsegs : MAX_RELEASE_CHECK_RATE);
 		return released;
 	}
 
 
-	/* -----------------------  Initialization of mstate ----------------------- */
+	/**
+	 * -----------------------  Initialization of mstate ----------------------- 
+	 */
 
-	/*
-		Initialize global mstate from a 'given' memory block
-	*/
+	/**
+	 *	Initialize global mstate from a 'given' memory block
+	 */
 
 	void xmem_heap::__initialize()
 	{
@@ -1524,12 +1743,14 @@ namespace xcore
 
 	void xmem_heap::__destroy()
 	{
-		// Release all segments that where obtained from the system
+		/// Release all segments that where obtained from the system
 		__release_unused_segments(mState);
 	}
 
 
-	/* mstate, give block of memory*/
+	/**
+	 * mstate, give block of memory
+	 */
 	void xmem_heap::__manage(void* block, xsize_t nb)
 	{
 		x_memset(block, 0, nb);
@@ -1573,21 +1794,27 @@ namespace xcore
 	}
 
 
-	/* ---------------------------- malloc support --------------------------- */
+	/**
+	 * ---------------------------- malloc support --------------------------- 
+	 */
 
-	/* allocate a large request from the best fitting chunk in a treebin */
+	/**
+	 * allocate a large request from the best fitting chunk in a treebin 
+	 */
 	void* xmem_heap_base::__tmalloc_large(mstate m, xsize_t nb)
 	{
 		tchunkptr v = 0;
-		xsize_t rsize = -nb; /* Unsigned negation */
+		xsize_t rsize = -nb; ///< Unsigned negation
 		tchunkptr t;
 		bindex_t idx;
 		compute_tree_index(nb, idx);
 		if ((t = *treebin_at(m, idx)) != 0) 
 		{
-			/* Traverse tree for this bin looking for node with size == nb */
+			/**
+			 * Traverse tree for this bin looking for node with size == nb 
+			 */
 			xsize_t sizebits = nb << leftshift_for_tree_index(idx);
-			tchunkptr rst = 0;  /* The deepest untaken right subtree */
+			tchunkptr rst = 0;  ///< The deepest untaken right subtree
 			for (;;) 
 			{
 				tchunkptr rt;
@@ -1604,7 +1831,7 @@ namespace xcore
 					rst = rt;
 				if (t == 0)
 				{
-					t = rst; /* set t to least subtree holding sizes > nb */
+					t = rst; ///< set t to least subtree holding sizes > nb
 					break;
 				}
 				sizebits <<= 1;
@@ -1658,7 +1885,9 @@ namespace xcore
 		return 0;
 	}
 
-	/* allocate a small request from the best fitting chunk in a treebin */
+	/**
+	 * allocate a small request from the best fitting chunk in a treebin 
+	 */
 	void* xmem_heap_base::__tmalloc_small(mstate m, xsize_t nb)
 	{
 		tchunkptr t, v;
@@ -1704,7 +1933,9 @@ namespace xcore
 		return 0;
 	}
 
-	/* --------------------------- realloc support --------------------------- */
+	/**
+	 * --------------------------- realloc support --------------------------- 
+	 */
 
 	void* xmem_heap_base::__internal_realloc(mstate m, void* oldmem, xsize_t alignment, xsize_t bytes)
 	{
@@ -1794,16 +2025,18 @@ namespace xcore
 		}
 	}
 
-	/* --------------------------- memalign support -------------------------- */
+	/**
+	 * --------------------------- memalign support -------------------------- 
+	 */
 
 	void* xmem_heap_base::__internal_memalign(xsize_t alignment, xsize_t bytes)
 	{
 		mstate m = mState;
 
-		if (alignment <= MALLOC_ALIGNMENT)    /* Can just use malloc */
+		if (alignment <= MALLOC_ALIGNMENT)    ///< Can just use malloc
 			return __alloc(bytes);
 
-		if (alignment <  MIN_CHUNK_SIZE) /* must be at least a minimum chunk size */
+		if (alignment <  MIN_CHUNK_SIZE)  ///< must be at least a minimum chunk size
 			alignment = MIN_CHUNK_SIZE;
 
 		if ((alignment & (alignment-SIZE_T_ONE)) != 0)
@@ -1839,14 +2072,15 @@ namespace xcore
 
 				if ((((xsize_t)(mem)) % alignment) != 0)
 				{	/* misaligned */
-					/*
-					Find an aligned spot inside chunk.  Since we need to give
-					back leading space in a chunk of at least MIN_CHUNK_SIZE, if
-					the first calculation places us at a spot with less than
-					MIN_CHUNK_SIZE leader, we can move to the next aligned spot.
-					We've allocated enough total room so that this is always
-					possible.
-					*/
+
+					/**  
+					 * Find an aligned spot inside chunk.  Since we need to give
+					 * back leading space in a chunk of at least MIN_CHUNK_SIZE, if
+					 * the first calculation places us at a spot with less than
+					 * MIN_CHUNK_SIZE leader, we can move to the next aligned spot.
+					 * We've allocated enough total room so that this is always
+					 * possible.
+					 */
 					xbyte* br = (xbyte*)mem2chunk((xsize_t)(((xsize_t)(mem + alignment - SIZE_T_ONE)) & -alignment));
 					xbyte* pos = ((xsize_t)(br - (xbyte*)(p)) >= MIN_CHUNK_SIZE)?br : br+alignment;
 					mchunkptr newp = (mchunkptr)pos;
@@ -1892,26 +2126,28 @@ namespace xcore
 		return 0;
 	}
 
-	/* ------------------------ comalloc/coalloc support --------------------- */
+	/**
+	 * ------------------------ comalloc/coalloc support --------------------- 
+	 */
 	void** xmem_heap_base::__internal_ic_alloc(xsize_t n_elements, xsize_t* sizes, s32 opts, void* chunks[])
 	{
-		/*
-		This provides common support for independent_X routines, handling
-		all of the combinations that can result.
+		/**
+		 * This provides common support for independent_X routines, handling
+		 * all of the combinations that can result.
 
-		The opts arg has:
-		bit 0 set if all elements are same size (using sizes[0])
-		bit 1 set if elements should be zeroed
-		*/
+		 * The opts arg has:
+		 * bit 0 set if all elements are same size (using sizes[0])
+		 * bit 1 set if elements should be zeroed
+		 */
 
-		xsize_t    element_size;   /* chunksize of each element, if all same */
-		xsize_t    contents_size;  /* total size of elements */
-		xsize_t    array_size;     /* request size of pointer array */
-		void*     mem;            /* malloced aggregate space */
-		mchunkptr p;              /* corresponding chunk */
-		xsize_t    remainder_size; /* remaining bytes while splitting */
-		void**    marray;         /* either "chunks" or malloced ptr array */
-		mchunkptr array_chunk;    /* chunk for malloced ptr array */
+		xsize_t    element_size;   ///< chunksize of each element, if all same
+		xsize_t    contents_size;  ///< total size of elements */
+		xsize_t    array_size;     ///< request size of pointer array */
+		void*     mem;            ///< malloced aggregate space */
+		mchunkptr p;              ///< corresponding chunk */
+		xsize_t    remainder_size; ///< remaining bytes while splitting */
+		void**    marray;         ///< either "chunks" or malloced ptr array */
+		mchunkptr array_chunk;    ///< chunk for malloced ptr array */
 		xsize_t    size;
 		xsize_t    i;
 
@@ -1951,9 +2187,9 @@ namespace xcore
 
 		size = contents_size + array_size;
 
-		/*
-			Allocate the aggregate chunk.
-		*/
+		/**
+		 *  Allocate the aggregate chunk.
+	     */
 		mem = __alloc(size - CHUNK_OVERHEAD);
 
 		if (mem == 0)
@@ -1966,11 +2202,13 @@ namespace xcore
 		remainder_size = chunksize(p);
 
 		if (opts & 0x2)
-		{       /* optionally clear the elements */
+		{       /// optionally clear the elements
 			x_memset((xsize_t*)mem, 0, remainder_size - SIZE_T_SIZE - array_size);
 		}
 
-		/* If not provided, allocate the pointer array as final part of chunk */
+		/**
+		 * If not provided, allocate the pointer array as final part of chunk 
+		 */
 		if (marray == 0) 
 		{
 			xsize_t  array_chunk_size;
@@ -1981,7 +2219,9 @@ namespace xcore
 			remainder_size = contents_size;
 		}
 
-		/* split out elements */
+		/**
+		 * split out elements 
+		 */
 		for (i = 0; ; ++i)
 		{
 			marray[i] = chunk2mem(p);
@@ -1996,7 +2236,10 @@ namespace xcore
 				p = chunk_plus_offset(p, size);
 			}
 			else 
-			{ /* the final element absorbs any overallocation slop */
+			{
+				/**
+				 * the final element absorbs any overallocation slop 
+				 */
 				set_size_and_pinuse_of_inuse_chunk(m, p, remainder_size);
 				break;
 			}
@@ -2006,7 +2249,9 @@ namespace xcore
 
 		if (marray != chunks)
 		{
-			/* final element must have exactly exhausted chunk */
+			/**
+			 * final element must have exactly exhausted chunk 
+			 */
 			if (element_size != 0)
 			{
 				ASSERT(remainder_size == element_size);
@@ -2020,39 +2265,41 @@ namespace xcore
 		for (i = 0; i != n_elements; ++i)
 			check_inuse_chunk(m, mParams, mem2chunk(marray[i]));
 
-	#endif /* XMEM_HEAP_DEBUG */
+	#endif ///< XMEM_HEAP_DEBUG
 
 		POSTACTION(m);
 		return marray;
 	}
 
 
-	/* -------------------------- public routines ---------------------------- */
+	/**
+	 * -------------------------- public routines ---------------------------- 
+	 */
 
 	void* xmem_heap_base::__alloc(xsize_t bytes)
 	{
-		/*
-		Basic algorithm:
-		If a small request (< 256 bytes minus per-chunk overhead):
-		1. If one exists, use a remainderless chunk in associated smallbin.
-		(Remainderless means that there are too few excess bytes to
-		represent as a chunk.)
-		2. If it is big enough, use the dv chunk, which is normally the
-		chunk adjacent to the one used for the most recent small request.
-		3. If one exists, split the smallest available chunk in a bin,
-		saving remainder in dv.
-		4. If it is big enough, use the top chunk.
-		5. If available, get memory from system and use it
-		Otherwise, for a large request:
-		1. Find the smallest available binned chunk that fits, and use it
-		if it is better fitting than dv chunk, splitting if necessary.
-		2. If better fitting than any binned chunk, use the dv chunk.
-		3. If it is big enough, use the top chunk.
-		4. 
-		5. If available, get memory from system and use it
-
-		The ugly goto's here ensure that postaction occurs along all paths.
-		*/
+		/**
+		 * Basic algorithm:
+		 * If a small request (< 256 bytes minus per-chunk overhead):
+		 * 1. If one exists, use a remainderless chunk in associated smallbin.
+		 * (Remainderless means that there are too few excess bytes to
+		 * represent as a chunk.)
+		 * 2. If it is big enough, use the dv chunk, which is normally the
+		 * chunk adjacent to the one used for the most recent small request.
+		 * 3. If one exists, split the smallest available chunk in a bin,
+		 * saving remainder in dv.
+		 * 4. If it is big enough, use the top chunk.
+		 * 5. If available, get memory from system and use it
+		 * Otherwise, for a large request:
+		 * 1. Find the smallest available binned chunk that fits, and use it
+		 * if it is better fitting than dv chunk, splitting if necessary.
+		 * 2. If better fitting than any binned chunk, use the dv chunk.
+		 * 3. If it is big enough, use the top chunk.
+		 * 4. 
+		 * 5. If available, get memory from system and use it
+		 *
+		 * The ugly goto's here ensure that postaction occurs along all paths.
+		 */
 
 		if (!PREACTION(mState)) 
 		{
@@ -2212,10 +2459,10 @@ namespace xcore
 	void xmem_heap_base::__free(void* mem)
 	{
 		/*
-			Consolidate freed chunks with preceding or succeeding bordering
-			free chunks, if they exist, and then place in a bin. Intermixed
-			with special cases for top, dv and usage errors.
-		*/
+	     * Consolidate freed chunks with preceding or succeeding bordering
+		 * free chunks, if they exist, and then place in a bin. Intermixed
+		 * with special cases for top, dv and usage errors.
+		 */
 
 		if (mem != 0)
 		{
@@ -2230,7 +2477,7 @@ namespace xcore
 			}
 	#else /* FOOTERS */
 			mstate fm = mState;
-	#endif /* FOOTERS */
+	#endif ///< FOOTERS
 			if (!PREACTION(fm))
 			{
 				check_inuse_chunk(fm, mParams, p);
@@ -2364,7 +2611,7 @@ namespace xcore
 			__free(oldmem);
 			return 0;
 		}
-	#endif /* REALLOC_ZERO_BYTES_FREES */
+	#endif ///< REALLOC_ZERO_BYTES_FREES
 		else
 		{
 	#if ! FOOTERS
@@ -2376,7 +2623,7 @@ namespace xcore
 				USAGE_ERROR_ACTION(m, oldmem);
 				return 0;
 			}
-	#endif /* FOOTERS */
+	#endif ///< FOOTERS
 			return __internal_realloc(m, oldmem, alignment, bytes);
 		}
 	}

@@ -6,15 +6,17 @@
 
 namespace xcore
 {
-	// ------------------------------------------------------------------------------
-	// Indexed pool allocator
-	// ------------------------------------------------------------------------------
-	// The indexed pool allocator uses blocks to allocate items from. Initially this
-	// allocator has 1 or more blocks where every block has a number of items to 
-	// allocate from. Every block has a free list and the allocator itself has a list
-	// of blocks which have free items in them.
-	// So the allocator is block oriented and can thus also free unused blocks (shrink).
-	// It is also better for the cache to try and keep blocks full.
+	/**
+     *  ------------------------------------------------------------------------------
+	 *  Indexed pool allocator
+	 *  ------------------------------------------------------------------------------
+	 *  The indexed pool allocator uses blocks to allocate items from. Initially this
+	 *  allocator has 1 or more blocks where every block has a number of items to 
+	 *  allocate from. Every block has a free list and the allocator itself has a list
+	 *  of blocks which have free items in them.
+	 *  So the allocator is block oriented and can thus also free unused blocks (shrink).
+	 *  It is also better for the cache to try and keep blocks full.
+	 */
 	class x_indexed_pool_allocator : public x_iidx_allocator
 	{
 	public:
@@ -73,8 +75,10 @@ namespace xcore
 		{
 			xbyte*				mData;
 
-			// We need to use indices here (relative) since this block will
-			// move in memory when the block array grows or shrinks.
+			/**
+			 * We need to use indices here (relative) since this block will
+			 * move in memory when the block array grows or shrinks.
+			 */
 			u32					mFreeListCnt;
 			u32					mFreeListHead;
 			block_idx_t			mNext;
@@ -187,14 +191,16 @@ namespace xcore
 
 		void			link_alloc_block(block_idx_t block_idx)
 		{
-			// Note:
-			//      Adding it to the tail gives us more chance to
-			//      shrink the block array. If we insert it as the
-			//      block to allocate from then theoretically the
-			//      chance that it will end up as unused is lower.
-			//      This is only valid when the user is allocating
-			//      and deallocating, once the user is only deallocating
-			//      it does not really matter what we do here.
+			/**
+             *  Note:
+			 *       Adding it to the tail gives us more chance to
+			 *       shrink the block array. If we insert it as the
+			 *       block to allocate from then theoretically the
+			 *       chance that it will end up as unused is lower.
+			 *       This is only valid when the user is allocating
+			 *       and deallocating, once the user is only deallocating
+			 *       it does not really matter what we do here.
+			 */
 
 			if (NILL_IDX == mBlockTailAlloc)
 			{
@@ -235,7 +241,7 @@ namespace xcore
 			{
 				block_idx_t block_head_alloc = mBlockHeadFree;
 
-				// Only give 'mGrowNumBlocks' out of the free blocks
+				/// Only give 'mGrowNumBlocks' out of the free blocks
 				for (block_idx_t i=1; i<mGrowNumBlocks; i++)
 				{
 					mBlockHeadFree = mBlocks[mBlockHeadFree].mNext;
@@ -243,7 +249,7 @@ namespace xcore
 						break;
 				}
 
-				// Break the list into 2
+				/// Break the list into 2
 				if (NILL_IDX != mBlockHeadFree)
 				{
 					block_idx_t const new_block_head_free = mBlocks[mBlockHeadFree].mNext;
@@ -309,20 +315,20 @@ namespace xcore
 			ASSERT(mAllocCount==0);
 			if (NULL!=mBlocks)
 			{
-				// Deallocate block data
+				/// Deallocate block data
 				for (block_idx_t i=0; i<mNumBlocks; ++i)
 				{
 					if (mBlocks[i].mData != NULL)
 						mObjectArrayAllocator->deallocate(mBlocks[i].mData);
 				}
 				
-				// Deallocate block array
+				/// Deallocate block array
 				mBlockAllocator->deallocate(mBlocks);
 				mBlocks = NULL;
 				mNumBlocks = 0;
 			}
 
-			// Clear free list
+			/// Clear free list
 			mBlockHeadAlloc = NILL_IDX;
 			mBlockTailAlloc = NILL_IDX;
 			mBlockHeadFree  = NILL_IDX;
@@ -356,7 +362,7 @@ namespace xcore
 				mBlockHeadAlloc = pop_free_blocks(mGrowNumBlocks);
 				if (mBlockHeadAlloc != NILL_IDX)
 				{
-					// Allocate data for those blocks taken from the list
+					/// Allocate data for those blocks taken from the list
 					block_idx_t block_idx = mBlockHeadAlloc;
 					do 
 					{
@@ -399,13 +405,17 @@ namespace xcore
 
 				if ((block->mFreeListCnt == mItemsPerBlock) && mShrinkNumBlocks>0)
 				{
-					// This block could be removed since no one is using it
-					// We can only shrink the mBlock array when this block is
-					// at the end, we cannot erase items since that will kill
-					// the indices that we have given to the user.
+					/**
+                     *  This block could be removed since no one is using it
+					 *  We can only shrink the mBlock array when this block is
+					 *  at the end, we cannot erase items since that will kill
+					 *  the indices that we have given to the user.
+					 */
 					block->dealloc_data(mObjectArrayAllocator);
 
-					// Unlink this block and add it to the mBlockHeadFree list
+					/**
+					 * Unlink this block and add it to the mBlockHeadFree list
+					 */
 					unlink_alloc_block(block_idx);
 					add_free_block(block_idx);
 
@@ -445,7 +455,7 @@ namespace xcore
 			ASSERT(mAllocCount>0);
 
 			xbyte* ptr = (xbyte*)p;
-			// We have to iterate over all the blocks
+			/// We have to iterate over all the blocks
 			for (block_idx_t i=0; i<mNumBlocks; ++i)
 			{
 				xblock& block = mBlocks[i];
