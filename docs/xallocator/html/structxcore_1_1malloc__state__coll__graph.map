@@ -1,0 +1,5 @@
+<map id="G" name="G">
+<area shape="rect" href="$structxcore_1_1malloc__segment.html" title="xcore::malloc_segment" alt="" coords="5,24,163,51"/>
+<area shape="rect" href="$structxcore_1_1malloc__chunk.html" title="xcore::malloc_chunk" alt="" coords="239,24,380,51"/>
+<area shape="rect" href="$structxcore_1_1malloc__tree__chunk.html" title="xcore::malloc_tree_chunk" alt="" coords="445,24,619,51"/>
+</map>
