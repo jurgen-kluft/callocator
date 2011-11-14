@@ -1,0 +1,4 @@
+<map id="G" name="G">
+<area shape="rect" href="$classxcore_1_1x__iextmem.html" title="External block allocator, manages external memory like Texture Memory, Sound Memory by putting bookke..." alt="" coords="5,8,131,35"/>
+<area shape="rect" href="$classxcore_1_1x__allocator__eb_1_1block.html" title="xcore::x_allocator_eb::block" alt="" coords="155,8,341,35"/>
+</map>
