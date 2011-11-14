@@ -14,8 +14,9 @@ namespace xcore
 {
 	#define XMEM_HEAP_DEBUG								1
 
-	//////////////////////////////////////////////////////////////////////////
-	// A memory heap capable of managing multiple segments (based on dlmalloc)
+	/**
+	 * A memory heap capable of managing multiple segments (based on dlmalloc)
+	 */
 	class xmem_heap_base
 	{
 	protected:
@@ -34,8 +35,9 @@ namespace xcore
 	};
 
 
-	//////////////////////////////////////////////////////////////////////////
-	/// xmem_space is an opaque type representing an independent region of space that supports mspace_malloc, etc.
+	/**
+	 * xmem_space is an opaque type representing an independent region of space that supports mspace_malloc, etc.
+	 */
 	class xmem_space : public xmem_heap_base
 	{
 	public:
@@ -46,8 +48,9 @@ namespace xcore
 		void				__initialize(xbyte* tbase, xsize_t tsize);
 	};
 
-	//////////////////////////////////////////////////////////////////////////
-	// A memory heap capable of managing multiple segments (based on dlmalloc)
+	/**
+	 * A memory heap capable of managing multiple segments (based on dlmalloc)
+	 */
 	class xmem_heap : public xmem_heap_base
 	{
 	public:
@@ -168,8 +171,10 @@ namespace xcore
 		} ptr;
 	} bhdr_t;
 
-	/* This structure is embedded at the beginning of each area, giving us
-	 * enough information to cope with a set of areas */
+	/**
+	 * This structure is embedded at the beginning of each area, giving us
+	 *  enough information to cope with a set of areas 
+	 */
 
 	typedef struct area_info_struct
 	{
@@ -201,9 +206,9 @@ namespace xcore
 	} tlsf_t;
 
 
-	/******************************************************************/
-	/**************     Helping functions    **************************/
-	/******************************************************************/
+	/*
+	 *Helping functions
+	 */
 	static void set_bit(s32 nr, u32 * addr);
 	static void clear_bit(s32 nr, u32 * addr);
 	static s32 ls_bit(s32 x);
@@ -375,11 +380,9 @@ namespace xcore
 		return ib;
 	}
 
-	/******************************************************************/
-	/******************** Begin of the allocator code *****************/
-	/******************************************************************/
-
-	/******************************************************************/
+	/**
+	 *Begin of the allocator code
+	 */
 	bool init_memory_pool(xsize_t mem_pool_size, void *mem_pool, xsize_t& outSize, void*& outPool)
 	{
 		tlsf_t *tlsf;
@@ -401,7 +404,7 @@ namespace xcore
 
 		tlsf = (tlsf_t *) mem_pool;
 
-		/* Check if already initialized */
+		/// Check if already initialized
 		if (tlsf->tlsf_signature == TLSF_SIGNATURE)
 		{
 			outPool = (char*)mem_pool;
@@ -540,11 +543,15 @@ namespace xcore
 
 		size = (size < MIN_BLOCK_SIZE) ? MIN_BLOCK_SIZE : ROUNDUP_SIZE(size);
 
-		/* Rounding up the requested size and calculating fl and sl */
+		/**
+		 * Rounding up the requested size and calculating fl and sl 
+		 */
 		MAPPING_SEARCH(&size, &fl, &sl);
 
-		/* Searching a free block, recall that this function changes the values of fl and sl,
-		   so they are not longer valid when the function fails */
+		/**
+		 * Searching a free block, recall that this function changes the values of fl and sl,
+		 * so they are not longer valid when the function fails 
+		 */
 		b = FIND_SUITABLE_BLOCK(tlsf, &fl, &sl);
 
 		if (!b)
@@ -737,11 +744,13 @@ namespace xcore
 
 	#if _DEBUG_TLSF_
 
-	/***************  DEBUG FUNCTIONS   **************/
-
-	/* The following functions have been designed to ease the debugging of */
-	/* the TLSF  structure.  For non-developing  purposes, it may  be they */
-	/* haven't too much worth.  To enable them, _DEBUG_TLSF_ must be set.  */
+	/**
+	 ***************  DEBUG FUNCTIONS   **************
+	 *
+	 * The following functions have been designed to ease the debugging of 
+	 * the TLSF  structure.  For non-developing  purposes, it may  be they 
+	 * haven't too much worth.  To enable them, _DEBUG_TLSF_ must be set.  
+	 */
 
 	extern void dump_memory_region(unsigned char *mem_ptr, u32 size);
 	extern void print_block(bhdr_t * b);
