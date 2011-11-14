@@ -10,11 +10,6 @@ using namespace xcore;
 
 extern xcore::x_iallocator* gSystemAllocator;
 
-struct myobject
-{
-	u32		mIndex;
-};
-
 UNITTEST_SUITE_BEGIN(x_idx_allocator_pool)
 {
 	UNITTEST_FIXTURE(main)
@@ -72,6 +67,11 @@ UNITTEST_SUITE_BEGIN(x_idx_allocator_pool)
 			allocator->clear();
 			allocator->release();
 		}
+
+		struct myobject
+		{
+			u32		mIndex;
+		};
 
 		UNITTEST_TEST(pool_1_3)
 		{
