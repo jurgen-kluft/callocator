@@ -7,56 +7,13 @@
 
 #include "xallocator\x_allocator.h"
 
-///< TLSF allocator
+///< TLSF allocator, Two-Level Segregate Fit
 ///< http://rtportal.upv.es/rtmalloc/
+///< 02/20/2008 - 15:54	TLSF 2.4
 
 namespace xcore
 {
 	#define XMEM_HEAP_DEBUG								1
-
-	//////////////////////////////////////////////////////////////////////////
-	// A memory heap capable of managing multiple segments (based on dlmalloc)
-	class xmem_heap_base
-	{
-	protected:
-		void*				mPool;
-
-	public:
-		void*				__alloc(xsize_t bytes);													///< Normal allocation
-		void*				__allocA(xsize_t alignment, xsize_t size);								///< Aligned allocation
-		void*				__allocR(void* ptr, xsize_t size);										///< Re allocation
-		void*				__allocN(xsize_t n_elements, xsize_t element_size);						///< Elements allocation
-		void**				__allocIC(xsize_t n_elements, xsize_t element_size, void** chunks);		///< Independent continues with equal sized elements
-		void**				__allocICO(xsize_t n_elements, xsize_t* element_sizes, void** chunks);	///< Independent continues with different size specified for every element
-		void				__free(void* ptr);
-
-		u32					__usable_size(void* mem);
-	};
-
-
-	//////////////////////////////////////////////////////////////////////////
-	/// xmem_space is an opaque type representing an independent region of space that supports mspace_malloc, etc.
-	class xmem_space : public xmem_heap_base
-	{
-	public:
-		void				__manage(void* mem, xsize_t size);
-		void				__destroy();
-
-	private:
-		void				__initialize(xbyte* tbase, xsize_t tsize);
-	};
-
-	//////////////////////////////////////////////////////////////////////////
-	// A memory heap capable of managing multiple segments (based on dlmalloc)
-	class xmem_heap : public xmem_heap_base
-	{
-	public:
-		void				__initialize();
-		void				__destroy();
-
-		void				__manage(void* mem, xsize_t size);
-	};
-
 
 
 	xsize_t		get_used_size(void *);
@@ -584,11 +541,6 @@ namespace xcore
 		bhdr_t *b, *tmp_b;
 		s32 fl = 0, sl = 0;
 
-		if (!ptr)
-		{
-			return;
-		}
-
 		b = (bhdr_t *) ((char *) ptr - BHDR_OVERHEAD);
 		b->size |= FREE_BLOCK;
 
@@ -892,7 +844,8 @@ namespace xcore
 
 		virtual void			deallocate(void* ptr)
 		{
-			free_ex(ptr, mPool);
+			if (ptr!=NULL)
+				free_ex(ptr, mPool);
 		}
 
 		virtual void			release()

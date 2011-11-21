@@ -11,7 +11,7 @@ namespace xcore
 	{
 	public:
 							x_allocator_eb();
-							x_allocator_eb(void* beginAddress, u32 size, x_iallocator* allocator, x_iextmem *extmem_access);
+							x_allocator_eb(void* beginAddress, u32 size, x_iallocator* allocator, xextmem_copy extmem_copy);
 		virtual				~x_allocator_eb();
 
 
@@ -60,7 +60,7 @@ namespace xcore
 		u32					mTotalSize;
 		u32					mFreeSize;
 		x_iallocator*		mAllocator;		// for block
-		x_iextmem*			mExtmemAccess;
+		xextmem_copy		mExtmemCopy;
 		block*				mElemListHead;	// head of block linked list 
 
 		block*				createNewBlock(u32 addressOffset, u32 blockSize, xbool isFree);
@@ -102,12 +102,12 @@ namespace xcore
 
 	}
 
-	x_allocator_eb::x_allocator_eb(void* beginAddress, u32 size, x_iallocator* allocator, x_iextmem *extmem_access)
+	x_allocator_eb::x_allocator_eb(void* beginAddress, u32 size, x_iallocator* allocator, xextmem_copy extmem_copy)
 		: mBeginAddress(beginAddress)
 		, mTotalSize(size)
 		, mFreeSize(size)
 		, mAllocator(allocator)
-		, mExtmemAccess(extmem_access)
+		, mExtmemCopy(extmem_copy)
 		, mElemListHead(NULL)
 	{ 
 		initialize(beginAddress, size, allocator);
@@ -254,7 +254,7 @@ namespace xcore
 				void* sourcePtr = (void*)((u32)(targetBlock->address) + (u32)mBeginAddress);
 				
 				// Copy the existing data from old block to the new block.
-				mExtmemAccess->copy(sourcePtr, targetBlock->size, newPtr, size);
+				mExtmemCopy(sourcePtr, targetBlock->size, newPtr, size);
 
 				// deallocate target block
 				deallocate(sourcePtr);
@@ -411,10 +411,10 @@ namespace xcore
 	}
 
 
-	x_iallocator*		gCreateEbAllocator(void* mem, s32 memsize, x_iallocator *allocator, x_iextmem *extmem_access)
+	x_iallocator*		gCreateEbAllocator(void* mem, s32 memsize, x_iallocator *allocator, xextmem_copy extmem_copy)
 	{
 		void* memForEBallocator = allocator->allocate(sizeof(x_allocator_eb), X_MEMALIGN);
-		x_allocator_eb* ebAllocator = new (memForEBallocator) x_allocator_eb(mem, memsize, allocator, extmem_access);
+		x_allocator_eb* ebAllocator = new (memForEBallocator) x_allocator_eb(mem, memsize, allocator, extmem_copy);
 		return ebAllocator;
 	}
 

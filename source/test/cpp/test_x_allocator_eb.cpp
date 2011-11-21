@@ -16,22 +16,17 @@ UNITTEST_SUITE_BEGIN(x_allocator_eb)
 		s32				gBlockSize;
 		x_iallocator*	gCustomAllocator;
 
-		class external_mem_access : public x_iextmem
+		static void	my_extmem_copy(void const* src, u32 src_size, void* dst, u32 dst_size)
 		{
-		public:
-			virtual void	copy(void const* src, u32 src_size, void* dst, u32 dst_size)
-			{
 
-			}
-		};
-		external_mem_access	gExternalMemCpy;
+		}
 
         UNITTEST_FIXTURE_SETUP()
 		{
 			gBlockSize = 128 * 1024;
 			gBlock = gSystemAllocator->allocate(gBlockSize, 8);
 			
-			gCustomAllocator = gCreateEbAllocator(gBlock, gBlockSize, gSystemAllocator, &gExternalMemCpy);
+			gCustomAllocator = gCreateEbAllocator(gBlock, gBlockSize, gSystemAllocator, &my_extmem_copy);
 		}
 
         UNITTEST_FIXTURE_TEARDOWN()
