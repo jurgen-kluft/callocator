@@ -9,7 +9,7 @@ using namespace xcore;
 UNITTEST_SUITE_LIST(xAllocatorUnitTest);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_dlmalloc);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_tlfs);
-UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_fst);
+UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_pool);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_eb);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_idx_allocator_array);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_idx_allocator_pool);

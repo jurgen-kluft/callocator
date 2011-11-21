@@ -8,8 +8,6 @@
 
 #ifdef TARGET_PS3
 #pragma diag_suppress=no_corresponding_delete
-//#pragma diag_warning=no_corresponding_delete
-//#pragma diag_error=no_corresponding_delete
 #endif
 
 namespace xcore
@@ -133,18 +131,6 @@ namespace xcore
 
 
 	//////////////////////////////////////////////////////////////////////////
-	/// xmem_space is an opaque type representing an independent region of space that supports mspace_malloc, etc.
-	class xmem_space : public xmem_heap_base
-	{
-	public:
-		void				__manage(void* mem, xsize_t size);
-		void				__destroy();
-
-	private:
-		void				__initialize(xbyte* tbase, xsize_t tsize);
-	};
-
-	//////////////////////////////////////////////////////////////////////////
 	// A memory heap capable of managing multiple segments (based on dlmalloc)
 	class xmem_heap : public xmem_heap_base
 	{
@@ -160,12 +146,7 @@ namespace xcore
 		malloc_state		mStateData;
 	};
 
-
-
-
-
-
-
+	
 
 	#define FOOTERS											1
 	#define INSECURE										0
@@ -2469,69 +2450,7 @@ namespace xcore
 //		}
 //	}
 
-
-
-	/* ----------------------------- xmem_space ---------------------------- */
-	/* ----------------------------- xmem_space ---------------------------- */
-	/* ----------------------------- xmem_space ---------------------------- */
-	/* ----------------------------- xmem_space ---------------------------- */
-
-	void xmem_space::__initialize(xbyte* tbase, xsize_t tsize) 
-	{
-		mSysAlloc = NULL;
-		mSysFree = NULL;
-
-		xsize_t msize = pad_request(sizeof(struct malloc_state));
-		mchunkptr mn;
-		mchunkptr msp = align_as_chunk(tbase);
-		mstate m = (mstate)(chunk2mem(msp));
-		x_memset(m, 0, msize);
-		msp->head = (msize|INUSE_BITS);
-		m->seg.base = m->least_addr = tbase;
-		m->seg.size = m->footprint = m->max_footprint = tsize;
-		m->magic = mParams.magic;
-		m->release_checks = MAX_RELEASE_CHECK_RATE;
-		m->mflags = mParams.default_mflags;
-		init_bins(m);
-		mn = next_chunk(mem2chunk(m));
-		init_top(m, mn, (xsize_t)((tbase + tsize) - (xbyte*)mn) - TOP_FOOT_SIZE);
-		check_top_chunk(m, m->top);
-		mState = m;
-	}
-
-	void xmem_space::__manage(void* mem, xsize_t size)
-	{
-		xsize_t msize;
-		ensure_initialization();
-		msize = pad_request(sizeof(struct malloc_state));
-		if (size > msize + TOP_FOOT_SIZE && size < (xsize_t) -(msize + TOP_FOOT_SIZE + mParams.page_size))
-		{
-			__initialize((xbyte*)mem, size);
-			mState->seg.sflags |= EXTERN_BIT;
-		}
-	}
-
-	void xmem_space::__destroy()
-	{
-		xsize_t freed = 0;
-		mstate ms = mState;
-		if (ok_magic(ms))
-		{
-			msegmentptr sp = &ms->seg;
-			while (sp != 0)
-			{
-				xsize_t size = sp->size;
-				sp = sp->next;
-				freed += size;
-			}
-		}
-		else 
-		{
-			USAGE_ERROR_ACTION(ms,ms);
-		}
-		mState = 0;
-	}
-
+	
 	xcore::u32	xmem_heap::__sGetMemSize(void* mem)
 	{
 		mchunkptr chunkPtr = mem2chunk(mem);
@@ -2573,7 +2492,8 @@ namespace xcore
 
 		virtual void			deallocate(void* ptr)
 		{
-			mDlMallocHeap.__free(ptr);
+			if (ptr!=NULL)
+				mDlMallocHeap.__free(ptr);
 		}
 
 
@@ -2602,7 +2522,5 @@ namespace xcore
 };	///< namespace xcore
 
 #ifdef TARGET_PS3
-//#pragma diag_suppress=no_corresponding_delete
 #pragma diag_warning=no_corresponding_delete
-//#pragma diag_error=no_corresponding_delete
 #endif
