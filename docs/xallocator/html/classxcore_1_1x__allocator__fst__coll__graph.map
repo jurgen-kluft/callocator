@@ -1,4 +1,0 @@
-<map id="G" name="G">
-<area shape="rect" href="$classxcore_1_1x__fst__elem.html" title="Fixed size type, element  It implements linked list behavior for free elements in the block..." alt="" coords="56,5,181,32"/>
-<area shape="rect" href="$classxcore_1_1x__fst__block.html" title="x_fst_block contains an array of x_fst_elem objects. This is the smallest memory chunk which is alloc..." alt="" coords="197,96,325,123"/>
-</map>
