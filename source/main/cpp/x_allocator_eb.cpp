@@ -11,13 +11,11 @@ namespace xcore
 	{
 	public:
 							x_allocator_eb();
-							x_allocator_eb(void* beginAddress, u32 size, x_iallocator* allocator, x_iextmem *extmem_access);
+							x_allocator_eb(void* beginAddress, u32 size, x_iallocator* allocator, xextmem_copy extmem_copy);
 		virtual				~x_allocator_eb();
 
 
-		/**
-		 * bookkeeping data head
-		 */
+		// bookkeeping data head
 		class block
 		{
 		public:
@@ -32,7 +30,7 @@ namespace xcore
 				next = NULL;
 			}
 
-			void*				address;	///< offset to the begin address
+			void*				address;	// offset to the begin address
 			u32					size;
 			xbool				isFree;
 			block*				previous;
@@ -61,17 +59,15 @@ namespace xcore
 		void*				mBeginAddress;
 		u32					mTotalSize;
 		u32					mFreeSize;
-		x_iallocator*		mAllocator;		///< for block
-		x_iextmem*			mExtmemAccess;
-		block*				mElemListHead;	///< head of block linked list 
+		x_iallocator*		mAllocator;		// for block
+		xextmem_copy		mExtmemCopy;
+		block*				mElemListHead;	// head of block linked list 
 
 		block*				createNewBlock(u32 addressOffset, u32 blockSize, xbool isFree);
 		block*				getTheBestFitBlockForAllocation(u32 allocSize, u32 alignment);
 		block*				getBlock(void* ptr);
 
-		/**
-		 * Copy construction and assignment are forbidden
-		 */
+		// Copy construction and assignment are forbidden
 							x_allocator_eb(const x_allocator_eb&);
 							x_allocator_eb& operator= (const x_allocator_eb&);
 	};
@@ -106,12 +102,12 @@ namespace xcore
 
 	}
 
-	x_allocator_eb::x_allocator_eb(void* beginAddress, u32 size, x_iallocator* allocator, x_iextmem *extmem_access)
+	x_allocator_eb::x_allocator_eb(void* beginAddress, u32 size, x_iallocator* allocator, xextmem_copy extmem_copy)
 		: mBeginAddress(beginAddress)
 		, mTotalSize(size)
 		, mFreeSize(size)
 		, mAllocator(allocator)
-		, mExtmemAccess(extmem_access)
+		, mExtmemCopy(extmem_copy)
 		, mElemListHead(NULL)
 	{ 
 		initialize(beginAddress, size, allocator);
@@ -131,13 +127,13 @@ namespace xcore
 
 		block* new_block = createNewBlock(0, mFreeSize, xTRUE);
 
-		/// add the block into the linked list
+		// add the block into the linked list
 		mElemListHead = new_block;
 	}
 
 	void x_allocator_eb::release()
 	{
-		/// Make sure we release our blocks
+		// Make sure we release our blocks
 		block* b = mElemListHead;
 		while (b != NULL)
 		{
@@ -166,7 +162,7 @@ namespace xcore
 
 		if (addrOffset > 0)
 		{
-			/// create a new free block before the allocated block
+			// create a new free block before the allocated block
 			block* freeBlock1 = createNewBlock( (u32)(sourceBlock->address), addrOffset, xTRUE);
 			freeBlock1->next = new_block;
 			new_block->previous = freeBlock1;
@@ -175,20 +171,20 @@ namespace xcore
 
 		if(neededSize < sourceBlock->size)
 		{
-			/// create a new free block after the allocated block
+			// create a new free block after the allocated block
 			block* freeBlock2 = createNewBlock( offsetAddr + alignedSize, sourceBlock->size - neededSize, xTRUE);
 			freeBlock2->previous = new_block;
 			new_block->next = freeBlock2;
 			lastBlock = freeBlock2;
 		}
 
-		/// insert the new blocks into the linked list
+		// insert the new blocks into the linked list
 		if(sourceBlock->previous != NULL)
 		{
 			sourceBlock->previous->next = firstBlock;
 			firstBlock->previous = sourceBlock->previous;
 		}
-		else /// sourceBlock is the head of linked list
+		else // sourceBlock is the head of linked list
 		{
 			ASSERT(sourceBlock == mElemListHead);
 			mElemListHead = firstBlock;
@@ -202,7 +198,7 @@ namespace xcore
 
 		mAllocator->deallocate(sourceBlock);
 
-		/// update the allocator
+		// update the allocator
 		mFreeSize-=alignedSize;
 
 		return (void*)((u32)(new_block->address) + (u32)mBeginAddress);
@@ -223,10 +219,10 @@ namespace xcore
 			block* nextBlock = targetBlock->next;
 			if(nextBlock != NULL && nextBlock->isFree && nextBlock->size >= neededSize)
 			{
-				/// resize the block
+				// resize the block
 				targetBlock->size = alignedSize;
 
-				/// update the block next to the reallocated block
+				// update the block next to the reallocated block
 				u32 leftSize = nextBlock->size - neededSize;
 				if(leftSize > 0)
 				{
@@ -235,35 +231,35 @@ namespace xcore
 				}
 				else
 				{
-					/// no left memory in the next block, so remove it
+					// no left memory in the next block, so remove it
 					if(nextBlock->next != NULL)
 					{
 						nextBlock->next->previous = targetBlock;
 						targetBlock->next = nextBlock->next;
 					}
-					else /// there is no blocks after the target block
+					else // there is no blocks after the target block
 					{
 						targetBlock->next = NULL;
 					}
 					mAllocator->deallocate(nextBlock);
 				}
 
-				/// update the allocator
+				// update the allocator
 				mFreeSize -= neededSize;
 			}
 			else 
 			{
-				/// Allocate a new block for new size
+				// Allocate a new block for new size
 				newPtr = allocate(size, alignment);
 				void* sourcePtr = (void*)((u32)(targetBlock->address) + (u32)mBeginAddress);
 				
-				/// Copy the existing data from old block to the new block.
-				mExtmemAccess->copy(sourcePtr, targetBlock->size, newPtr, size);
+				// Copy the existing data from old block to the new block.
+				mExtmemCopy(sourcePtr, targetBlock->size, newPtr, size);
 
-				/// deallocate target block
+				// deallocate target block
 				deallocate(sourcePtr);
 
-			} ///< END IF (nextBlock != NULL && nextBlock->isFree && nextBlock->size >= neededSize)
+			} // END IF (nextBlock != NULL && nextBlock->isFree && nextBlock->size >= neededSize)
 		}
 
 		return newPtr;
@@ -279,7 +275,7 @@ namespace xcore
 		u32 releasedSize = targetBlock->size;
 		targetBlock->isFree = xTRUE;
 
-		/// IF its neighbors are also free blocks, combine them into a bigger one and deallocate the block
+		// IF its neighbors are also free blocks, combine them into a bigger one and deallocate the block
 		block* prevBlock = targetBlock->previous;
 		block* nextBlock = targetBlock->next;
 
@@ -315,7 +311,7 @@ namespace xcore
 			mAllocator->deallocate(nextBlock);
 		}
 
-		/// update the allocator
+		// update the allocator
 		mFreeSize += releasedSize;
 	}
 
@@ -335,8 +331,8 @@ namespace xcore
 		u32 alignedSize = x_intu::alignUp(allocSize, alignment);
 
 		block* bestFitBlock = NULL;
-		u32 bestFitBlockNumber = 3;	///< the number of blocks after allocation, the maximum would be 3
-		u32 bestFitUnusedSize = 0xFFFFFFFF; ///< the unused size of the free block after allocation.
+		u32 bestFitBlockNumber = 3;	// the number of blocks after allocation, the maximum would be 3
+		u32 bestFitUnusedSize = 0xFFFFFFFF; // the unused size of the free block after allocation.
 
 		while( currentBlock != NULL)
 		{
@@ -353,11 +349,11 @@ namespace xcore
 					u32 unusedSize = 0;
 
 					unusedSize += currentBlock->size - alignedSize;
-					if(addrOffset > 0)	///< need to create a free block before the allocated block
+					if(addrOffset > 0)	// need to create a free block before the allocated block
 					{
 						blockNum+=1;
 					}
-					if( neededSize < currentBlock->size) ///< need to create a free block after the allocated block
+					if( neededSize < currentBlock->size) // need to create a free block after the allocated block
 					{
 						blockNum+=1;
 					}
@@ -375,7 +371,7 @@ namespace xcore
 
 		} // END WHILE
 
-		ASSERT(bestFitBlock != NULL); ///< Fatal error! Could not find a block for allocation. Out of memory.
+		ASSERT(bestFitBlock != NULL); // Fatal error! Could not find a block for allocation. Out of memory.
 		return bestFitBlock;
 	}
 
@@ -395,7 +391,7 @@ namespace xcore
 			
 		} // END WHILE
 
-		ASSERT(0); ///< not found the block
+		ASSERT(0); // not found the block
 		return NULL;
 	}
 
@@ -415,10 +411,10 @@ namespace xcore
 	}
 
 
-	x_iallocator*		gCreateEbAllocator(void* mem, s32 memsize, x_iallocator *allocator, x_iextmem *extmem_access)
+	x_iallocator*		gCreateEbAllocator(void* mem, s32 memsize, x_iallocator *allocator, xextmem_copy extmem_copy)
 	{
 		void* memForEBallocator = allocator->allocate(sizeof(x_allocator_eb), X_MEMALIGN);
-		x_allocator_eb* ebAllocator = new (memForEBallocator) x_allocator_eb(mem, memsize, allocator, extmem_access);
+		x_allocator_eb* ebAllocator = new (memForEBallocator) x_allocator_eb(mem, memsize, allocator, extmem_copy);
 		return ebAllocator;
 	}
 
