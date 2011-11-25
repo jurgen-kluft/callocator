@@ -9,100 +9,99 @@
 
 namespace xcore
 {
-	/**
-	 * @brief		Fixed size type, element
-	 * @desc		It implements linked list behavior for free elements in the block.
-	 */
-	class x_fst_elem
+	namespace xpool_allocator
 	{
-	public:
-		/// This part is a little bit dirty...
-		x_fst_elem*			getNext()							{ return *reinterpret_cast<x_fst_elem**>(&mData); }
-		void				setNext(x_fst_elem* next)			{ x_fst_elem** temp = reinterpret_cast<x_fst_elem**>(&mData); *temp = next; }
-		void*				getObject()							{ return (void*)&mData; }
-	private:
-		u32					mData;	
-	};
-
-
-	/**
-	 * @brief	x_fst_block contains an array of x_fst_elem objects. This is the smallest
-	 *		memory chunk which is allocated from system (via allocated/deallocator) and is the
-	 *		smallest unit by which the allocator can grow. The inElemSize and inNumElements 
-	 *		parameter sent to init function determines the size of the block.
-	 */
-	class x_fst_block
-	{
-	public:
-							x_fst_block() : mElementArray (0) {}
-
-		void				init(x_iallocator* allocator, u32 inElemSize, u32 inNumElements, s32 inAlignment);
-		void				release(x_iallocator* allocator);
-
-		x_fst_elem*			getAt(s32 inElemIndex, s32 inElemSize)
+		/**
+		@brief		Fixed size type, element
+		@desc		It implements linked list behavior for free elements in the block.
+		**/
+		class xelement	
 		{
-			x_fst_elem*	elem = (x_fst_elem*)((u32)mElementArray + (inElemIndex * inElemSize));
-			return elem;
-		}
+		public:
+			// This part is a little bit dirty...
+			xelement*			getNext()							{ return *reinterpret_cast<xelement**>(&mData); }
+			void				setNext(xelement* next)				{ xelement** temp = reinterpret_cast<xelement**>(&mData); *temp = next; }
+			void*				getObject()							{ return (void*)&mData; }
+		private:
+			u32					mData;	
+		};
+
+
+		/**
+		@brief	xblock contains an array of xelement objects. This is the smallest
+				memory chunk which is allocated from system (via allocated/deallocator) and is the
+				smallest unit by which the allocator can grow. The inElemSize and inNumElements 
+				parameter sent to init function determines the size of the block.
+		**/
+		class xblock
+		{
+		public:
+								xblock() : mElementArray (0) {}
+
+			void				init(x_iallocator* allocator, u32 inElemSize, u32 inNumElements, s32 inAlignment);
+			void				release(x_iallocator* allocator);
+
+			xelement*			getAt(s32 inElemIndex, s32 inElemSize)
+			{
+				xelement*	elem = (xelement*)((u32)mElementArray + (inElemIndex * inElemSize));
+				return elem;
+			}
 			
-	public:
-		x_fst_elem*			mElementArray;
-	};
+		public:
+			xelement*			mElementArray;
+		};
 
-	void		x_fst_block::init(x_iallocator* allocator, u32 inElemSize, u32 inNumElements, s32 inAlignment)
-	{
-		ASSERT(inElemSize != 0);			// Check input parameters
-		ASSERT(inNumElements > 0);
+		void		xblock::init(x_iallocator* allocator, u32 inElemSize, u32 inNumElements, s32 inAlignment)
+		{
+			ASSERT(inElemSize != 0);			// Check input parameters
+			ASSERT(inNumElements > 0);
 		
-		void* p = allocator->allocate(inElemSize * inNumElements, inAlignment);
-   		mElementArray = static_cast<x_fst_elem*>((void*)p);
+			void* p = allocator->allocate(inElemSize * inNumElements, inAlignment);
+			mElementArray = static_cast<xelement*>((void*)p);
 		
-		ASSERT(mElementArray != 0);
-	}
+			ASSERT(mElementArray != 0);
+		}
 
-	void x_fst_block::release(x_iallocator* allocator)
-	{ 
-   		allocator->deallocate(mElementArray);
-		mElementArray = 0;
+		void xblock::release(x_iallocator* allocator)
+		{ 
+			allocator->deallocate(mElementArray);
+			mElementArray = 0;
+		}
 	}
 
 	/**
-	 * @brief	x_allocator_fst is a fast allocator for objects of fixed size.
+	@brief	x_allocator_pool is a fast allocator for objects of fixed size.
 
-	 * @desc	It preallocates (from @allocator) @inInitialBlockCount blocks with @inBlockSize T elements.
-	 * 		By calling Allocate an application can fetch one T object. By calling Deallocate
-	 * 		an application returns one T object to pool.
-	 * 		When all objects on the pool are used, pool can grow to accommodate new requests.
-	 * 		@inGrowthCount specifies by how many blocks the pool will grow.
-	 * 		Reset reclaims all objects and reinitializes the pool. The parameter RestoreToInitialSize
-	 * 		can be used to resize the pool to initial size in case it grew.
+	@desc	It preallocates (from @allocator) @inInitialBlockCount blocks with @inBlockSize T elements.
+			By calling Allocate an application can fetch one T object. By calling Deallocate
+			an application returns one T object to pool.
+			When all objects on the pool are used, pool can grow to accommodate new requests.
+			@inGrowthCount specifies by how many blocks the pool will grow.
+			Reset reclaims all objects and reinitializes the pool. The parameter RestoreToInitialSize
+			can be used to resize the pool to initial size in case it grew.
 
-	 * @note	This allocator does not guarantee that two objects allocated sequentially are sequential in memory.
-	 */
-	class x_allocator_fst : public x_iallocator
+	@note	This allocator does not guarantee that two objects allocated sequentially are sequential in memory.
+	**/
+	class x_allocator_pool : public x_iallocator
 	{
 	public:
-								x_allocator_fst();
+								x_allocator_pool();
 
-        /**
-		 * @inElemSize			This determines the size in bytes of an element
-		 * @inBlockElemCnt		This determines the number of elements that are part of a block
-		 * @inInitialBlockCount	Initial number of blocks in the memory pool
-		 * @inBlockGrowthCount	Number of blocks by which it will grow if all space is used
-		 * @inElemAlignment		Alignment of the start of each pool (can be 0, which creates fixed size memory pool)
-		 */
-								x_allocator_fst(x_iallocator* allocator, u32 inElemSize, u32 inBlockElemCnt, u32 inInitialBlockCount, u32 inBlockGrowthCount, u32 inElemAlignment = 0);
-		virtual					~x_allocator_fst();
+		// @inElemSize			This determines the size in bytes of an element
+		// @inBlockElemCnt		This determines the number of elements that are part of a block
+		// @inInitialBlockCount	Initial number of blocks in the memory pool
+		// @inBlockGrowthCount	Number of blocks by which it will grow if all space is used
+		// @inElemAlignment		Alignment of the start of each pool (can be 0, which creates fixed size memory pool)
+								x_allocator_pool(x_iallocator* allocator, u32 inElemSize, u32 inBlockElemCnt, u32 inInitialBlockCount, u32 inBlockGrowthCount, u32 inElemAlignment = 0);
+		virtual					~x_allocator_pool();
 
 		virtual const char*		name() const
 		{
-			return "fixed size allocator";
+			return "pool allocator";
 		}
 
-		/**
-		 * @name	Should be called when created with default constructor
-		 *			Parameters are the same as for constructor with parameters
-		 */
+		///@name	Should be called when created with default constructor
+		//			Parameters are the same as for constructor with parameters
 		void					init(x_iallocator* allocator, u32 inElemSize, u32 inBlockElemCnt, u32 inInitialBlockCount, u32 inBlockGrowthCount, u32 inElemAlignment);
 
 		///@name	Resets allocator
@@ -130,30 +129,28 @@ namespace xcore
 
 	protected:
 		x_iallocator*			mAllocator;
-		x_fst_block*			mBlockArray;
+		xpool_allocator::xblock*	mBlockArray;
 		u32						mBlockArraySize;
-		u32						mBlockArrayCapacity;		///< Real size of the block array (to avoid excessive reallocation)
-		x_fst_elem*				mFirstFreeElement;			///< First free element in the free list
+		u32						mBlockArrayCapacity;		// Real size of the block array (to avoid excessive reallocation)
+		xpool_allocator::xelement*	mFirstFreeElement;		// First free element in the free list
 
-		/**
-		 * Save initial parameters
-		 */
+		// Save initial parameters
 		u32						mElemSize;
 		u32						mElemAlignment;
 		u32 					mBlockElemCount;
 		u32 					mBlockInitialCount;
 		u32 					mBlockGrowthCount;
 
-		/// Helper members
+		// Helper members
 		s32						mUsedItems;
 
 	private:
-		/// Copy construction and assignment are forbidden
-								x_allocator_fst(const x_allocator_fst&);
-		x_allocator_fst&		operator= (const x_allocator_fst&);
+		// Copy construction and assignment are forbidden
+								x_allocator_pool(const x_allocator_pool&);
+		x_allocator_pool&		operator= (const x_allocator_pool&);
 	};
 
-	x_allocator_fst::x_allocator_fst()
+	x_allocator_pool::x_allocator_pool()
 		: mAllocator(NULL)
 		, mBlockArray(0)
 		, mBlockArraySize(0)
@@ -168,7 +165,7 @@ namespace xcore
 	{
 	}
 
-	x_allocator_fst::x_allocator_fst(x_iallocator* allocator, u32 inElemSize, u32 inBlockElemCnt, u32 inBlockInitialCount, u32 inBlockGrowthCount, u32 inElemAlignment)
+	x_allocator_pool::x_allocator_pool(x_iallocator* allocator, u32 inElemSize, u32 inBlockElemCnt, u32 inBlockInitialCount, u32 inBlockGrowthCount, u32 inElemAlignment)
 		: mAllocator(allocator)
 		, mBlockArray(0)
 		, mBlockArraySize(0)
@@ -184,11 +181,11 @@ namespace xcore
 		init(allocator, inElemSize, inBlockElemCnt, inBlockInitialCount, inBlockGrowthCount, inElemAlignment);
 	}
 
-	x_allocator_fst::~x_allocator_fst ()
+	x_allocator_pool::~x_allocator_pool ()
 	{
 	}
 
-	void x_allocator_fst::init(x_iallocator* allocator, u32 inElemSize, u32 inBlockElemCnt, u32 inBlockInitialCount, u32 inBlockGrowthCount, u32 inElemAlignment)
+	void x_allocator_pool::init(x_iallocator* allocator, u32 inElemSize, u32 inBlockElemCnt, u32 inBlockInitialCount, u32 inBlockGrowthCount, u32 inElemAlignment)
 	{
 		mAllocator = allocator;
 
@@ -213,7 +210,7 @@ namespace xcore
 		extend(mBlockInitialCount);
 	}
 
-	void		x_allocator_fst::reset(xbool inRestoreToInitialSize)
+	void		x_allocator_pool::reset(xbool inRestoreToInitialSize)
 	{
 		// Check if pool is empty
 		ASSERT(mUsedItems == 0);
@@ -234,7 +231,7 @@ namespace xcore
 		{
 			for (u32 j=0; j<mBlockElemCount; ++j)
 			{
-				x_fst_elem* elem = mBlockArray[i].getAt(j, mElemSize);
+				xpool_allocator::xelement* elem = mBlockArray[i].getAt(j, mElemSize);
 				elem->setNext(mFirstFreeElement);
 				mFirstFreeElement = elem;
 			}
@@ -242,7 +239,7 @@ namespace xcore
 		mUsedItems = 0;
 	}
 
-	void*		x_allocator_fst::allocate(u32 size, u32 alignment)
+	void*		x_allocator_pool::allocate(u32 size, u32 alignment)
 	{
 		ASSERT((u32)size <= mElemSize);
 
@@ -254,23 +251,24 @@ namespace xcore
 		if (mFirstFreeElement == NULL)
 			return NULL;
 
-		x_fst_elem* element = mFirstFreeElement;
+		xpool_allocator::xelement* element = mFirstFreeElement;
 		mFirstFreeElement = element->getNext();
 		++mUsedItems;
 		return element->getObject();
 	}
 
-	void*		x_allocator_fst::reallocate(void* inObject, u32 size, u32 alignment)
+	void*		x_allocator_pool::reallocate(void* inObject, u32 size, u32 alignment)
 	{
 		ASSERT((u32)size <= mElemSize);
 		ASSERT(alignment <= mElemAlignment);
 		return inObject;
 	}
 
-	void		x_allocator_fst::deallocate(void* inObject)
+	void		x_allocator_pool::deallocate(void* inObject)
 	{
 		// Check input parameters
-		ASSERT(inObject != NULL);
+		if (inObject == NULL)
+			return;
 
 		// Verify if object is from this pool
 #ifdef X_DEBUG
@@ -289,13 +287,13 @@ namespace xcore
 		ASSERT(addressOk == xTRUE);
 #endif
 
-		x_fst_elem*	element = reinterpret_cast<x_fst_elem*>(inObject);
+		xpool_allocator::xelement*	element = reinterpret_cast<xpool_allocator::xelement*>(inObject);
 		element->setNext(mFirstFreeElement);
 		mFirstFreeElement = element;
 		--mUsedItems;
 	}
 
-	void		x_allocator_fst::extend(u32 inBlockCount)
+	void		x_allocator_pool::extend(u32 inBlockCount)
 	{
 		// In case of fixed pool it is legal to call extend with blockCount = 0
 		if (inBlockCount == 0)
@@ -310,13 +308,13 @@ namespace xcore
 				newSize = 2 * mBlockArrayCapacity;
 
 			// Allocate new array
-			x_fst_block* oldArray = mBlockArray;
-			mBlockArray = static_cast<x_fst_block*>(mAllocator->allocate(newSize * sizeof(x_fst_block), X_ALIGNMENT_DEFAULT));
+			xpool_allocator::xblock* oldArray = mBlockArray;
+			mBlockArray = static_cast<xpool_allocator::xblock*>(mAllocator->allocate(newSize * sizeof(xpool_allocator::xblock), X_ALIGNMENT_DEFAULT));
 			ASSERT(mBlockArray != NULL);
 			if (oldArray != NULL)		// at first extend (initialization) this is maybe not true
 			{ 
 				// Copy old array to new array
-				x_memcpy(mBlockArray, oldArray, mBlockArraySize * sizeof(x_fst_block));
+				x_memcpy(mBlockArray, oldArray, mBlockArraySize * sizeof(xpool_allocator::xblock));
 				mAllocator->deallocate(oldArray);
 			}		
 			mBlockArrayCapacity = newSize;
@@ -325,13 +323,13 @@ namespace xcore
 		// Extend memory pool by allocating new blocks
 		for (u32 i=mBlockArraySize; i<mBlockArraySize+inBlockCount; ++i)
 		{
-			x_fst_block* block = &mBlockArray[i];
+			xpool_allocator::xblock* block = &mBlockArray[i];
 			block->init(mAllocator, mElemSize, mBlockElemCount, mElemAlignment);
 
 			// Initialize free list
 			for (u32 j=0; j<mBlockElemCount; ++j)
 			{
-				x_fst_elem* elem = block->getAt(j, mElemSize);
+				xpool_allocator::xelement* elem = block->getAt(j, mElemSize);
 				elem->setNext(mFirstFreeElement);
 				mFirstFreeElement = elem;
 			}
@@ -339,22 +337,22 @@ namespace xcore
 		mBlockArraySize += inBlockCount;
 	}
 
-	s32		x_allocator_fst::getUsedItemCount() const
+	s32		x_allocator_pool::getUsedItemCount() const
 	{
 		return mUsedItems;
 	}
 
-	u32		x_allocator_fst::getCurrentBlockCount() const
+	u32		x_allocator_pool::getCurrentBlockCount() const
 	{
 		return mBlockArraySize;
 	}
 
-	u32		x_allocator_fst::getTotalCapacity() const
+	u32		x_allocator_pool::getTotalCapacity() const
 	{
 		return mBlockArraySize * mBlockElemCount;
 	}
 
-	void	x_allocator_fst::release()
+	void	x_allocator_pool::release()
 	{
 		ASSERT(mUsedItems == 0);
 		for (u32 i=0; i<mBlockArraySize; ++i)
@@ -367,12 +365,11 @@ namespace xcore
 		mAllocator->deallocate(this);
 	}
 
-	x_iallocator*		gCreateFstAllocator(x_iallocator* allocator, s32 elem_size, s32 elem_alignment, s32 block_elem_count, s32 block_initial_count, s32 block_growth_count, s32 block_max_count)
+	x_iallocator*		gCreatePoolAllocator(x_iallocator* allocator, xpool_params const& params)
 	{
-		void* mem = allocator->allocate(sizeof(x_allocator_fst), X_ALIGNMENT_DEFAULT);
-		x_allocator_fst* fst_allocator = new (mem) x_allocator_fst();
-		fst_allocator->init(allocator, elem_size, block_elem_count, block_initial_count, block_growth_count, elem_alignment);
-
+		void* mem = allocator->allocate(sizeof(x_allocator_pool), X_ALIGNMENT_DEFAULT);
+		x_allocator_pool* fst_allocator = new (mem) x_allocator_pool();
+		fst_allocator->init(allocator, params.get_elem_size(), params.get_block_size(), params.get_block_initial_count(), params.get_block_growth_count(), params.get_elem_alignment());
 		return fst_allocator;
 	}
 
