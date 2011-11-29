@@ -411,7 +411,7 @@ namespace xcore
 	}
 
 
-	x_iallocator*		gCreateEbAllocator(void* mem, s32 memsize, x_iallocator *allocator, xextmem_copy extmem_copy)
+	x_iallocator*		gCreateEbAllocator(void* mem, u32 memsize, x_iallocator *allocator, xextmem_copy extmem_copy)
 	{
 		void* memForEBallocator = allocator->allocate(sizeof(x_allocator_eb), X_MEMALIGN);
 		x_allocator_eb* ebAllocator = new (memForEBallocator) x_allocator_eb(mem, memsize, allocator, extmem_copy);

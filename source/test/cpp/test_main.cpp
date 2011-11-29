@@ -11,6 +11,7 @@ UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_dlmalloc);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_tlfs);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_pool);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_eb);
+UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_fr);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_idx_allocator_array);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_idx_allocator_pool);
 
@@ -60,4 +61,5 @@ bool gRunUnitTest(UnitTest::TestReporter& reporter)
 	systemAllocator->release();
 	return r==0;
 }
+
 
