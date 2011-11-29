@@ -2515,7 +2515,7 @@ namespace xcore
 		void					operator delete(void* pMem, void* )				{ }
 	};
 
-	x_iallocator*		gCreateDlAllocator(void* mem, s32 memsize)
+	x_iallocator*		gCreateDlAllocator(void* mem, u32 memsize)
 	{
 		x_allocator_dlmalloc* allocator = new (mem) x_allocator_dlmalloc();
 

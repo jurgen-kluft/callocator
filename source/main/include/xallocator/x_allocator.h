@@ -19,14 +19,20 @@ namespace xcore
 	class x_iallocator;
 
 	/// The custom allocators, 'Doug Lea malloc' and 'Two-Level Segregate Fit' allocator
-	extern x_iallocator*		gCreateDlAllocator(void* mem, s32 memsize);
-	extern x_iallocator*		gCreateTlsfAllocator(void* mem, s32 memsize);
+	extern x_iallocator*		gCreateDlAllocator(void* mem, u32 memsize);
+	extern x_iallocator*		gCreateTlsfAllocator(void* mem, u32 memsize);
 
 	/// External block allocator, manages external memory like Texture Memory, Sound Memory
 	/// by putting bookkeeping data in separate memory.
 	typedef void (*xextmem_copy)(void const* src, u32 src_size, void* dst, u32 dst_size);
-	extern x_iallocator*		gCreateEbAllocator(void* mem, s32 memsize, x_iallocator *allocator, xextmem_copy extmem_copy);
+	extern x_iallocator*		gCreateEbAllocator(void* mem, u32 memsize, x_iallocator *allocator, xextmem_copy extmem_copy);
 	
+	/// The forward ring allocator is a specialized allocator. You can use it when you are allocating different size blocks that
+	/// all have a life-time that doesn't differ much. This allocator is very fast in allocation O(1), deallocations effectively
+	/// also shows O(1) behavior but due to its coalesce mechanism can sometimes take a bit more time. If you mostly allocate
+	/// and deallocate in a non-random order than deallocation is surely O(1).
+	extern x_iallocator*		gCreateForwardRingAllocator(x_iallocator* allocator, u32 memsize);
+
 	/// The pool (fixed sized type) allocator
 	struct xpool_params
 	{

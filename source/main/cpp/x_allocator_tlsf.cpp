@@ -865,7 +865,7 @@ namespace xcore
 
 	};
 
-	x_iallocator*		gCreateTlsfAllocator(void* mem, s32 memsize)
+	x_iallocator*		gCreateTlsfAllocator(void* mem, u32 memsize)
 	{
 		x_allocator_tlsf* allocator = new (mem) x_allocator_tlsf();
 		
