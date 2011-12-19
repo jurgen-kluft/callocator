@@ -7,12 +7,17 @@
 
 namespace xcore
 {
-	class x_allocator_eb : public x_iallocator
+	/// A not so efficient allocator.
+	/// Whenever you allocate through this allocator it also allocates or
+	/// deallocates a linked list node.
+	/// It tries to find the best fit block out of the first 3 available
+	/// blocks.
+	class x_allocator_bestfit_ext : public x_iallocator
 	{
 	public:
-							x_allocator_eb();
-							x_allocator_eb(void* beginAddress, u32 size, x_iallocator* allocator, xextmem_copy extmem_copy);
-		virtual				~x_allocator_eb();
+							x_allocator_bestfit_ext();
+							x_allocator_bestfit_ext(x_iallocator* allocator, x_imemory* memory);
+		virtual				~x_allocator_bestfit_ext();
 
 
 		// bookkeeping data head
@@ -46,10 +51,6 @@ namespace xcore
 		virtual void*		reallocate(void* ptr, u32 size, u32 alignment);
 		virtual void		deallocate(void* ptr);
 
-		u32					getTotalSize()const;
-		u32					getFreeSize()const;
-		u32					getUsedSize()const;
-		
 		void*				operator new(xsize_t num_bytes)					{ return NULL; }
 		void*				operator new(xsize_t num_bytes, void* mem)		{ return mem; }
 		void				operator delete(void* pMem)						{ }
@@ -60,7 +61,7 @@ namespace xcore
 		u32					mTotalSize;
 		u32					mFreeSize;
 		x_iallocator*		mAllocator;		// for block
-		xextmem_copy		mExtmemCopy;
+		x_imemory*			mExtMemory;
 		block*				mElemListHead;	// head of block linked list 
 
 		block*				createNewBlock(u32 addressOffset, u32 blockSize, xbool isFree);
@@ -68,31 +69,11 @@ namespace xcore
 		block*				getBlock(void* ptr);
 
 		// Copy construction and assignment are forbidden
-							x_allocator_eb(const x_allocator_eb&);
-							x_allocator_eb& operator= (const x_allocator_eb&);
+							x_allocator_bestfit_ext(const x_allocator_bestfit_ext&);
+							x_allocator_bestfit_ext& operator= (const x_allocator_bestfit_ext&);
 	};
 
-// 	void x_allocator_eb::outputAllBlockState()
-// 	{
-// 		OutputDebugString("==============allocator states=====================\n");
-// 		char temp[100];
-// 		sprintf(temp, "Total size = %d\n", mTotalSize);
-// 		OutputDebugString(temp);
-// 		sprintf(temp, "Used size = %d\n", mTotalSize - mFreeSize);
-// 		OutputDebugString(temp);
-// 		block* currentBlock = mElemListHead;
-// 		int i = 0;
-// 		while(currentBlock != NULL)
-// 		{
-// 			sprintf(temp, "Block %d, isFree = %s, address = %10d, size = %d\n", i, currentBlock->isFree?"True ":"False", currentBlock->address, currentBlock->size);
-// 			OutputDebugString(temp);
-// 			currentBlock = currentBlock->next;
-// 			i++;
-// 		}
-// 		OutputDebugString("===================================================\n");
-// 	}
-
-	x_allocator_eb::x_allocator_eb()
+	x_allocator_bestfit_ext::x_allocator_bestfit_ext()
 		: mBeginAddress(NULL)
 		, mTotalSize(0)
 		, mFreeSize(0)
@@ -102,28 +83,27 @@ namespace xcore
 
 	}
 
-	x_allocator_eb::x_allocator_eb(void* beginAddress, u32 size, x_iallocator* allocator, xextmem_copy extmem_copy)
-		: mBeginAddress(beginAddress)
-		, mTotalSize(size)
-		, mFreeSize(size)
-		, mAllocator(allocator)
-		, mExtmemCopy(extmem_copy)
+	x_allocator_bestfit_ext::x_allocator_bestfit_ext(x_iallocator* allocator, x_imemory* extmemory)
+		: mAllocator(allocator)
+		, mExtMemory(extmemory)
 		, mElemListHead(NULL)
-	{ 
-		initialize(beginAddress, size, allocator);
+	{
+		void* mem_begin;
+		void* mem_end;
+		u32 mem_size = extmemory->mem_range(mem_begin, mem_end);
+		initialize(mem_begin, mem_size, allocator);
 	}
 
-	x_allocator_eb::~x_allocator_eb()
+	x_allocator_bestfit_ext::~x_allocator_bestfit_ext()
 	{
 		release();
 	}
 
-	void x_allocator_eb::initialize(void* beginAddress, u32 size, x_iallocator* allocator)
+	void x_allocator_bestfit_ext::initialize(void* beginAddress, u32 size, x_iallocator* allocator)
 	{
 		mBeginAddress = beginAddress;
 		mTotalSize = size;
 		mFreeSize = size;
-		mAllocator = allocator;
 
 		block* new_block = createNewBlock(0, mFreeSize, xTRUE);
 
@@ -131,7 +111,7 @@ namespace xcore
 		mElemListHead = new_block;
 	}
 
-	void x_allocator_eb::release()
+	void x_allocator_bestfit_ext::release()
 	{
 		// Make sure we release our blocks
 		block* b = mElemListHead;
@@ -144,7 +124,7 @@ namespace xcore
 		mAllocator->deallocate(this);
 	}
 
-	void*	x_allocator_eb::allocate(u32 size, u32 alignment)
+	void*	x_allocator_bestfit_ext::allocate(u32 size, u32 alignment)
 	{
 		block* sourceBlock = getTheBestFitBlockForAllocation(size, alignment);
 
@@ -204,7 +184,7 @@ namespace xcore
 		return (void*)((u32)(new_block->address) + (u32)mBeginAddress);
 	}
 
-	void* x_allocator_eb::reallocate(void* ptr, u32 size, u32 alignment)
+	void* x_allocator_bestfit_ext::reallocate(void* ptr, u32 size, u32 alignment)
 	{
 		ASSERT(ptr != NULL);
 		block* targetBlock = getBlock(ptr);
@@ -254,7 +234,7 @@ namespace xcore
 				void* sourcePtr = (void*)((u32)(targetBlock->address) + (u32)mBeginAddress);
 				
 				// Copy the existing data from old block to the new block.
-				mExtmemCopy(sourcePtr, targetBlock->size, newPtr, size);
+				mExtMemory->mem_copy(sourcePtr, newPtr, targetBlock->size);
 
 				// deallocate target block
 				deallocate(sourcePtr);
@@ -265,7 +245,7 @@ namespace xcore
 		return newPtr;
 	}
 
-	void x_allocator_eb::deallocate(void* ptr)
+	void x_allocator_bestfit_ext::deallocate(void* ptr)
 	{
 		ASSERT(ptr != NULL);
 
@@ -315,7 +295,7 @@ namespace xcore
 		mFreeSize += releasedSize;
 	}
 
-	x_allocator_eb::block* x_allocator_eb::createNewBlock(u32 addressOffset, u32 blockSize, xbool isFree)
+	x_allocator_bestfit_ext::block* x_allocator_bestfit_ext::createNewBlock(u32 addressOffset, u32 blockSize, xbool isFree)
 	{
 		block* new_block = static_cast<block*>(mAllocator->allocate(sizeof(block),X_MEMALIGN));
 		ASSERT(new_block != 0);
@@ -325,7 +305,7 @@ namespace xcore
 		return new_block;
 	}
 
-	x_allocator_eb::block* x_allocator_eb::getTheBestFitBlockForAllocation(u32 allocSize, u32 alignment)
+	x_allocator_bestfit_ext::block* x_allocator_bestfit_ext::getTheBestFitBlockForAllocation(u32 allocSize, u32 alignment)
 	{
 		block* currentBlock = mElemListHead;
 		u32 alignedSize = x_intu::alignUp(allocSize, alignment);
@@ -375,7 +355,7 @@ namespace xcore
 		return bestFitBlock;
 	}
 
-	x_allocator_eb::block* x_allocator_eb::getBlock(void* ptr)
+	x_allocator_bestfit_ext::block* x_allocator_bestfit_ext::getBlock(void* ptr)
 	{
 		block* currentBlock = mElemListHead;
 		u32 offsetAddress = (u32)ptr - (u32)mBeginAddress;
@@ -395,26 +375,10 @@ namespace xcore
 		return NULL;
 	}
 
-	u32 x_allocator_eb::getTotalSize()const
+	x_iallocator*		gCreateExtBlockAllocator(x_iallocator *allocator, x_imemory* memory)
 	{
-		return mTotalSize;
-	}
-
-	u32 x_allocator_eb::getFreeSize()const
-	{
-		return mFreeSize;
-	}
-
-	u32 x_allocator_eb::getUsedSize()const
-	{
-		return mTotalSize - mFreeSize;
-	}
-
-
-	x_iallocator*		gCreateEbAllocator(void* mem, u32 memsize, x_iallocator *allocator, xextmem_copy extmem_copy)
-	{
-		void* memForEBallocator = allocator->allocate(sizeof(x_allocator_eb), X_MEMALIGN);
-		x_allocator_eb* ebAllocator = new (memForEBallocator) x_allocator_eb(mem, memsize, allocator, extmem_copy);
+		void* memForEBallocator = allocator->allocate(sizeof(x_allocator_bestfit_ext), X_MEMALIGN);
+		x_allocator_bestfit_ext* ebAllocator = new (memForEBallocator) x_allocator_bestfit_ext(allocator, memory);
 		return ebAllocator;
 	}
 

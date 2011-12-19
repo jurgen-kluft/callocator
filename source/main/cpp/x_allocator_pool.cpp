@@ -9,6 +9,13 @@
 
 namespace xcore
 {
+	/// If we use a red-black tree to manage blocks then at the moment of deallocation we can easily find
+	/// the block where the element came from. In this way it becomes easy to release blocks.
+	/// We can manage the blocks which still have free elements in a list
+	/// The allocation strategy should be that it should allocate from the most oldest block, in this way
+	/// we will make sure that newer blocks might become unused and thus are able to be deallocated.
+	/// 
+
 	namespace xpool_allocator
 	{
 		/**
@@ -97,7 +104,7 @@ namespace xcore
 
 		virtual const char*		name() const
 		{
-			return "pool allocator";
+			return "Fixed size pool allocator";
 		}
 
 		///@name	Should be called when created with default constructor

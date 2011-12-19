@@ -16,17 +16,59 @@ UNITTEST_SUITE_BEGIN(x_allocator_eb)
 		s32				gBlockSize;
 		x_iallocator*	gCustomAllocator;
 
-		static void	my_extmem_copy(void const* src, u32 src_size, void* dst, u32 dst_size)
+		class my_extmem : public x_imemory
 		{
+			void*			mBlock;
+			s32				mBlockSize;
+		public:
+			my_extmem()
+				: mBlock(NULL)
+				, mBlockSize(0)
+			{
+			}
 
-		}
+			my_extmem(void* mem_begin, u32 mem_size)
+				: mBlock(mem_begin)
+				, mBlockSize(mem_size)
+			{
+			}
+			
+			virtual const char*		name() const
+			{
+				return "my external memory";
+			}
+			
+			virtual u32				mem_range(void*& low, void*& high) const
+			{
+				low = mBlock;
+				high = (xbyte*)mBlock + mBlockSize;
+				return mBlockSize;
+			}
+			
+			virtual void			mem_copy(void* dst, void const* src, u32 size) const
+			{
+			}
+
+			virtual u32				page_size() const
+			{
+				return 64 * 1024;
+			}
+
+			virtual u32				align_size() const
+			{
+				return 64;
+			}
+		};
+
+		my_extmem		mExtMemory;
 
         UNITTEST_FIXTURE_SETUP()
 		{
 			gBlockSize = 128 * 1024;
 			gBlock = gSystemAllocator->allocate(gBlockSize, 8);
+			mExtMemory = my_extmem(gBlock, gBlockSize);
 			
-			gCustomAllocator = gCreateEbAllocator(gBlock, gBlockSize, gSystemAllocator, &my_extmem_copy);
+			gCustomAllocator = gCreateExtBlockAllocator(gSystemAllocator, &mExtMemory);
 		}
 
         UNITTEST_FIXTURE_TEARDOWN()
