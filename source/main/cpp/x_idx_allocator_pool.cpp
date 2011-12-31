@@ -42,6 +42,8 @@ namespace xcore
 			, mObjectArrayAllocator(NULL)
 		{
 		}
+
+		const char*			name() const	{ return "x_idx_allocator_pool; an indexed pool allocator that can grow and shrink"; }
 		
 		void				initialize(x_iallocator* block_allocator, x_iallocator* object_array_allocator, u32 size_of_item, u32 item_alignment, u32 num_items_per_block, u32 num_initial_blocks, u32 num_grow_blocks=0, u32 num_shrink_blocks=0)
 		{
@@ -352,7 +354,15 @@ namespace xcore
 			}
 		}
 
-		virtual u32			allocate(void*& p)
+		virtual void*		allocate(u32 size, u32 alignment)
+		{
+			ASSERT(size <= mSizeOfItem);
+			void* p;
+			iallocate(p);
+			return p;
+		}
+
+		virtual u32			iallocate(void*& p)
 		{
 			if (NILL_IDX == mBlockHeadAlloc)
 			{
@@ -392,7 +402,25 @@ namespace xcore
 			return index;
 		}
 
-		virtual void		deallocate(u32 idx)
+		virtual void*		reallocate(void* p, u32 new_size, u32 new_alignment)
+		{
+			if (new_size < mSizeOfItem)
+			{
+				u32 alignment = 1 << x_intu::countTrailingZeros((u32)p);
+				if (new_alignment <= alignment)
+					return p;
+			}
+			ASSERTS(false, "Error: this indexed pool allocator has a fixed size allocation and the requested size is larger");
+			return NULL;
+		}
+
+		virtual void		deallocate(void* p)
+		{
+			u32 idx = to_idx(p);
+			ideallocate(idx);
+		}
+
+		virtual void		ideallocate(u32 idx)
 		{
 			ASSERT(mAllocCount>0);
 			if (NILL_IDX != idx) 

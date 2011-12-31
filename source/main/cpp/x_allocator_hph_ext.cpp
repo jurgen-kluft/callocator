@@ -37,77 +37,87 @@ namespace xcore
 	/// The user also needs to supply a function for copying external memory to
 	/// facilitate reallocation.
 
-	/// Memory block info struct
-	struct block
+	struct rbnode_alloc;
+	struct rbnode_address;
+	struct rbnode_size;
+
+	/// Block that is free (16 bytes)
+	struct block_free
 	{
-		void*			mPtr;						/// Start of this free/used memory
-		u32				mLock;						/// Bit 32, Lock-Locked(1)/Unlocked(0)
-		u32				mSize;						/// Size of free/used memory
-		void*			mLink;						/// (ll_node*) when free or (bin*) when allocated (bit 0 = Bin-Small/Large)
+		void*				mPtr;						/// Start of this free/used memory
+		u32					mSize;						/// Size of free/used memory
+		block_free*			mPrev;
+		block_free*			mNext;
 	};
 
-	/// Linked list node (16 bytes)
-	struct ll_node
+	/// Block that is allocated (16 bytes)
+	struct block_alloc
 	{
-		rbnode_size*	mParent;					/// Our parent
-		ll_node*		mLink[2];					/// Next/Prev, used for linking nodes of the same size
-		block*			mBlock;
+		void*				mPtr;						/// Start of this free/used memory
+		u32					mSize;						/// Size of free/used memory
+		u32					mLock;
+		void*				mBin;						/// (smallbin* or largebin*)
 	};
-
-	/// A handle is actually a pointer to a block with the 2 lowest bits set to 1
-	inline bool		gIsExternalMemHandle(void *p)		{ return ((u32)p&3) == 3; }
-	inline void*	gHandleToExternalMemPtr(void* p)	{ return ((block*)((u32)p&~3))->mPtr; }
 
 	/// BST node (16 bytes)
-	struct rbnode_address
+	struct rbnode_alloc
 	{
-		rbnode_address*	mParent;					/// (rbnode_address) (bit 0 = Side-Left/Right)
-		rbnode_address*	mChild[2];					/// (rbnode_address) Tree children, Left (bit 0 = Color-Red/Black) and Right
-		block*			mBlock;						/// (block) Our associated size node, so that when we coalesce we can 
-													/// also pull out the nodes from the FreeTreeBySize. Within the rbnode_size
-													/// we still need to search through the ll_nodes our associated block.
+		rbnode_address*		mParent;					/// (rbnode_address) (bit 0 = Side-Left/Right)
+		rbnode_address*		mChild[2];					/// (rbnode_address) Tree children, Left (bit 0 = Color-Red/Black) and Right
+		block_alloc*		mBlock;
 	};
 
+	/// BST node (20 bytes)
+	struct rbnode_address
+	{
+		rbnode_address*		mParent;					/// (rbnode_address) (bit 0 = Side-Left/Right)
+		rbnode_address*		mChild[2];					/// (rbnode_address) Tree children, Left (bit 0 = Color-Red/Black) and Right
+		block_free*			mBlock;						/// (block) Our associated size node, so that when we coalesce we can 
+														/// also pull out the nodes from the FreeTreeBySize. Within the rbnode_size
+														/// we still need to search through the ll_nodes our associated block.
+	};
+
+	/// BST node (16 bytes)
 	struct rbnode_size
 	{
-		rbnode_size*	mParent;					/// (rbnode_size) (bit 0 = Side-Left/Right, bit 1 = Color-Red/Black)
-		rbnode_size*	mChild[2];					/// (rbnode_size) Tree children, Left and Right
-		ll_node*		mSibling;					/// (block) Minimum of 1 sibling
+		rbnode_size*		mParent;					/// (rbnode_size) (bit 0 = Side-Left/Right, bit 1 = Color-Red/Black)
+		rbnode_size*		mChild[2];					/// (rbnode_size) Tree children, Left and Right
+		block_free*			mBlocks;					/// (block) Minimum of 1 sibling
 	};
 
 	/// Small bin (16 bytes)
 	struct smallbin
 	{
-		rbnode_address*	mFreeTreeByAddress;			/// (rb_node_address) BST organized by address to support coalescing during deallocation
-		void*			mDummy1;					/// We do not need a free tree by size since the size is fixed, we can pop from the FreeTreeByAddress
-		smallbin*		mNext;						/// (smallbin) List of bins
-		smallbin*		mPrev;
+		rbnode_address*		mFreeTreeByAddress;			/// (rb_node_address) BST organized by address to support coalescing during deallocation
+		void*				mDummy1;					/// We do not need a free tree by size since the size is fixed, we can pop from the FreeTreeByAddress
+		smallbin*			mNext;						/// (smallbin) List of bins
+		smallbin*			mPrev;
 	};
 
 	// Large bin (8 bytes)
 	struct largebin
 	{
-		rbnode_address*	mFreeTreeByAddress;			/// (rb_node_address) BST organized by address to support coalescing during deallocation
-		rbnode_size*	mFreeTreeBySize;			/// (rb_node_size) BST organized by size to support allocation
-		void*			mDummy1;
-		void*			mDummy2;
+		rbnode_address*		mFreeTreeByAddress;			/// (rb_node_address) BST organized by address to support coalescing during deallocation
+		rbnode_size*		mFreeTreeBySize;			/// (rb_node_size) BST organized by size to support allocation
+		void*				mDummy1;
+		void*				mDummy2;
 	};
 
 	// Small bin allocator
 	struct smallbin_allocator
 	{
-		u32				mNumSmallBins;				/// Number of small bins
-		u32*			mSmallBinSizes;				/// Size of every small bin
-		smallbin**		mSmallBins;					/// Small bins
-		smallbin**		mFullBins;					/// Full bins
+		u32					mNumSmallBins;				/// Number of small bins
+		u32*				mSmallBinSizes;				/// Size of every small bin
+		smallbin**			mSmallBins;					/// Small bins
+		smallbin**			mFullBins;					/// Full bins
 	};
 
 	/// Allocates from high to low
 	struct largebin_allocator
 	{
-		u16				mDefaultAlignmentAddress;
-		u16				mDefaultAlignmentSize;
-		largebin		mLargeBin;
+		u16					mDefaultAlignmentAddress;
+		u16					mDefaultAlignmentSize;
+		largebin			mLargeBin;
 	};
 
 	struct hph_ext_allocator
@@ -125,9 +135,8 @@ namespace xcore
 		/// Large bin
 		largebin_allocator	mLargeBinAllocator;
 
-		/// Doubly linked list of allocations
-		ll_node*			mAllocations;
-		ll_node*			mDeallocations;			/// 1st stage deallocation
+		/// BST of allocations (key == address)
+		rbnode_address*		mAllocations;
 
 		/// e.g.
 		/// u16 sizes[] = { 64, 128, 256, 512, 1024 };

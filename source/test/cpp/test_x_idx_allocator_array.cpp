@@ -35,7 +35,7 @@ UNITTEST_SUITE_BEGIN(x_idx_allocator_array)
 			for (u32 i=0; i<size; ++i)
 			{
 				void* obj_mem;
-				u32 idx = allocator->allocate(obj_mem);
+				u32 idx = allocator->iallocate(obj_mem);
 				CHECK_NOT_NULL(obj_mem);
 				CHECK_EQUAL(i, idx);
 
@@ -47,7 +47,7 @@ UNITTEST_SUITE_BEGIN(x_idx_allocator_array)
 			for (u32 i=0; i<2; ++i)
 			{
 				void* obj_mem;
-				u32 idx = allocator->allocate(obj_mem);
+				u32 idx = allocator->iallocate(obj_mem);
 				CHECK_NULL(obj_mem);
 				CHECK_EQUAL(0xffffffff, idx);
 			}
@@ -58,7 +58,7 @@ UNITTEST_SUITE_BEGIN(x_idx_allocator_array)
 				CHECK_NOT_NULL(p);
 				object* obj = (object*)p;
 				CHECK_EQUAL(i, obj->mIndex);
-				allocator->deallocate(obj->mIndex);
+				allocator->ideallocate(obj->mIndex);
 			}
 
 			allocator->clear();
