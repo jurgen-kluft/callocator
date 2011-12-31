@@ -23,11 +23,17 @@ namespace xcore
 		virtual void		init();
 		virtual void		clear();
 
+		virtual const char*	name() const		{ return "x_indexed_array_allocator; an indexed pool allocator limited to one array"; }
+
 		virtual u32			size() const		{ return mAllocCount; }
 		virtual u32			max_size() const	{ return mObjectArraySize; }
 
-		virtual u32			allocate(void*& p);
-		virtual void		deallocate(u32 idx);
+		virtual void*		allocate(u32 size, u32 alignment);
+		virtual void*		reallocate(void* p, u32 new_size, u32 new_alignment);
+		virtual void		deallocate(void* p);
+
+		virtual u32			iallocate(void*& p);
+		virtual void		ideallocate(u32 idx);
 
 		virtual void*		to_ptr(u32 idx) const;
 		virtual u32			to_idx(void const* p) const;
@@ -128,7 +134,15 @@ namespace xcore
 		mFreeObjectList = NULL;
 	}
 
-	u32			x_indexed_array_allocator::allocate(void*& p)
+	void*		x_indexed_array_allocator::allocate(u32 size, u32 alignment)
+	{
+		ASSERT(size < mSizeOfObject);
+		void* p;
+		iallocate(p);
+		return p;
+	}
+
+	u32			x_indexed_array_allocator::iallocate(void*& p)
 	{
 		if (mFreeObjectList == NULL)
 		{
@@ -149,7 +163,20 @@ namespace xcore
 		return idx;
 	}
 
-	void		x_indexed_array_allocator::deallocate(u32 idx)
+	void*		x_indexed_array_allocator::reallocate(void* old_ptr, u32 new_size, u32 new_alignment)
+	{
+		ASSERT(new_size <= mSizeOfObject);
+		ASSERT(new_alignment <= mAlignOfObject);
+		return old_ptr;
+	}
+
+	void		x_indexed_array_allocator::deallocate(void* ptr)
+	{
+		u32 idx = to_idx(ptr);
+		ideallocate(idx);
+	}
+
+	void		x_indexed_array_allocator::ideallocate(u32 idx)
 	{
 		if (idx < mObjectArraySize)
 		{
