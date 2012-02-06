@@ -5,7 +5,7 @@
 #include "xbase\x_memory_std.h"
 #include "xbase\x_allocator.h"
 
-#include "xallocator\x_allocator.h"
+#include "xallocator\x_allocator_tlsf.h"
 
 ///< TLSF allocator, Two-Level Segregate Fit
 ///< http://rtportal.upv.es/rtmalloc/

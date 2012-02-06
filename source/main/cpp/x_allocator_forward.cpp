@@ -5,20 +5,20 @@
 #include "xbase\x_allocator.h"
 #include "xbase\x_integer.h"
 
-#include "xallocator\x_allocator.h"
+#include "xallocator\x_allocator_forward.h"
 
 namespace xcore
 {
 	#define	CHUNK_MAGIC		0xCAFEBABE
 
-	class x_allocator_fr : public x_iallocator
+	class x_allocator_forward : public x_iallocator
 	{
 	public:
-							x_allocator_fr();
-							x_allocator_fr(xbyte* beginAddress, u32 size, x_iallocator* allocator);
-		virtual				~x_allocator_fr();
+							x_allocator_forward();
+							x_allocator_forward(xbyte* beginAddress, u32 size, x_iallocator* allocator);
+		virtual				~x_allocator_forward();
 
-		virtual const char*	name() const									{ return "Forward Ring Allocator"; }
+		virtual const char*	name() const									{ return "Forward Allocator"; }
 
 		void				initialize(void* beginAddress, u32 size);
 		virtual void		release();
@@ -298,42 +298,42 @@ namespace xcore
 		u32					mTotalSize;
 		xforwardring		mForwardRing;
 
-							x_allocator_fr(const x_allocator_fr&);
-							x_allocator_fr& operator= (const x_allocator_fr&);
+							x_allocator_forward(const x_allocator_forward&);
+							x_allocator_forward& operator= (const x_allocator_forward&);
 	};
 
 
-	x_allocator_fr::x_allocator_fr()
+	x_allocator_forward::x_allocator_forward()
 		: mAllocator(NULL)
 		, mTotalSize(0)
 	{
 
 	}
 
-	x_allocator_fr::x_allocator_fr(xbyte* beginAddress, u32 size, x_iallocator* allocator)
+	x_allocator_forward::x_allocator_forward(xbyte* beginAddress, u32 size, x_iallocator* allocator)
 		: mAllocator(allocator)
 		, mTotalSize(size)
 	{ 
 		mForwardRing.init(beginAddress, beginAddress + size);
 	}
 
-	x_allocator_fr::~x_allocator_fr()
+	x_allocator_forward::~x_allocator_forward()
 	{
 		release();
 	}
 
-	void x_allocator_fr::release()
+	void x_allocator_forward::release()
 	{
 		mAllocator->deallocate(mForwardRing.mMemBegin);
 		mAllocator->deallocate(this);
 	}
 
-	void*	x_allocator_fr::allocate(u32 size, u32 alignment)
+	void*	x_allocator_forward::allocate(u32 size, u32 alignment)
 	{
 		return mForwardRing.allocate(size, alignment);
 	}
 
-	void* x_allocator_fr::reallocate(void* ptr, u32 size, u32 alignment)
+	void* x_allocator_forward::reallocate(void* ptr, u32 size, u32 alignment)
 	{
 		chunk* c = (chunk*)((u32)ptr - sizeof(chunk));
 		ASSERT(c->is_used==1 && c->begin_magic == CHUNK_MAGIC && c->end_magic == CHUNK_MAGIC);
@@ -344,16 +344,16 @@ namespace xcore
 		return new_ptr;
 	}
 
-	void x_allocator_fr::deallocate(void* ptr)
+	void x_allocator_forward::deallocate(void* ptr)
 	{
 		return mForwardRing.deallocate(ptr);
 	}
 
-	x_iallocator*		gCreateForwardRingAllocator(x_iallocator* allocator, u32 memsize)
+	x_iallocator*		gCreateForwardAllocator(x_iallocator* allocator, u32 memsize)
 	{
-		void* memForAllocator = allocator->allocate(sizeof(x_allocator_fr), 4);
+		void* memForAllocator = allocator->allocate(sizeof(x_allocator_forward), 4);
 		void* mem = allocator->allocate(memsize, 4);
-		x_allocator_fr* forwardRingAllocator = new (memForAllocator) x_allocator_fr((xbyte*)mem, memsize, allocator);
+		x_allocator_forward* forwardRingAllocator = new (memForAllocator) x_allocator_forward((xbyte*)mem, memsize, allocator);
 		return forwardRingAllocator;
 	}
 

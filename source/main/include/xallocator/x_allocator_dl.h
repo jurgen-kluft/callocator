@@ -1,8 +1,8 @@
 //==============================================================================
-//  x_allocator.h
+//  x_dl_allocator.h
 //==============================================================================
-#ifndef __X_ALLOCATOR_H__
-#define __X_ALLOCATOR_H__
+#ifndef __X_DL_ALLOCATOR_H__
+#define __X_DL_ALLOCATOR_H__
 #include "xbase\x_target.h"
 #ifdef USE_PRAGMA_ONCE 
 #pragma once 
@@ -16,9 +16,10 @@ namespace xcore
 	/// Forward declares
 	class x_iallocator;
 
-	/// Heap allocator (dlmalloc allocator)
-	extern x_iallocator*	gCreateHeapAllocator(void* mem_begin, u32 mem_size);
+	/// A custom allocator; Doug Lea malloc
+	extern x_iallocator*		gCreateDlAllocator(void* mem, u32 memsize);
+
 };
 
-#endif	/// __X_ALLOCATOR_H__
+#endif	/// __X_DL_ALLOCATOR_H__
 
