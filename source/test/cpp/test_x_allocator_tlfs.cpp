@@ -1,6 +1,6 @@
 #include "xbase\x_types.h"
 #include "xbase\x_allocator.h"
-#include "xallocator\x_allocator.h"
+#include "xallocator\x_allocator_tlsf.h"
 
 #include "xunittest\xunittest.h"
 
@@ -22,7 +22,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_tlfs)
 		{
 			gBlockSize = 128 * 1024;
 			gBlock = gSystemAllocator->allocate(gBlockSize, 8);
-			gCustomAllocator = gCreateDlAllocator(gBlock, gBlockSize);
+			gCustomAllocator = gCreateTlsfAllocator(gBlock, gBlockSize);
 		}
 
         UNITTEST_FIXTURE_TEARDOWN()
