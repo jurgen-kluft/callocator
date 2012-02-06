@@ -6,10 +6,25 @@
 #include "xbase\x_allocator.h"
 #include "xbase\private\x_rbtree.h"
 
-#include "xallocator\x_allocator.h"
+#include "xallocator\x_allocator_pool.h"
 
 namespace xcore
 {
+	void	xpool_params::set_elem_size(u32 size)									{ mElemSize = size; }
+	void	xpool_params::set_elem_alignment(u32 alignment)							{ mElemAlignment = alignment; }
+	void	xpool_params::set_block_size(u32 num_elements)							{ mBlockElemCount = num_elements; }
+	void	xpool_params::set_block_initial_count(u32 initial_num_blocks)			{ mBlockInitialCount = initial_num_blocks; }
+	void	xpool_params::set_block_growth_count(u32 growth_num_blocks)				{ mBlockGrowthCount = growth_num_blocks; }
+	void	xpool_params::set_block_max_count(u32 max_num_blocks)					{ mBlockMaxCount = max_num_blocks; }
+
+	u32		xpool_params::get_elem_size() const										{ return mElemSize; }
+	u32		xpool_params::get_elem_alignment() const								{ return mElemAlignment; }
+	u32		xpool_params::get_block_size() const									{ return mBlockElemCount; }
+	u32		xpool_params::get_block_initial_count() const							{ return mBlockInitialCount; }
+	u32		xpool_params::get_block_growth_count() const							{ return mBlockGrowthCount; }
+	u32		xpool_params::get_block_max_count() const								{ return mBlockMaxCount; }
+
+
 	namespace xpool_allocator
 	{
 		/**
@@ -303,13 +318,31 @@ namespace xcore
 
 			void				release(x_iallocator* allocator)
 			{
-				while (empty() == false)
+				xblock* root = &mRoot;
+				xblock* it   = (xblock*)mRoot.get_child(xblock::LEFT);
+				while ( it != root ) 
 				{
-					xblock* b = pop();
-					b->release(allocator);
+					xblock* save;
+					if ( it->get_child(xblock::LEFT) == root ) 
+					{
+						/* No left links, just kill the node and move on */
+						save = (xblock*)it->get_child(xblock::RIGHT);
+						if (it != root)
+						{
+							it->release(allocator);
+							--mNumBlocks;
+						}
+					}
+					else
+					{
+						/* Rotate away the left link and check again */
+						save = (xblock*)it->get_child(xblock::LEFT);
+						it->set_child(save->get_child(xblock::RIGHT), xblock::LEFT);
+						save->set_child(it, xblock::RIGHT);
+					}
+					it = save;
 				}
 			}
-
 		private:
 			xblock				mRoot;
 			u32					mNumBlocks;
