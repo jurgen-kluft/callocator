@@ -81,6 +81,7 @@ namespace xcore
 			//		return large_bin.allocate(size, alignment);
 			// Else
 			//      return small_bin.allocate(size, alignment);
+			return NULL;
 		}
 
 		void	deallocate(void* ptr)
