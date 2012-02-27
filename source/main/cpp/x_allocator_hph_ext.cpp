@@ -35,7 +35,7 @@ namespace xcore
 		/// This allocator manages many small bins and one large bin. The number
 		/// of small bins can be configured as well as the allocation size that 
 		/// every bin should manage (e.g. 64/128/256/512/1024).
-		//
+		///
 		/// All the larger allocations go to the large bin. You can specify the
 		/// minimum alignment for the large bin as well as the page size.
 		/// The user also needs to supply a function for copying external memory to

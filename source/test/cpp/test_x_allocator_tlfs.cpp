@@ -20,7 +20,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_tlfs)
 
         UNITTEST_FIXTURE_SETUP()
 		{
-			gBlockSize = 128 * 1024;
+			gBlockSize = 4 * 1024 * 1024;
 			gBlock = gSystemAllocator->allocate(gBlockSize, 8);
 			gCustomAllocator = gCreateTlsfAllocator(gBlock, gBlockSize);
 		}

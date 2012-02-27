@@ -13,6 +13,7 @@ UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_pool);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_forward);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_idx_allocator_array);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_idx_allocator_pool);
+UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_small_ext);
 
 xcore::x_iallocator* gSystemAllocator;
 
