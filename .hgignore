@@ -1,0 +1,40 @@
+syntax: glob
+
+; VS files
+*.sln
+*.vcxproj
+*.filters
+*.user
+*.ncb
+*.suo
+*.user
+*.aps
+*.pdb
+*.obj
+*.idb
+*.pch
+*.opensdf
+*.sdf
+
+; target
+*target\
+*ipch\
+
+; HG files
+*.orig
+
+; Doc-O-Matic files
+*.bak
+*.doxdb
+
+; Hg directory
+.hg
+
+; other
+*.log
+*.d
+*.cgb
+*.ppu.o
+*.lib
+*.dep
+*.a
