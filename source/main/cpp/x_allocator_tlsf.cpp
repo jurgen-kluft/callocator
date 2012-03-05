@@ -96,8 +96,8 @@ namespace xcore
 
 	/* This code has been tested on 32- and 64-bit (LP/LLP) architectures. */
 	tlsf_static_assert(sizeof(s32) * 8 == 32);
-	tlsf_static_assert(sizeof(size_t) * 8 >= 32);
-	tlsf_static_assert(sizeof(size_t) * 8 <= 64);
+	tlsf_static_assert(sizeof(xsize_t) * 8 >= 32);
+	tlsf_static_assert(sizeof(xsize_t) * 8 <= 64);
 
 	/* SL_INDEX_COUNT must be <= number of bits in sl_bitmap's storage type. */
 	tlsf_static_assert(sizeof(u32) * 8 >= SL_INDEX_COUNT);
@@ -125,7 +125,7 @@ namespace xcore
 		struct block_header_t* prev_phys_block;
 
 		/* The size of this block, excluding the block header. */
-		size_t size;
+		xsize_t size;
 
 		/* Next and previous free blocks. */
 		struct block_header_t* next_free;
@@ -138,26 +138,26 @@ namespace xcore
 	** - bit 0: whether block is busy or free
 	** - bit 1: whether previous block is busy or free
 	*/
-	static const size_t block_header_free_bit = 1 << 0;
-	static const size_t block_header_prev_free_bit = 1 << 1;
+	static const xsize_t block_header_free_bit = 1 << 0;
+	static const xsize_t block_header_prev_free_bit = 1 << 1;
 
 	/*
 	** The size of the block header exposed to used blocks is the size field.
 	** The prev_phys_block field is stored *inside* the previous free block.
 	*/
-	static const size_t block_header_overhead = sizeof(size_t);
+	static const xsize_t block_header_overhead = sizeof(xsize_t);
 
 	/* User data starts directly after the size field in a used block. */
-	static const size_t block_start_offset = X_OFFSET_OF(block_header_t, size) + sizeof(size_t);
+	static const xsize_t block_start_offset = X_OFFSET_OF(block_header_t, size) + sizeof(xsize_t);
 
 	/*
 	** A free block must be large enough to store its header minus the size of
 	** the prev_phys_block field, and no larger than the number of addressable
 	** bits for FL_INDEX.
 	*/
-	static const size_t block_size_min = 
+	static const xsize_t block_size_min = 
 		sizeof(block_header_t) - sizeof(block_header_t*);
-	static const size_t block_size_max = tlsf_cast(size_t, 1) << FL_INDEX_MAX;
+	static const xsize_t block_size_max = tlsf_cast(xsize_t, 1) << FL_INDEX_MAX;
 
 
 	/* The TLSF pool structure. */
@@ -181,14 +181,14 @@ namespace xcore
 	** block_header_t member functions.
 	*/
 
-	static size_t block_size(const block_header_t* block)
+	static xsize_t block_size(const block_header_t* block)
 	{
 		return block->size & ~(block_header_free_bit | block_header_prev_free_bit);
 	}
 
-	static void block_set_size(block_header_t* block, size_t size)
+	static void block_set_size(block_header_t* block, xsize_t size)
 	{
-		const size_t oldsize = block->size;
+		const xsize_t oldsize = block->size;
 		block->size = size | (oldsize & (block_header_free_bit | block_header_prev_free_bit));
 	}
 
@@ -240,7 +240,7 @@ namespace xcore
 	}
 
 	/* Return location of next block after block of given size. */
-	static block_header_t* offset_to_block(const void* ptr, size_t size)
+	static block_header_t* offset_to_block(const void* ptr, xsize_t size)
 	{
 		return tlsf_cast(block_header_t*, tlsf_cast(tlsfptr_t, ptr) + size);
 	}
@@ -282,19 +282,19 @@ namespace xcore
 		block_set_used(block);
 	}
 
-	static size_t align_up(size_t x, size_t align)
+	static xsize_t align_up(xsize_t x, xsize_t align)
 	{
 		ASSERT(0 == (align & (align - 1)) && "must align to a power of two");
 		return (x + (align - 1)) & ~(align - 1);
 	}
 
-	static size_t align_down(size_t x, size_t align)
+	static xsize_t align_down(xsize_t x, xsize_t align)
 	{
 		ASSERT(0 == (align & (align - 1)) && "must align to a power of two");
 		return x - (x & (align - 1));
 	}
 
-	static void* align_ptr(const void* ptr, size_t align)
+	static void* align_ptr(const void* ptr, xsize_t align)
 	{
 		const tlsfptr_t aligned =
 			(tlsf_cast(tlsfptr_t, ptr) + (align - 1)) & ~(align - 1);
@@ -306,12 +306,12 @@ namespace xcore
 	** Adjust an allocation size to be aligned to word size, and no smaller
 	** than internal minimum.
 	*/
-	static size_t adjust_request_size(size_t size, size_t align)
+	static xsize_t adjust_request_size(xsize_t size, xsize_t align)
 	{
-		size_t adjust = 0;
+		xsize_t adjust = 0;
 		if (size && size < block_size_max)
 		{
-			const size_t aligned = align_up(size, align);
+			const xsize_t aligned = align_up(size, align);
 			adjust = tlsf_max(aligned, block_size_min);
 		}
 		return adjust;
@@ -322,7 +322,7 @@ namespace xcore
 	** the documentation found in the white paper.
 	*/
 
-	static void mapping_insert(size_t size, s32* fli, s32* sli)
+	static void mapping_insert(xsize_t size, s32* fli, s32* sli)
 	{
 		s32 fl, sl;
 		if (size < SMALL_BLOCK_SIZE)
@@ -342,11 +342,11 @@ namespace xcore
 	}
 
 	/* This version rounds up to the next block size (for allocations) */
-	static void mapping_search(size_t size, s32* fli, s32* sli)
+	static void mapping_search(xsize_t size, s32* fli, s32* sli)
 	{
 		if (size >= (1 << SL_INDEX_COUNT_LOG2))
 		{
-			const size_t round = (1 << (tlsf_fls(size) - SL_INDEX_COUNT_LOG2)) - 1;
+			const xsize_t round = (1 << (tlsf_fls(size) - SL_INDEX_COUNT_LOG2)) - 1;
 			size += round;
 		}
 		mapping_insert(size, fli, sli);
@@ -450,19 +450,19 @@ namespace xcore
 		insert_free_block(pool, block, fl, sl);
 	}
 
-	static s32 block_can_split(block_header_t* block, size_t size)
+	static s32 block_can_split(block_header_t* block, xsize_t size)
 	{
 		return block_size(block) >= sizeof(block_header_t) + size;
 	}
 
 	/* Split a block into two, the second of which is free. */
-	static block_header_t* block_split(block_header_t* block, size_t size)
+	static block_header_t* block_split(block_header_t* block, xsize_t size)
 	{
 		/* Calculate the amount of space left in the remaining block. */
 		block_header_t* remaining =
 			offset_to_block(block_to_ptr(block), size - block_header_overhead);
 
-		const size_t remain_size = block_size(block) - (size + block_header_overhead);
+		const xsize_t remain_size = block_size(block) - (size + block_header_overhead);
 
 		ASSERT(block_to_ptr(remaining) == align_ptr(block_to_ptr(remaining), ALIGN_SIZE)
 			&& "remaining block not aligned properly");
@@ -519,7 +519,7 @@ namespace xcore
 	}
 
 	/* Trim any trailing block space off the end of a block, return to pool. */
-	static void block_trim_free(pool_t* pool, block_header_t* block, size_t size)
+	static void block_trim_free(pool_t* pool, block_header_t* block, xsize_t size)
 	{
 		ASSERT(block_is_free(block) && "block must be free");
 		if (block_can_split(block, size))
@@ -532,7 +532,7 @@ namespace xcore
 	}
 
 	/* Trim any trailing block space off the end of a used block, return to pool. */
-	static void block_trim_used(pool_t* pool, block_header_t* block, size_t size)
+	static void block_trim_used(pool_t* pool, block_header_t* block, xsize_t size)
 	{
 		ASSERT(!block_is_free(block) && "block must be used");
 		if (block_can_split(block, size))
@@ -546,7 +546,7 @@ namespace xcore
 		}
 	}
 
-	static block_header_t* block_trim_free_leading(pool_t* pool, block_header_t* block, size_t size)
+	static block_header_t* block_trim_free_leading(pool_t* pool, block_header_t* block, xsize_t size)
 	{
 		block_header_t* remaining_block = block;
 		if (block_can_split(block, size))
@@ -562,7 +562,7 @@ namespace xcore
 		return remaining_block;
 	}
 
-	static block_header_t* block_locate_free(pool_t* pool, size_t size)
+	static block_header_t* block_locate_free(pool_t* pool, xsize_t size)
 	{
 		s32 fl = 0, sl = 0;
 		block_header_t* block = 0;
@@ -582,7 +582,7 @@ namespace xcore
 		return block;
 	}
 
-	static void* block_prepare_used(pool_t* pool, block_header_t* block, size_t size)
+	static void* block_prepare_used(pool_t* pool, block_header_t* block, xsize_t size)
 	{
 		void* p = 0;
 		if (block)
@@ -625,13 +625,13 @@ namespace xcore
 
 	#define tlsf_insist(x) { ASSERT(x); if (!(x)) { status--; } }
 
-	static void integrity_walker(void* ptr, size_t size, s32 used, void* user)
+	static void integrity_walker(void* ptr, xsize_t size, s32 used, void* user)
 	{
 		block_header_t* block = block_from_ptr(ptr);
 		integrity_t* integ = tlsf_cast(integrity_t*, user);
 		const s32 this_prev_status = block_is_prev_free(block) ? 1 : 0;
 		const s32 this_status = block_is_free(block) ? 1 : 0;
-		const size_t this_block_size = block_size(block);
+		const xsize_t this_block_size = block_size(block);
 
 		s32 status = 0;
 		tlsf_insist(integ->prev_status == this_prev_status && "prev status incorrect");
@@ -641,7 +641,7 @@ namespace xcore
 		integ->status += status;
 	}
 
-	typedef void (*tlsf_walker)(void* ptr, size_t size, int used, void* user);
+	typedef void (*tlsf_walker)(void* ptr, xsize_t size, int used, void* user);
 	static void tlsf_walk_heap(tlsf_pool pool, tlsf_walker walker, void* user);
 
 	s32 tlsf_check_heap(tlsf_pool tlsf)
@@ -703,7 +703,7 @@ namespace xcore
 
 	#undef tlsf_insist
 
-	static void default_walker(void* ptr, size_t size, s32 used, void* user)
+	static void default_walker(void* ptr, xsize_t size, s32 used, void* user)
 	{
 		(void)user;
 		//printf("\t%p %s size: %x (%p)\n", ptr, used ? "used" : "free", (u32)size, block_from_ptr(ptr));
@@ -720,9 +720,9 @@ namespace xcore
 		}
 	}
 
-	size_t tlsf_block_size(void* ptr)
+	xsize_t tlsf_block_size(void* ptr)
 	{
-		size_t size = 0;
+		xsize_t size = 0;
 		if (ptr)
 		{
 			const block_header_t* block = block_from_ptr(ptr);
@@ -736,9 +736,9 @@ namespace xcore
 	** tlsf_create, equal to the size of a pool_t plus overhead of the initial
 	** free block and the sentinel block.
 	*/
-	size_t tlsf_overhead()
+	xsize_t tlsf_overhead()
 	{
-		const size_t pool_overhead = sizeof(pool_t) + 2 * block_header_overhead;
+		const xsize_t pool_overhead = sizeof(pool_t) + 2 * block_header_overhead;
 		return pool_overhead;
 	}
 
@@ -746,13 +746,13 @@ namespace xcore
 	** TLSF main interface. Right out of the white paper.
 	*/
 
-	tlsf_pool tlsf_create(void* mem, size_t bytes)
+	tlsf_pool tlsf_create(void* mem, xsize_t bytes)
 	{
 		block_header_t* block;
 		block_header_t* next;
 
-		const size_t pool_overhead = tlsf_overhead();
-		const size_t pool_bytes = align_down(bytes - pool_overhead, ALIGN_SIZE);
+		const xsize_t pool_overhead = tlsf_overhead();
+		const xsize_t pool_bytes = align_down(bytes - pool_overhead, ALIGN_SIZE);
 		pool_t* pool = tlsf_cast(pool_t*, mem);
 
 #ifdef X_DEBUG
@@ -803,18 +803,18 @@ namespace xcore
 		pool = pool;
 	}
 
-	void* tlsf_malloc(tlsf_pool tlsf, size_t size)
+	void* tlsf_malloc(tlsf_pool tlsf, xsize_t size)
 	{
 		pool_t* pool = tlsf_cast(pool_t*, tlsf);
-		const size_t adjust = adjust_request_size(size, ALIGN_SIZE);
+		const xsize_t adjust = adjust_request_size(size, ALIGN_SIZE);
 		block_header_t* block = block_locate_free(pool, adjust);
 		return block_prepare_used(pool, block, adjust);
 	}
 
-	void* tlsf_memalign(tlsf_pool tlsf, size_t align, size_t size)
+	void* tlsf_memalign(tlsf_pool tlsf, xsize_t align, xsize_t size)
 	{
 		pool_t* pool = tlsf_cast(pool_t*, tlsf);
-		const size_t adjust = adjust_request_size(size, ALIGN_SIZE);
+		const xsize_t adjust = adjust_request_size(size, ALIGN_SIZE);
 
 		/*
 		** We must allocate an additional minimum block size bytes so that if
@@ -824,11 +824,11 @@ namespace xcore
 		** the prev_phys_block field is not valid, and we can't simply adjust
 		** the size of that block.
 		*/
-		const size_t gap_minimum = sizeof(block_header_t);
-		const size_t size_with_gap = adjust_request_size(adjust + align + gap_minimum, align);
+		const xsize_t gap_minimum = sizeof(block_header_t);
+		const xsize_t size_with_gap = adjust_request_size(adjust + align + gap_minimum, align);
 
 		/* If alignment is less than or equals base alignment, we're done. */
-		const size_t aligned_size = (align <= ALIGN_SIZE) ? adjust : size_with_gap;
+		const xsize_t aligned_size = (align <= ALIGN_SIZE) ? adjust : size_with_gap;
 
 		block_header_t* block = block_locate_free(pool, aligned_size);
 
@@ -839,17 +839,17 @@ namespace xcore
 		{
 			void* ptr = block_to_ptr(block);
 			void* aligned = align_ptr(ptr, align);
-			size_t gap = tlsf_cast(size_t, tlsf_cast(tlsfptr_t, aligned) - tlsf_cast(tlsfptr_t, ptr));
+			xsize_t gap = tlsf_cast(xsize_t, tlsf_cast(tlsfptr_t, aligned) - tlsf_cast(tlsfptr_t, ptr));
 
 			/* If gap size is too small, offset to next aligned boundary. */
 			if (gap && gap < gap_minimum)
 			{
-				const size_t gap_remain = gap_minimum - gap;
-				const size_t offset = tlsf_max(gap_remain, align);
+				const xsize_t gap_remain = gap_minimum - gap;
+				const xsize_t offset = tlsf_max(gap_remain, align);
 				const void* next_aligned = tlsf_cast(void*, tlsf_cast(tlsfptr_t, aligned) + offset);
 
 				aligned = align_ptr(next_aligned, align);
-				gap = tlsf_cast(size_t, tlsf_cast(tlsfptr_t, aligned) - tlsf_cast(tlsfptr_t, ptr));
+				gap = tlsf_cast(xsize_t, tlsf_cast(tlsfptr_t, aligned) - tlsf_cast(tlsfptr_t, ptr));
 			}
 
 			if (gap)
@@ -889,7 +889,7 @@ namespace xcore
 	** - an extended buffer size will leave the newly-allocated area with
 	**   contents undefined
 	*/
-	void* tlsf_realloc(tlsf_pool tlsf, void* ptr, size_t size)
+	void* tlsf_realloc(tlsf_pool tlsf, void* ptr, xsize_t size)
 	{
 		pool_t* pool = tlsf_cast(pool_t*, tlsf);
 		void* p = 0;
@@ -909,9 +909,9 @@ namespace xcore
 			block_header_t* block = block_from_ptr(ptr);
 			block_header_t* next = block_next(block);
 
-			const size_t cursize = block_size(block);
-			const size_t combined = cursize + block_size(next) + block_header_overhead;
-			const size_t adjust = adjust_request_size(size, ALIGN_SIZE);
+			const xsize_t cursize = block_size(block);
+			const xsize_t combined = cursize + block_size(next) + block_header_overhead;
+			const xsize_t adjust = adjust_request_size(size, ALIGN_SIZE);
 
 			/*
 			** If the next block is used, or when combined with the current
@@ -922,7 +922,7 @@ namespace xcore
 				p = tlsf_malloc(tlsf, size);
 				if (p)
 				{
-					const size_t minsize = tlsf_min(cursize, size);
+					const xsize_t minsize = tlsf_min(cursize, size);
 					x_memcpy(p, ptr, minsize);
 					tlsf_free(tlsf, ptr);
 				}
