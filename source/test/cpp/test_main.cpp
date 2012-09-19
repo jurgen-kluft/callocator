@@ -9,11 +9,13 @@ using namespace xcore;
 UNITTEST_SUITE_LIST(xAllocatorUnitTest);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_dlmalloc);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_tlfs);
+UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_freelist);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_pool);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_forward);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_idx_allocator_array);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_idx_allocator_pool);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_small_ext);
+UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_large_ext);
 
 xcore::x_iallocator* gSystemAllocator;
 
