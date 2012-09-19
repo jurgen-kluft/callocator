@@ -11,7 +11,7 @@ namespace xcore
 	{
 		struct xsnode
 		{
-			xsnode*	mNodes[4];
+			xsnode*			mNodes[4];
 		};
 
 		struct xbnode
@@ -244,7 +244,6 @@ namespace xcore
 			node_allocator->deallocate(mNode);
 			mNode = NULL;
 		}
-
 
 		void*		xsmall_allocator::allocate(u32 size, u32 alignment, x_iallocator* node_allocator)
 		{
