@@ -8,14 +8,14 @@
 #pragma once 
 #endif
 
+#include "xbase\private\x_rbtree15.h"
+#include "xbase\x_idx_allocator.h"
+
 //==============================================================================
 // xCore namespace
 //==============================================================================
 namespace xcore
 {
-	// Forward declares
-	class x_iidx_allocator;
-
 	namespace xexternal_memory
 	{
 		// An allocator that manages 'external' memory with book keeping data outside of that memory.
@@ -42,6 +42,60 @@ namespace xcore
 			u32					mSizeAlignment;
 			u32					mAddressAlignment;
 		};
+
+		static inline void*		advance_ptr(void* ptr, u32 size)		{ return (void*)((xbyte*)ptr + size); }
+		static inline void*		align_ptr(void* ptr, u32 alignment)		{ return (void*)(((u32)ptr + (alignment-1)) & ~(alignment-1)); }
+		static inline void*		mark_ptr_0(void* ptr, u8 bit)			{ return (void*)((u32)ptr & ~(1<<bit)); }
+		static inline void*		mark_ptr_1(void* ptr, u8 bit)			{ return (void*)((u32)ptr | (1<<bit)); }
+		static inline bool		get_ptr_mark(void* ptr, u8 bit)			{ u32 const field = (1<<bit); return ((u32)ptr&field) != 0; }
+		static inline void*		get_ptr(void* ptr, u8 used_bits)		{ return (void*)((u32)ptr & ~((1<<used_bits)-1)); }
+		static u32				diff_ptr(void* ptr, void* next_ptr)		{ return (u32)((xbyte*)next_ptr - (xbyte*)ptr); }
+
+		struct xlnode : public xrbnode15
+		{
+			enum EState { STATE_USED=1, STATE_FREE=0, USED_BIT=0, USED_BITS=1 };
+
+			void*			ptr;				// (4) pointer to external mem
+			u16				next;				// (2) linear list ordered by physical address
+			u16				prev;				// (2)  
+		};
+
+		static inline xlnode*	allocate_node(x_iidx_allocator* allocator, u16& outNodeIdx)
+		{
+			void* nodePtr;
+			outNodeIdx = allocator->iallocate(nodePtr);
+			xlnode* node = (xlnode*)nodePtr;
+			return node;
+		}
+
+		static inline void		init_node(xlnode* node, void* ptr, xlnode::EState state, u16 next, u16 prev, u16 nill)
+		{
+			node->ptr  = (state==xlnode::STATE_USED) ? mark_ptr_1(ptr, xlnode::USED_BIT) : mark_ptr_0(ptr, xlnode::USED_BIT);
+			node->next = next;
+			node->prev = prev;
+			node->clear(nill);
+		}
+
+		static inline void		deallocate_node(xlnode* nodePtr, x_iidx_allocator* allocator)
+		{
+			allocator->deallocate(nodePtr);
+		}
+
+		static inline s32		cmp_range_ptr(void* low, void* high, void* p)
+		{ 
+			if ((xbyte*)p < (xbyte*)low)
+				return -1; 
+			else if ((xbyte*)p >= (xbyte*)high)
+				return 1;
+			return 0;
+		}
+
+		static inline u32		get_size(xlnode* nodePtr, x_iidx_allocator* a)
+		{
+			xlnode* nextNodePtr = (xlnode*)a->to_ptr(nodePtr->next);
+			u32 const nodeSize  = diff_ptr(get_ptr(nextNodePtr->ptr, xlnode::USED_BITS), get_ptr(nodePtr->ptr, xlnode::USED_BITS));
+			return nodeSize;
+		}
 	}
 };
 

@@ -40,12 +40,15 @@ UNITTEST_SUITE_BEGIN(x_allocator_small_ext)
 		UNITTEST_TEST(allocate2)
 		{
 			xexternal_memory::xsmall_allocator sb;
-			sb.init((void*)0x80000000, 65536, 2048);
+			void* base = (void*)0x80000000;
+			sb.init(base, 65536, 2048);
 
 			for (s32 i=0; i<32; ++i)
 			{
 				void* p1 = sb.allocate(60, 4, gSystemAllocator);
 				CHECK_NOT_NULL(p1);
+				void* pp = (void*)((char*)base + i*2048);
+				CHECK_EQUAL(pp, p1);
 			}
 			void* p2 = sb.allocate(60, 4, gSystemAllocator);
 			CHECK_NULL(p2);
