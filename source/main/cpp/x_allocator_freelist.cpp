@@ -6,6 +6,7 @@
 #include "xbase\x_allocator.h"
 #include "xbase\private\x_rbtree.h"
 
+#include "xbase\x_idx_allocator.h"
 #include "xallocator\x_allocator_pool.h"
 
 namespace xcore
@@ -27,6 +28,16 @@ namespace xcore
 			u32					mData;	
 		};
 
+		struct xblock_info
+		{
+								xblock_info() : mElemSize(0), mElemAlignment(0), mElemMaxCount(0) {}
+								xblock_info(u32 elem_size, u32 elem_alignment, u32 elem_max_count) : mElemSize(elem_size), mElemAlignment(elem_alignment), mElemMaxCount(elem_max_count) {}
+
+			u32					mElemSize;
+			u32					mElemAlignment;
+			u32 				mElemMaxCount;
+		};
+
 		/**
 		@brief	xblock contains an array of xelement objects.
 		**/
@@ -36,58 +47,58 @@ namespace xcore
 								xblock() 
 									: mElementArray(NULL)
 									, mFreeList (0)
-									, mAllocCount (0) { }
+									, mInfo (NULL) { }
 
-			void				init(xbyte* elementArray, u32 inElemSize, u32 inNumElements);
-			void				reset(u32 inSizeOfElement, u32 inElementsPerBlock);
+			void				init(xbyte* elementArray, xblock_info const* info);
+			void				reset();
 			
 			inline bool			full() const						{ return mFreeList == NULL; }
-			inline bool			empty() const						{ return mAllocCount == 0; }
 
 			inline xelement*	allocate()
 			{
+				if (mFreeList == NULL)
+					return NULL;
 				xelement* e = mFreeList;
 				mFreeList = e->getNext();
-				++mAllocCount;
 				return e;
 			}
 			
-			inline void			deallocate(xelement* element, u32 inElementsPerBlock, u32 inSizeOfElement)
+			inline void			deallocate(xelement* element)
 			{
-				u32 idx = index_of(element, inSizeOfElement);
-				ASSERT(idx>=0 && idx<inElementsPerBlock);
+				if (mFreeList == NULL)
+					return;
+
+				u32 idx = index_of(element);
+				ASSERT(idx>=0 && idx<mInfo->mElemMaxCount);
 				element->setNext(mFreeList);
 				mFreeList = element;
-				--mAllocCount;
 			}
 
+			inline s32			index_of(xelement const* element) const	{ return ((s32)((xbyte const*)element - (xbyte const*)mElementArray)) / (s32)mInfo->mElemSize; }
+			inline xelement*	ptr_at(u32 index) const					{ return (xelement*)((xbyte*)mElementArray + (index * mInfo->mElemSize)); }
+		
 		private:
-			inline s32			index_of(xelement* element, u32 inSizeOfElement) const	{ return (s32)((u32)element - (u32)mElementArray) / (s32)inSizeOfElement; }
-			inline xelement*	at(u32 index, u32 inSizeOfElement)						{ return (xelement*)((xbyte*)mElementArray + (index * inSizeOfElement)); }
-
 			xelement*			mElementArray;
 			xelement*			mFreeList;
-			u32					mAllocCount;
+			xblock_info const*	mInfo;
 		};
 
-		void		xblock::init(xbyte* elementArray, u32 inElemSize, u32 inNumElements)
+		void		xblock::init(xbyte* elementArray, xblock_info const* info)
 		{
 			mElementArray = static_cast<xelement*>((void*)elementArray);
 			ASSERT(mElementArray != 0);
 
-			mFreeList   = NULL;
-			mAllocCount = 0;
-
-			reset(inElemSize, inNumElements);
+			mFreeList = NULL;
+			mInfo     = info;
+			reset();
 		}
 
-		void		xblock::reset(u32 inSizeOfElement, u32 inElementsPerBlock)
+		void		xblock::reset()
 		{
 			mFreeList = NULL;
-			mAllocCount = 0;
-			for (s32 i=inElementsPerBlock-1; i>=0; --i)
+			for (s32 i=mInfo->mElemMaxCount-1; i>=0; --i)
 			{
-				xelement* e = at(i, inSizeOfElement);
+				xelement* e = ptr_at(i);
 				e->setNext(mFreeList);
 				mFreeList = e;
 			}
@@ -119,28 +130,35 @@ namespace xcore
 			///@name	Should be called when created with default constructor
 			//			Parameters are the same as for constructor with parameters
 			void					init();
+			void					clear();
+			void					exit();
+
+			u32						size() const										{ return mAllocCount; }
+			u32						max_size() const									{ return mBlockInfo.mElemMaxCount; }
 
 			virtual void*			allocate(u32 size, u32 alignment);
 			virtual void*			reallocate(void* p, u32 size, u32 alignment);
 			virtual void			deallocate(void* p);
 
+			u32						to_idx(void const* p) const;
+			void*					from_idx(u32 idx) const;
+
+			x_iallocator*			allocator() const									{ return (x_iallocator*)mAllocator; }
+
+			virtual void			release ();
+
 			///@name	Placement new/delete
 			XCORE_CLASS_PLACEMENT_NEW_DELETE
 
 		protected:
-			virtual void			release ();
-
-		protected:
 			x_iallocator*			mAllocator;
 
-			u32						mElementArrayOwned;
 			xbyte*					mElementArray;
-			xblock					mBlock;
+			u32						mElementArrayOwned;
 
-			// Save initial parameters
-			u32						mElemSize;
-			u32						mElemAlignment;
-			u32 					mBlockElemCount;
+			xblock					mBlock;
+			xblock_info				mBlockInfo;
+			u32						mAllocCount;
 
 		private:
 			// Copy construction and assignment are forbidden
@@ -151,9 +169,8 @@ namespace xcore
 		xallocator_imp::xallocator_imp()
 			: mAllocator(NULL)
 			, mElementArray(NULL)
-			, mElemSize(4)
-			, mElemAlignment(X_ALIGNMENT_DEFAULT)
-			, mBlockElemCount(0)
+			, mBlockInfo(4, X_ALIGNMENT_DEFAULT, 0)
+			, mAllocCount(0)
 		{
 		}
 
@@ -161,55 +178,70 @@ namespace xcore
 			: mAllocator(allocator)
 			, mElementArrayOwned(true)
 			, mElementArray(NULL)
-			, mElemSize(inElemSize)
-			, mElemAlignment(inElemAlignment)
-			, mBlockElemCount(inBlockElemCnt)
+			, mBlockInfo(inElemSize, inElemAlignment, inBlockElemCnt)
+			, mAllocCount(0)
 		{
-			init();
 		}
 
 		xallocator_imp::xallocator_imp(x_iallocator* allocator, void* inElementArray, u32 inElemSize, u32 inElemAlignment, u32 inBlockElemCnt)
 			: mAllocator(allocator)
 			, mElementArrayOwned(false)
 			, mElementArray((xbyte*)inElementArray)
-			, mElemSize(inElemSize)
-			, mElemAlignment(inElemAlignment)
-			, mBlockElemCount(inBlockElemCnt)
+			, mBlockInfo(inElemSize, inElemAlignment, inBlockElemCnt)
+			, mAllocCount(0)
 		{
-			init();
 		}
 
 		xallocator_imp::~xallocator_imp ()
 		{
-			ASSERT(mBlock.empty());
+			ASSERT(mAllocCount == 0);
 		}
 
 		void xallocator_imp::init()
 		{
 			// Check input parameters	
-			ASSERT(mElemSize >= 4);
-			ASSERT(mBlockElemCount > 0);
+			ASSERT(mBlockInfo.mElemSize >= 4);
+			ASSERT(mBlockInfo.mElemMaxCount > 0);
 
 			// Save initial parameters
-			mElemAlignment     = mElemAlignment==0 ? X_ALIGNMENT_DEFAULT : mElemAlignment;
-			mElemSize          = x_intu::alignUp(mElemSize, mElemAlignment);			// Align element size to a multiple of element alignment
+			mBlockInfo.mElemAlignment     = mBlockInfo.mElemAlignment==0 ? X_ALIGNMENT_DEFAULT : mBlockInfo.mElemAlignment;
+			mBlockInfo.mElemSize          = x_intu::alignUp(mBlockInfo.mElemSize, mBlockInfo.mElemAlignment);			// Align element size to a multiple of element alignment
 
 			// Allocate element array
 			if (mElementArray == NULL)
 			{
-				mElementArray = (xbyte*)mAllocator->allocate(mElemSize * mBlockElemCount, mElemAlignment);
+				mElementArray = (xbyte*)mAllocator->allocate(mBlockInfo.mElemSize * mBlockInfo.mElemMaxCount, mBlockInfo.mElemAlignment);
 				mElementArrayOwned = true;
 			}
 
-			mBlock.init(mElementArray, mElemSize, mBlockElemCount);
+			mAllocCount = 0;
+			mBlock.init(mElementArray, &mBlockInfo);
+		}
+
+		void		xallocator_imp::clear()
+		{
+			mAllocCount = 0;
+			mBlock.reset();
+		}
+
+		void		xallocator_imp::exit()
+		{
+			ASSERT(mAllocCount == 0);
+			if (mElementArrayOwned!=0)
+			{
+				mAllocator->deallocate(mElementArray);
+				mElementArray = NULL;
+			}
 		}
 
 		void*		xallocator_imp::allocate(u32 size, u32 alignment)
 		{
-			ASSERT((u32)size <= mElemSize);
-			ASSERT((u32)alignment <= mElemAlignment);
-			ASSERT(mBlock.empty()==false);
-			return mBlock.allocate();
+			ASSERT((u32)size <= mBlockInfo.mElemSize);
+			ASSERT((u32)alignment <= mBlockInfo.mElemAlignment);
+			void* p = mBlock.allocate();	// Will return NULL if no more memory available
+			if (p != NULL)
+				++mAllocCount;
+			return p;
 		}
 
 		void*		xallocator_imp::reallocate(void* inObject, u32 size, u32 alignment)
@@ -225,8 +257,8 @@ namespace xcore
 			}
 			else
 			{
-				ASSERT((u32)size <= mElemSize);
-				ASSERT(alignment <= mElemAlignment);
+				ASSERT((u32)size <= mBlockInfo.mElemSize);
+				ASSERT(alignment <= mBlockInfo.mElemAlignment);
 				return inObject;
 			}
 		}
@@ -236,18 +268,95 @@ namespace xcore
 			// Check input parameters
 			if (inObject == NULL)
 				return;
-			mBlock.deallocate((xelement*)inObject, mBlockElemCount, mElemSize);
+			mBlock.deallocate((xelement*)inObject);
+			--mAllocCount;
+		}
+
+		u32		xallocator_imp::to_idx(void const* p) const
+		{
+			// Check input parameters
+			ASSERT (p != NULL);
+			return mBlock.index_of((xfreelist_allocator::xelement*)p);
+		}
+
+		void*	xallocator_imp::from_idx(u32 idx) const
+		{
+			return mBlock.ptr_at(idx);
 		}
 
 		void	xallocator_imp::release()
 		{
-			ASSERT(mBlock.empty());
-			if (mElementArrayOwned!=0)
-			{
-				mAllocator->deallocate(mElementArray);
-				mElementArray = NULL;
-			}
+			exit();
 			mAllocator->deallocate(this);
+		}
+
+		class xiallocator_imp : public x_iidx_allocator
+		{
+			x_iallocator*			mOurAllocator;
+			xallocator_imp			mAllocator;
+
+		public:
+			xiallocator_imp();
+			xiallocator_imp(x_iallocator* allocator, u32 inElemSize, u32 inElemAlignment, u32 inBlockElemCnt);
+			xiallocator_imp(x_iallocator* allocator, void* mem_block, u32 inElemSize, u32 inElemAlignment, u32 inBlockElemCnt);
+
+			virtual const char*		name() const										{ return "freelist idx allocator"; }
+
+			virtual void*			allocate(u32 size, u32 align)						{ return mAllocator.allocate(size, align); }
+			virtual void*			reallocate(void* p, u32 size, u32 align)			{ return mAllocator.reallocate(p, size, align); }
+			virtual void			deallocate(void* p)									{ return mAllocator.deallocate(p); }
+
+			virtual void			release()											{ mAllocator.exit(); mOurAllocator->deallocate(this); }
+
+			virtual void			init()												{ mAllocator.init(); }
+			virtual void			clear()												{ mAllocator.clear(); }
+
+			virtual u32				size() const										{ return mAllocator.size(); }
+			virtual u32				max_size() const									{ return mAllocator.max_size(); }
+
+			virtual u32				iallocate(void*& p)
+			{
+				p = allocate(1, 4);
+				return mAllocator.to_idx(p);
+			}
+
+			virtual void			ideallocate(u32 idx)
+			{
+				void* p = mAllocator.from_idx(idx);
+				mAllocator.deallocate(p);
+			}
+
+			virtual void*			to_ptr(u32 idx) const
+			{
+				void* p = mAllocator.from_idx(idx);
+				return p;
+			}
+
+			virtual u32				to_idx(void const* p) const
+			{
+				u32 idx = mAllocator.to_idx(p);
+				return idx;
+			}
+
+			///@name	Placement new/delete
+			XCORE_CLASS_PLACEMENT_NEW_DELETE
+		};
+
+		xiallocator_imp::xiallocator_imp()
+			: mOurAllocator(NULL)
+		{
+		}
+
+		xiallocator_imp::xiallocator_imp(x_iallocator* allocator, u32 inElemSize, u32 inElemAlignment, u32 inBlockElemCnt)
+			: mOurAllocator(allocator)
+			, mAllocator(allocator, inElemSize, inElemAlignment, inBlockElemCnt)
+		{
+		}
+
+		xiallocator_imp::xiallocator_imp(x_iallocator* allocator, void* inElementArray, u32 inElemSize, u32 inElemAlignment, u32 inBlockElemCnt)
+			: mOurAllocator(allocator)
+			, mAllocator(allocator, inElementArray, inElemSize, inElemAlignment, inBlockElemCnt)
+		{
 		}
 
 	}	// End of xfreelist_allocator namespace
@@ -264,6 +373,22 @@ namespace xcore
 	{
 		void* mem = allocator->allocate(sizeof(xfreelist_allocator::xallocator_imp), X_ALIGNMENT_DEFAULT);
 		xfreelist_allocator::xallocator_imp* _allocator = new (mem) xfreelist_allocator::xallocator_imp(allocator, inElementArray, inSizeOfElement, inElementAlignment, inNumElements);
+		_allocator->init();
+		return _allocator;
+	}
+
+	x_iidx_allocator*	gCreateFreeListIdxAllocator(x_iallocator* allocator, u32 inSizeOfElement, u32 inElementAlignment, u32 inNumElements)
+	{
+		void* mem = allocator->allocate(sizeof(xfreelist_allocator::xiallocator_imp), X_ALIGNMENT_DEFAULT);
+		xfreelist_allocator::xiallocator_imp* _allocator = new (mem) xfreelist_allocator::xiallocator_imp(allocator, inSizeOfElement, inElementAlignment, inNumElements);
+		_allocator->init();
+		return _allocator;
+	}
+
+	x_iidx_allocator*	gCreateFreeListIdxAllocator(x_iallocator* allocator, void* inElementArray, u32 inSizeOfElement, u32 inElementAlignment, u32 inNumElements)
+	{
+		void* mem = allocator->allocate(sizeof(xfreelist_allocator::xiallocator_imp), X_ALIGNMENT_DEFAULT);
+		xfreelist_allocator::xiallocator_imp* _allocator = new (mem) xfreelist_allocator::xiallocator_imp(allocator, inElementArray, inSizeOfElement, inElementAlignment, inNumElements);
 		_allocator->init();
 		return _allocator;
 	}
