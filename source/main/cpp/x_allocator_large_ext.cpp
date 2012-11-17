@@ -1,7 +1,7 @@
 #include "xbase\x_target.h"
 #include "xbase\x_debug.h"
 #include "xbase\x_integer.h"
-#include "xbase\private\x_rbtree15.h"
+#include "xbase\x_tree.h"
 #include "xallocator\private\x_allocator_large_ext.h"
 
 namespace xcore
@@ -453,9 +453,9 @@ namespace xcore
 
 		inline u16			to_idx(x_iidx_allocator* a, xlnode* node)	{ return a->to_idx(node); }
 
-		static xlnode*		insert_in_list(xlnode* nodep, u32 size, x_iidx_allocator* a)
+		xlnode*		insert_in_list(xlnode* nodep, u32 size, x_iidx_allocator* a, u16& newNode)
 		{
-			u16 newNode = 0xffff;
+			newNode = 0xffff;
 			{
 				void* p;
 				newNode = a->iallocate(p);
@@ -475,7 +475,7 @@ namespace xcore
 			return newNodep;
 		}
 
-		static void			remove_from_list(u16 node, x_iidx_allocator* a)
+		void			remove_from_list(u16 node, x_iidx_allocator* a)
 		{
 			// The node to remove from the linear list
 			xlnode* nodep = (xlnode*)xrbnode15::to_ptr(a, node);
