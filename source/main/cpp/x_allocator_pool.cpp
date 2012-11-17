@@ -4,7 +4,7 @@
 #include "xbase\x_memory_std.h"
 #include "xbase\x_integer.h"
 #include "xbase\x_allocator.h"
-#include "xbase\private\x_rbtree.h"
+#include "xbase\x_tree.h"
 
 #include "xallocator\x_allocator_pool.h"
 
