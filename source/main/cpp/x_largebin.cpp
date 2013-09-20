@@ -2,11 +2,11 @@
 #include "xbase\x_debug.h"
 #include "xbase\x_integer.h"
 #include "xbase\x_tree.h"
-#include "xallocator\private\x_allocator_large_ext.h"
+#include "xallocator\private\x_largebin.h"
 
 namespace xcore
 {
-	namespace xexternal_memory
+	namespace xexternal
 	{
 		/*
 		Large block allocator
@@ -30,7 +30,7 @@ namespace xcore
 		static void			remove_from_list(u16 node, x_iidx_allocator* a);
 		static void			remove_from_tree(u16 root, u16 node, x_iidx_allocator* a);
 
-		void				xlarge_allocator::init(void* mem_begin, u32 mem_size, u32 size_alignment, u32 address_alignment, x_iidx_allocator* node_allocator)
+		void				xlargebin::init(void* mem_begin, u32 mem_size, u32 size_alignment, u32 address_alignment, x_iidx_allocator* node_allocator)
 		{
 			x_iidx_allocator* a = node_allocator;
 
@@ -82,7 +82,7 @@ namespace xcore
 			init_node(addrRoot, NULL, xlnode::STATE_USED, addr_nill, addr_nill, addr_nill);
 		}
 
-		void				xlarge_allocator::release	()
+		void				xlargebin::release	()
 		{
 			x_iidx_allocator* a = mNodeAllocator;
 
@@ -106,7 +106,7 @@ namespace xcore
 			mAddressAlignment = 0xffffffff;
 		}
 		
-		void*				xlarge_allocator::allocate	(u32 size, u32 alignment)
+		void*				xlargebin::allocate	(u32 size, u32 alignment)
 		{
 			x_iidx_allocator* a = mNodeAllocator;
 
@@ -161,7 +161,7 @@ namespace xcore
 		}
 
 
-		void				xlarge_allocator::deallocate	(void* ptr)
+		void				xlargebin::deallocate	(void* ptr)
 		{
 			x_iidx_allocator* a = mNodeAllocator;
 

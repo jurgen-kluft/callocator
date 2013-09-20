@@ -1,6 +1,6 @@
 #include "xbase\x_types.h"
 #include "xbase\x_allocator.h"
-#include "xallocator\private\x_allocator_small_ext.h"
+#include "xallocator\private\x_smallbin.h"
 
 #include "xunittest\xunittest.h"
 
@@ -22,13 +22,13 @@ UNITTEST_SUITE_BEGIN(x_allocator_small_ext)
 
         UNITTEST_TEST(init1)
         {
-			xexternal_memory::xsmall_allocator sb;
+			xexternal::xsmallbin sb;
 			sb.init((void*)0x80000000, 65536, 64);
         }
 
 		UNITTEST_TEST(allocate1)
 		{
-			xexternal_memory::xsmall_allocator sb;
+			xexternal::xsmallbin sb;
 			sb.init((void*)0x80000000, 65536, 64);
 
 			void* p1 = sb.allocate(60, 4, gSystemAllocator);
@@ -39,7 +39,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_small_ext)
 	
 		UNITTEST_TEST(allocate2)
 		{
-			xexternal_memory::xsmall_allocator sb;
+			xexternal::xsmallbin sb;
 			void* base = (void*)0x80000000;
 			sb.init(base, 65536, 2048);
 

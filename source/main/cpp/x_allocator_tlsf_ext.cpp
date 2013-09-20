@@ -3,7 +3,7 @@
 #include "xbase\x_allocator.h"
 #include "xbase\x_integer.h"
 #include "xbase\private\x_rbtree.h"
-#include "xallocator\private\x_allocator_small_ext.h"
+#include "xallocator\private\x_smallbin.h"
 
 namespace xcore
 {
@@ -56,7 +56,7 @@ namespace xcore
 
 		struct xsmallbin
 		{
-			xexternal_memory::xsmall_allocator*		pool;
+			xexternal::xsmallbin*		pool;
 
 			xsmallbin*		next;
 			xsmallbin*		prev;

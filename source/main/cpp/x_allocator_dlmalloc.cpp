@@ -2472,7 +2472,7 @@ namespace xcore
 
 		virtual const char*		name() const
 		{
-			return "dlmalloc allocator";
+			return TARGET_FULL_DESCR_STR " [Allocator, Type=dlmalloc]";
 		}
 
 		void					init(void* mem, s32 mem_size) 

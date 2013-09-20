@@ -375,7 +375,7 @@ namespace xcore
 									xallocator_imp(x_iallocator* allocator, u32 inElemSize, u32 inBlockElemCnt, u32 inInitialBlockCount, u32 inBlockGrowthCount, u32 inBlockMaxCount, u32 inElemAlignment = 0);
 			virtual					~xallocator_imp();
 
-			virtual const char*		name() const									{ return "Fixed size pool allocator"; }
+			virtual const char*		name() const									{ return TARGET_FULL_DESCR_STR " Fixed size pool allocator"; }
 
 			///@name	Should be called when created with default constructor
 			//			Parameters are the same as for constructor with parameters

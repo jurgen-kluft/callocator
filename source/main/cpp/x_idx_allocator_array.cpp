@@ -23,7 +23,7 @@ namespace xcore
 		virtual void		init();
 		virtual void		clear();
 
-		virtual const char*	name() const		{ return "x_indexed_array_allocator; an indexed pool allocator limited to one array"; }
+		virtual const char*	name() const		{ return TARGET_FULL_DESCR_STR " [Allocator, Type=array,indexed]"; }
 
 		virtual u32			size() const		{ return mAllocCount; }
 		virtual u32			max_size() const	{ return mObjectArraySize; }
