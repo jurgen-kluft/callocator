@@ -3,11 +3,11 @@
 #include "xbase\x_allocator.h"
 #include "xbase\x_integer.h"
 
-#include "xallocator\private\x_allocator_small_ext.h"
+#include "xallocator\private\x_smallbin.h"
 
 namespace xcore
 {
-	namespace xexternal_memory
+	namespace xexternal
 	{
 		struct xsnode
 		{
@@ -184,7 +184,7 @@ namespace xcore
 
 		static u16		sb_compute_num_levels(u32 bin_size, u16 chunk_size);
 
-		void		xsmall_allocator::init(void* base_address, u32 bin_size, u16 chunk_size)
+		void		xsmallbin::init(void* base_address, u32 bin_size, u16 chunk_size)
 		{
 			mBaseAddress = base_address;
 			mNode        = NULL;
@@ -231,7 +231,7 @@ namespace xcore
 			}
 		}
 
-		void		xsmall_allocator::release		(x_iallocator* node_allocator)
+		void		xsmallbin::release		(x_iallocator* node_allocator)
 		{
 			if (mLevels > 0)
 			{
@@ -245,7 +245,7 @@ namespace xcore
 			mNode = NULL;
 		}
 
-		void*		xsmall_allocator::allocate(u32 size, u32 alignment, x_iallocator* node_allocator)
+		void*		xsmallbin::allocate(u32 size, u32 alignment, x_iallocator* node_allocator)
 		{
 			if (((u32)mNode & 1) == 1)
 			{
@@ -279,7 +279,7 @@ namespace xcore
 			return ptr;
 		}
 
-		void		xsmall_allocator::deallocate(void* ptr)
+		void		xsmallbin::deallocate(void* ptr)
 		{
 			ptr = ptr_relative(mBaseAddress, ptr);
 			u32 const chunk_idx = (u32)ptr / mChunkSize;

@@ -955,7 +955,7 @@ namespace xcore
 
 		virtual const char*		name() const
 		{
-			return "tlsf allocator";
+			return TARGET_FULL_DESCR_STR " TLSF allocator";
 		}
 
 		void					init(void* mem, s32 mem_size) 

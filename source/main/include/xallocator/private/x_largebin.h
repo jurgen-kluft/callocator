@@ -1,8 +1,8 @@
 //==============================================================================
-//  x_allocator_large_ext.h
+//  x_largebin.h
 //==============================================================================
-#ifndef __X_ALLOCATOR_LARGE_EXT_H__
-#define __X_ALLOCATOR_LARGE_EXT_H__
+#ifndef __X_ALLOCATOR_LARGE_BIN_H__
+#define __X_ALLOCATOR_LARGE_BIN_H__
 #include "xbase\x_target.h"
 #ifdef USE_PRAGMA_ONCE 
 #pragma once 
@@ -16,7 +16,7 @@
 //==============================================================================
 namespace xcore
 {
-	namespace xexternal_memory
+	namespace xexternal
 	{
 		// An allocator that manages 'external' memory with book keeping data outside of that memory.
 		// Every allocation and every free chunk will occupy 1 16 bytes structure.
@@ -24,7 +24,7 @@ namespace xcore
 		// The 'size_alignment' and 'address_alignment should be smartly initialized since:
 		//  - you may increase the amount of wasted memory (size alignment and/or address alignment to large)
 		//  - you may decrease the performance (size alignment to small)
-		struct xlarge_allocator
+		struct xlargebin
 		{
 			//@note: 'node_allocator' is used to allocate fixed size (16 bytes) structures
 			void				init		(void* mem_begin, u32 mem_size, u32 size_alignment, u32 address_alignment, x_iidx_allocator* node_allocator);
@@ -99,5 +99,5 @@ namespace xcore
 	}
 };
 
-#endif	/// __X_ALLOCATOR_LARGE_EXT_H__
+#endif	/// __X_ALLOCATOR_LARGE_BIN_H__
 

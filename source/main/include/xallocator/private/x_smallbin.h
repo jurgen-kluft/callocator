@@ -16,7 +16,7 @@ namespace xcore
 	// Forward declares
 	class x_iallocator;
 
-	namespace xexternal_memory
+	namespace xexternal
 	{
 		struct xsnode;	
 
@@ -26,7 +26,7 @@ namespace xcore
 		// It will not grow or shrink and allocates 16 byte sized structures from the
 		// 'node_allocator' for book-keeping purposes.
 		// The overhead of every allocation when approaching 'full' is ~0.2 bytes.
-		struct xsmall_allocator
+		struct xsmallbin
 		{
 			void			init		(void* base_address, u32 bin_size, u16 chunk_size);
 			void			release		(x_iallocator* node_allocator);
