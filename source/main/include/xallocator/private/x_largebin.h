@@ -26,7 +26,7 @@ namespace xcore
 		//  - you may decrease the performance (size alignment to small)
 		struct xlargebin
 		{
-			//@note: 'node_allocator' is used to allocate fixed size (16 bytes) structures
+			//@note: 'node_allocator' is used to allocate fixed size (16/32 bytes) structures
 			void				init		(void* mem_begin, u32 mem_size, u32 size_alignment, u32 address_alignment, x_iidx_allocator* node_allocator);
 			void				release		();
 		
@@ -44,18 +44,18 @@ namespace xcore
 		};
 
 		static inline void*		advance_ptr(void* ptr, u32 size)		{ return (void*)((xbyte*)ptr + size); }
-		static inline void*		align_ptr(void* ptr, u32 alignment)		{ return (void*)(((u32)ptr + (alignment-1)) & ~(alignment-1)); }
-		static inline void*		mark_ptr_0(void* ptr, u8 bit)			{ return (void*)((u32)ptr & ~(1<<bit)); }
-		static inline void*		mark_ptr_1(void* ptr, u8 bit)			{ return (void*)((u32)ptr | (1<<bit)); }
-		static inline bool		get_ptr_mark(void* ptr, u8 bit)			{ u32 const field = (1<<bit); return ((u32)ptr&field) != 0; }
-		static inline void*		get_ptr(void* ptr, u8 used_bits)		{ return (void*)((u32)ptr & ~((1<<used_bits)-1)); }
+		static inline void*		align_ptr(void* ptr, u32 alignment)		{ return (void*)(((X_PTR_SIZED_INT)ptr + (alignment-1)) & ~(alignment-1)); }
+		static inline void*		mark_ptr_0(void* ptr, u8 bit)			{ return (void*)((X_PTR_SIZED_INT)ptr & ~((X_PTR_SIZED_INT)1<<bit)); }
+		static inline void*		mark_ptr_1(void* ptr, u8 bit)			{ return (void*)((X_PTR_SIZED_INT)ptr | ((X_PTR_SIZED_INT)1<<bit)); }
+		static inline bool		get_ptr_mark(void* ptr, u8 bit)			{ u32 const field = (1<<bit); return ((X_PTR_SIZED_INT)ptr&field) != 0; }
+		static inline void*		get_ptr(void* ptr, u8 used_bits)		{ return (void*)((X_PTR_SIZED_INT)ptr & ~(((X_PTR_SIZED_INT)1<<used_bits)-1)); }
 		static u32				diff_ptr(void* ptr, void* next_ptr)		{ return (u32)((xbyte*)next_ptr - (xbyte*)ptr); }
 
 		struct xlnode : public xrbnode15
 		{
 			enum EState { STATE_USED=1, STATE_FREE=0, USED_BIT=0, USED_BITS=1 };
 
-			void*			ptr;				// (4) pointer to external mem
+			void*			ptr;				// (4) pointer to external memory
 			u16				next;				// (2) linear list ordered by physical address
 			u16				prev;				// (2)  
 		};

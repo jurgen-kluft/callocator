@@ -128,7 +128,7 @@ namespace xcore
 					// Allocate a new node
 					if (level_idx == 1)
 					{
-						xbnode* bnode = (xbnode*)node_allocator->allocate(sizeof(xbnode), 4);
+						xbnode* bnode = (xbnode*)node_allocator->allocate(sizeof(xsnode), 4);
 						clear(bnode);
 						*child = (xsnode*)bnode;
 						sb_allocate(level_idxs, (xbnode*)(*child), outChunkIdx);
@@ -256,7 +256,7 @@ namespace xcore
 			{
 				if (mLevels == 0)
 				{
-					xbnode* bnode = (xbnode*)node_allocator->allocate(sizeof(xbnode), 4);
+					xbnode* bnode = (xbnode*)node_allocator->allocate(sizeof(xsnode), 4);
 					clear(bnode);
 					mNode = (xsnode*)bnode;
 				}

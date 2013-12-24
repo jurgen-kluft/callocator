@@ -28,8 +28,8 @@ namespace xcore
 		virtual u32			size() const		{ return mAllocCount; }
 		virtual u32			max_size() const	{ return mObjectArraySize; }
 
-		virtual void*		allocate(u32 size, u32 alignment);
-		virtual void*		reallocate(void* p, u32 new_size, u32 new_alignment);
+		virtual void*		allocate(xsize_t size, u32 alignment);
+		virtual void*		reallocate(void* p, xsize_t new_size, u32 new_alignment);
 		virtual void		deallocate(void* p);
 
 		virtual u32			iallocate(void*& p);
@@ -134,7 +134,7 @@ namespace xcore
 		mFreeObjectList = NULL;
 	}
 
-	void*		x_indexed_array_allocator::allocate(u32 size, u32 alignment)
+	void*		x_indexed_array_allocator::allocate(xsize_t size, u32 alignment)
 	{
 		ASSERT(size < mSizeOfObject);
 		void* p;
@@ -163,7 +163,7 @@ namespace xcore
 		return idx;
 	}
 
-	void*		x_indexed_array_allocator::reallocate(void* old_ptr, u32 new_size, u32 new_alignment)
+	void*		x_indexed_array_allocator::reallocate(void* old_ptr, xsize_t new_size, u32 new_alignment)
 	{
 		ASSERT(new_size <= mSizeOfObject);
 		ASSERT(new_alignment <= mAlignOfObject);

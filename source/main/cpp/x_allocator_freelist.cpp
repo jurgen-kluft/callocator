@@ -1,5 +1,4 @@
 #include "xbase\x_target.h"
-#include "xbase\x_types.h"
 #include "xbase\x_debug.h"
 #include "xbase\x_memory_std.h"
 #include "xbase\x_integer.h"
@@ -47,8 +46,8 @@ namespace xcore
 			u32						size() const										{ return mAllocCount; }
 			u32						max_size() const									{ return mFreeListData.getElemMaxCount(); }
 
-			virtual void*			allocate(u32 size, u32 alignment);
-			virtual void*			reallocate(void* p, u32 size, u32 alignment);
+			virtual void*			allocate(xsize_t size, u32 alignment);
+			virtual void*			reallocate(void* p, xsize_t size, u32 alignment);
 			virtual void			deallocate(void* p);
 
 			u32						to_idx(void const* p) const;
@@ -135,7 +134,7 @@ namespace xcore
 				mFreeListData.set_array(NULL);
 		}
 
-		void*		xallocator_imp::allocate(u32 size, u32 alignment)
+		void*		xallocator_imp::allocate(xsize_t size, u32 alignment)
 		{
 			ASSERT((u32)size <= mFreeListData.getElemSize());
 			ASSERT((u32)alignment <= mFreeListData.getElemAlignment());
@@ -145,7 +144,7 @@ namespace xcore
 			return p;
 		}
 
-		void*		xallocator_imp::reallocate(void* inObject, u32 size, u32 alignment)
+		void*		xallocator_imp::reallocate(void* inObject, xsize_t size, u32 alignment)
 		{
 			if (inObject == NULL)
 			{
@@ -203,8 +202,8 @@ namespace xcore
 
 			virtual const char*		name() const										{ return TARGET_FULL_DESCR_STR " [Allocator, Type=freelist,indexed]"; }
 
-			virtual void*			allocate(u32 size, u32 align)						{ return mAllocator.allocate(size, align); }
-			virtual void*			reallocate(void* p, u32 size, u32 align)			{ return mAllocator.reallocate(p, size, align); }
+			virtual void*			allocate(xsize_t size, u32 align)					{ return mAllocator.allocate(size, align); }
+			virtual void*			reallocate(void* p, xsize_t size, u32 align)		{ return mAllocator.reallocate(p, size, align); }
 			virtual void			deallocate(void* p)									{ return mAllocator.deallocate(p); }
 
 			virtual void			release()											{ mAllocator.exit(); mOurAllocator->deallocate(this); }

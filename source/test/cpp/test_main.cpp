@@ -1,5 +1,4 @@
 #include "xbase\x_target.h"
-#include "xbase\x_types.h"
 #include "xbase\x_allocator.h"
 
 #include "xunittest\xunittest.h"
@@ -31,7 +30,7 @@ public:
 		mAllocator = allocator;
 	}
 
-	virtual void*	Allocate(int size)
+	virtual void*	Allocate(size_t size)
 	{
 		++mNumAllocations;
 		return mAllocator->allocate(size, 4);

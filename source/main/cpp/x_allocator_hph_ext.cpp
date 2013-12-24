@@ -57,7 +57,7 @@ namespace xcore
 		struct largebin;
 
 		static void				insert_size(rbnode_size* root, block_free* block, x_iallocator* node_allocator, rbnode_size*& outNode);
-		static bool				find_size(rbnode_size* root, u32 size, u32 alignment, rbnode_size*& outNode, block_free*& outBlock);
+		static bool				find_size(rbnode_size* root, xsize_t size, u32 alignment, rbnode_size*& outNode, block_free*& outBlock);
 		static bool				find_size(rbnode_size* root, block_free* free_block, rbnode_size*& outNode);
 		static void				remove_size(rbnode_size* root, rbnode_size* n, block_free* block);
 
@@ -75,7 +75,7 @@ namespace xcore
 		static void				insert_block(block_free* head, block_free* node);
 		static void				remove_block(block_free*& head, block_free* node);
 
-		static block_free*		split_block(block_free*& block, u32 size, u32 alignment, x_iallocator* node_allocator, u32 minimum_size, u32 minimum_alignment);
+		static block_free*		split_block(block_free*& block, xsize_t size, u32 alignment, x_iallocator* node_allocator, xsize_t minimum_size, u32 minimum_alignment);
 
 		static block_alloc*		convert_block(block_free* free_block);
 		static block_free*		convert_block(block_alloc* alloc_block);
@@ -84,8 +84,8 @@ namespace xcore
 		static void				encode_bin_ptr(block_alloc* block, largebin* bin);
 		static void				decode_bin_ptr(void* bin_ptr, largebin*& large_bin, smallbin*& small_bin);
 
-		static inline void*		get_aligned_ptr(void* ptr, u32 alignment)		{ return (void*)(((u32)ptr + (alignment-1)) & ~(alignment-1)); }
-		static inline void*		add_to_ptr(void* ptr, u32 size)					{ return (void*)((u32)ptr + size); }
+		static inline void*		get_aligned_ptr(void* ptr, u32 alignment)		{ return (void*)(((X_PTR_SIZED_INT)ptr + (alignment-1)) & ~(alignment-1)); }
+		static inline void*		add_to_ptr(void* ptr, xsize_t size)				{ return (void*)((X_PTR_SIZED_INT)ptr + size); }
 
 		/// Block that is free (size = 16 bytes)
 		struct block_free
@@ -171,7 +171,7 @@ namespace xcore
 					return 0; 
 			}
 
-			block_alloc*			allocate(u32 size, u32 alignment, x_iallocator* allocator)	/// Allocate a block from this bin
+			block_alloc*			allocate(xsize_t size, u32 alignment, x_iallocator* allocator)	/// Allocate a block from this bin
 			{
 				rbnode_address* node = (rbnode_address*)mAddressTreeRoot->get_child(rbnode_address::LEFT);
 				if (node == mAddressTreeRoot)
@@ -238,7 +238,7 @@ namespace xcore
 				return large_bin;
 			}
 
-			block_alloc*		allocate(u32 size, u32 alignment, x_iallocator* node_allocator, u32 minimum_size, u32 minimum_alignment)
+			block_alloc*		allocate(xsize_t size, u32 alignment, x_iallocator* node_allocator, xsize_t minimum_size, u32 minimum_alignment)
 			{
 				block_free* free_block;
 				rbnode_size* size_node;
@@ -310,7 +310,7 @@ namespace xcore
 				}
 			}
 
-			block_alloc*		allocate(u32 size, u32 alignment, x_iallocator* node_allocator)
+			block_alloc*		allocate(u16 size, u32 alignment, x_iallocator* node_allocator)
 			{
 				smallbin* sbin = find_bin(size);
 				if (sbin != NULL)
@@ -403,7 +403,7 @@ namespace xcore
 				mLargeBin->release(mAllocator);
 			}
 
-			block_alloc*		allocate(u32 size, u32 alignment, x_iallocator* node_allocator)
+			block_alloc*		allocate(xsize_t size, u32 alignment, x_iallocator* node_allocator)
 			{
 				block_alloc* alloc_block = mLargeBin->allocate(size, alignment, node_allocator, mMinimumSize, mMinimumAlignment);
 				return alloc_block;
@@ -451,7 +451,7 @@ namespace xcore
 				mAllocations   = NULL;
 			}
 
-			void*				allocate(u32 size, u32 alignment);
+			void*				allocate(xsize_t size, u32 alignment);
 			void				deallocate(void* p);
 
 		protected:
@@ -460,7 +460,7 @@ namespace xcore
 
 			/// Configuration
 			bool				mTwoStageDeallocation;		/// (default = false)
-			u32					mPageSize;					/// (default = 65536, 64KB)
+			xsize_t				mPageSize;					/// (default = 65536, 64KB)
 
 			/// Small bins
 			smallbin_allocator	mSmallBinAllocator;
@@ -503,9 +503,12 @@ namespace xcore
 		    Return address of external memory
 
 		*/
-		void*			allocator::allocate(u32 size, u32 alignment)
+		void*			allocator::allocate(xsize_t size, u32 alignment)
 		{
-			block_alloc* alloc_block = mSmallBinAllocator.allocate(size, alignment, mNodeAllocator);
+			block_alloc* alloc_block = NULL;
+			if (size < mPageSize)
+				alloc_block = mSmallBinAllocator.allocate((u16)size, alignment, mNodeAllocator);
+
 			if (alloc_block == NULL)
 				alloc_block = mLargeBinAllocator.allocate(size, alignment, mNodeAllocator);
 
@@ -612,7 +615,7 @@ namespace xcore
 			CHECK_RBTREE(root);
 		}
 
-		bool		find_size(rbnode_size* root, u32 size, u32 alignment, rbnode_size*& outNode, block_free*& outBlock)
+		bool		find_size(rbnode_size* root, xsize_t size, u32 alignment, rbnode_size*& outNode, block_free*& outBlock)
 		{
 			rbnode_size* lastNode = root;
 			rbnode_size* curNode  = (rbnode_size*)root->get_child(rbnode_size::LEFT);;
@@ -1043,7 +1046,7 @@ namespace xcore
 				head = NULL;
 		}
 
-		static block_free*		split_block(block_free*& block, u32 size, u32 alignment, x_iallocator* node_allocator, u32 minimum_size, u32 minimum_alignment)
+		static block_free*		split_block(block_free*& block, xsize_t size, u32 alignment, x_iallocator* node_allocator, xsize_t minimum_size, u32 minimum_alignment)
 		{
 			void*     split_ptr  = get_aligned_ptr(add_to_ptr(get_aligned_ptr(block->mPtr, alignment), size), minimum_alignment);
 			u32 const split_size = block->mSize - ((u32)split_ptr - (u32)block->mPtr);
@@ -1132,12 +1135,12 @@ namespace xcore
 			mAllocator.init(mem_begin, mem_size, mHeapAllocator, mNodeAllocator, num_small_bins, small_bin_sizes, max_num_allocs);
 		}
 
-		virtual void*			allocate(u32 size, u32 alignment)
+		virtual void*			allocate(xsize_t size, u32 alignment)
 		{
 			return mAllocator.allocate(size, alignment);
 		}
 
-		virtual void*			reallocate(void* ptr, u32 size, u32 alignment)
+		virtual void*			reallocate(void* ptr, xsize_t size, u32 alignment)
 		{
 			ASSERT(false);
 			return ptr;

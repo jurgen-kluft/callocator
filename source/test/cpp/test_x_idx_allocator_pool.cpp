@@ -1,5 +1,4 @@
 #include "xbase\x_target.h"
-#include "xbase\x_types.h"
 #include "xbase\x_idx_allocator.h"
 
 #include "xallocator\x_idx_allocator.h"
@@ -98,6 +97,15 @@ UNITTEST_SUITE_BEGIN(x_idx_allocator_pool)
 			CHECK_NULL(null_ptr);
 			null_ptr = allocator->to_ptr(allocator->to_idx(NULL));
 			CHECK_NULL(null_ptr);
+
+			// Check allocated items
+			for (u32 i=size-1; i!=0xffffffff; --i)
+			{
+				void* p = allocator->to_ptr(i);
+				CHECK_NOT_NULL(p);
+				myobject* obj = (myobject*)p;
+				CHECK_EQUAL(i, obj->mIndex);
+			}
 
 			// Reversed item deallocation
 			for (u32 i=size-1; i!=0xffffffff; --i)

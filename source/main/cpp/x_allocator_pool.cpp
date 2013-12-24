@@ -1,5 +1,4 @@
 #include "xbase\x_target.h"
-#include "xbase\x_types.h"
 #include "xbase\x_debug.h"
 #include "xbase\x_memory_std.h"
 #include "xbase\x_integer.h"
@@ -381,8 +380,8 @@ namespace xcore
 			//			Parameters are the same as for constructor with parameters
 			void					init();
 
-			virtual void*			allocate(u32 size, u32 alignment);
-			virtual void*			reallocate(void* p, u32 size, u32 alignment);
+			virtual void*			allocate(xsize_t size, u32 alignment);
+			virtual void*			reallocate(void* p, xsize_t size, u32 alignment);
 			virtual void			deallocate(void* p);
 
 			///@name	Placement new/delete
@@ -577,7 +576,7 @@ namespace xcore
 			mUsedItems = 0;
 		}
 
-		void*		xallocator_imp::allocate(u32 size, u32 alignment)
+		void*		xallocator_imp::allocate(xsize_t size, u32 alignment)
 		{
 			ASSERT((u32)size <= mElemSize);
 
@@ -595,7 +594,7 @@ namespace xcore
 			return p;
 		}
 
-		void*		xallocator_imp::reallocate(void* inObject, u32 size, u32 alignment)
+		void*		xallocator_imp::reallocate(void* inObject, xsize_t size, u32 alignment)
 		{
 			ASSERT((u32)size <= mElemSize);
 			ASSERT(alignment <= mElemAlignment);
