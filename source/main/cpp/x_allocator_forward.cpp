@@ -1,6 +1,6 @@
 #include "xbase\x_target.h"
-#include "xbase\x_types.h"
 #include "xbase\x_memory_std.h"
+#include "xbase\x_limits.h"
 #include "xbase\x_integer.h"
 #include "xbase\x_allocator.h"
 #include "xbase\x_integer.h"
@@ -23,8 +23,8 @@ namespace xcore
 		void				initialize(void* beginAddress, u32 size);
 		virtual void		release();
 		
-		virtual void*		allocate(u32 size, u32 alignment);
-		virtual void*		reallocate(void* ptr, u32 size, u32 alignment);
+		virtual void*		allocate(xsize_t size, u32 alignment);
+		virtual void*		reallocate(void* ptr, xsize_t size, u32 alignment);
 		virtual void		deallocate(void* ptr);
 	
 		void*				operator new(xsize_t num_bytes)					{ return NULL; }
@@ -70,15 +70,17 @@ namespace xcore
 		mAllocator->deallocate(this);
 	}
 
-	void*	x_allocator_forward::allocate(u32 size, u32 alignment)
+	void*	x_allocator_forward::allocate(xsize_t size, u32 alignment)
 	{
-		return mForwardAllocator.allocate(size, alignment);
+		ASSERT(size < X_U32_MAX);
+		return mForwardAllocator.allocate((u32)size, alignment);
 	}
 
-	void* x_allocator_forward::reallocate(void* ptr, u32 size, u32 alignment)
+	void* x_allocator_forward::reallocate(void* ptr, xsize_t size, u32 alignment)
 	{
+		ASSERT(size < X_U32_MAX);
 		u32 const old_size = mForwardAllocator.get_size(ptr);
-		void* new_ptr = mForwardAllocator.allocate(size, alignment);
+		void* new_ptr = mForwardAllocator.allocate((u32)size, alignment);
 		x_memcpy(new_ptr, ptr, old_size);
 		mForwardAllocator.deallocate(ptr);
 		return new_ptr;

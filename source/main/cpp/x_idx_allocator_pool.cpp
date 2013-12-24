@@ -88,7 +88,7 @@ namespace xcore
 
 			u32					to_idx(xbyte* ptr, u32 size_of_item)
 			{
-				u32 idx = (ptr - mData) / size_of_item;
+				u32 idx = (u32)((ptr - mData) / size_of_item);
 				return idx;
 			}
 
@@ -146,7 +146,7 @@ namespace xcore
 		{
 			if (num_blocks > mNumBlocks)
 			{
-				xblock* new_blocks = (xblock*)mBlockAllocator->allocate(sizeof(xblock) * num_blocks, 4);
+				xblock* new_blocks = (xblock*)mBlockAllocator->allocate(sizeof(xblock) * num_blocks, sizeof(void*));
 				if (NULL!=mBlocks)
 					x_memcopy(new_blocks, mBlocks, sizeof(xblock) * mNumBlocks);
 
@@ -288,7 +288,7 @@ namespace xcore
 			xblock* new_blocks = NULL;
 			if (NULL!=mBlocks && num_blocks>0)
 			{
-				new_blocks = (xblock*)mBlockAllocator->allocate(sizeof(xblock) * num_blocks, 4);
+				new_blocks = (xblock*)mBlockAllocator->allocate(sizeof(xblock) * num_blocks, sizeof(void*));
 				x_memcopy(new_blocks, mBlocks, sizeof(xblock) * num_blocks);
 			}
 
@@ -354,7 +354,7 @@ namespace xcore
 			}
 		}
 
-		virtual void*		allocate(u32 size, u32 alignment)
+		virtual void*		allocate(xsize_t size, u32 alignment)
 		{
 			ASSERT(size <= mSizeOfItem);
 			void* p;
@@ -376,6 +376,7 @@ namespace xcore
 					block_idx_t block_idx = mBlockHeadAlloc;
 					do 
 					{
+						ASSERT(block_idx < mNumBlocks);
 						mBlocks[block_idx].init(mBlockAllocator, mSizeOfItem, mAlignOfItem, mItemsPerBlock);
 						block_idx = mBlocks[block_idx].mNext;
 					} while (NILL_IDX != block_idx);
@@ -388,9 +389,11 @@ namespace xcore
 
 			++mAllocCount;
 
-			xblock* block = &mBlocks[mBlockHeadAlloc];
+			block_idx_t block_idx = mBlockHeadAlloc;
+			ASSERT(block_idx < mNumBlocks);
+			xblock* block = &mBlocks[block_idx];
 			xbyte* ptr = block->pop_free_item(mSizeOfItem);
-			u32 index = (mBlockHeadAlloc<<mBlockIndexBitShift);
+			u32 index = (block_idx<<mBlockIndexBitShift);
 			index = index | block->to_idx(ptr, mSizeOfItem);
 
 			if (0 == block->mFreeListCnt)
@@ -402,7 +405,7 @@ namespace xcore
 			return index;
 		}
 
-		virtual void*		reallocate(void* p, u32 new_size, u32 new_alignment)
+		virtual void*		reallocate(void* p, xsize_t new_size, u32 new_alignment)
 		{
 			if (new_size < mSizeOfItem)
 			{
@@ -426,7 +429,9 @@ namespace xcore
 			if (NILL_IDX != idx) 
 			{
 				block_idx_t block_idx = idx >> mBlockIndexBitShift;
+				ASSERT(block_idx < mNumBlocks);
 				xblock* block = &mBlocks[block_idx];
+				ASSERT(block->mFreeListCnt < mItemsPerBlock);
 				block->push_free_item(idx & mItemsPerBlockBitMask, mSizeOfItem);
 
 				--mAllocCount;
@@ -489,7 +494,7 @@ namespace xcore
 				xblock& block = mBlocks[i];
 				if (ptr>=block.mData && ptr<(block.mData + mSizeOfBlockData))
 				{
-					u32 item_idx = (ptr - block.mData) / mSizeOfItem;
+					u32 item_idx = (u32)((ptr - block.mData) / mSizeOfItem);
 					return (u32)(i << mBlockIndexBitShift) | item_idx;
 				}
 			}
@@ -532,7 +537,7 @@ namespace xcore
 
 	x_iidx_allocator*		gCreatePoolIdxAllocator(x_iallocator* allocator, x_iallocator* block_array_allocator, x_iallocator* object_array_allocator, u32 size_of_object, u32 object_alignment, u32 num_objects_per_block, u32 num_initial_blocks, u32 num_grow_blocks, u32 num_shrink_blocks)
 	{
-		void* mem = allocator->allocate(sizeof(x_indexed_pool_allocator), 4);
+		void* mem = allocator->allocate(sizeof(x_indexed_pool_allocator), sizeof(void*));
 		x_indexed_pool_allocator* pool_allocator = new (mem) x_indexed_pool_allocator(allocator);
 		pool_allocator->initialize(block_array_allocator, object_array_allocator, size_of_object, object_alignment, num_objects_per_block, num_initial_blocks, num_grow_blocks, num_shrink_blocks);
 		return pool_allocator;
@@ -540,7 +545,7 @@ namespace xcore
 
 	x_iidx_allocator*		gCreatePoolIdxAllocator(x_iallocator* allocator, u32 size_of_object, u32 object_alignment, u32 num_objects_per_block, u32 num_initial_blocks, u32 num_grow_blocks, u32 num_shrink_blocks)
 	{
-		void* mem = allocator->allocate(sizeof(x_indexed_pool_allocator), 4);
+		void* mem = allocator->allocate(sizeof(x_indexed_pool_allocator), sizeof(void*));
 		x_indexed_pool_allocator* pool_allocator = new (mem) x_indexed_pool_allocator(allocator);
 		pool_allocator->initialize(size_of_object, object_alignment, num_objects_per_block, num_initial_blocks, num_grow_blocks, num_shrink_blocks);
 		return pool_allocator;

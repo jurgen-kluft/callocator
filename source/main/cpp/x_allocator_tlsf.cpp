@@ -15,7 +15,7 @@ namespace xcore
 {
 	/* Generic implementation. */
 
-	static s32 tlsf_fls_generic(u32 word)
+	static s32 tlsf_fls_generic(xsize_t word)
 	{
 		s32 bit = 32;
 
@@ -35,7 +35,7 @@ namespace xcore
 		return tlsf_fls_generic(word & (~word + 1)) - 1;
 	}
 
-	static s32 tlsf_fls(u32 word)
+	static s32 tlsf_fls(xsize_t word)
 	{
 		return tlsf_fls_generic(word) - 1;
 	}
@@ -174,8 +174,14 @@ namespace xcore
 		block_header_t* blocks[FL_INDEX_COUNT][SL_INDEX_COUNT];
 	} pool_t;
 
+#ifdef TARGET_32BIT
 	/* A type used for casting when doing pointer arithmetic. */
 	typedef s32 tlsfptr_t;
+#endif
+#ifdef TARGET_64BIT
+	/* A type used for casting when doing pointer arithmetic. */
+	typedef s64 tlsfptr_t;
+#endif
 
 	/*
 	** block_header_t member functions.
@@ -296,8 +302,7 @@ namespace xcore
 
 	static void* align_ptr(const void* ptr, xsize_t align)
 	{
-		const tlsfptr_t aligned =
-			(tlsf_cast(tlsfptr_t, ptr) + (align - 1)) & ~(align - 1);
+		const tlsfptr_t aligned = (tlsf_cast(tlsfptr_t, ptr) + (align - 1)) & ~(align - 1);
 		ASSERT(0 == (align & (align - 1)) && "must align to a power of two");
 		return tlsf_cast(void*, aligned);
 	}
@@ -923,7 +928,7 @@ namespace xcore
 				if (p)
 				{
 					const xsize_t minsize = tlsf_min(cursize, size);
-					x_memcpy(p, ptr, minsize);
+					x_memcpy(p, ptr, (u32)minsize);
 					tlsf_free(tlsf, ptr);
 				}
 			}
@@ -963,14 +968,14 @@ namespace xcore
 			mPool = tlsf_create(mem, mem_size);
 		}
 
-		virtual void*			allocate(u32 size, u32 alignment)
+		virtual void*			allocate(xsize_t size, u32 alignment)
 		{
 			if (alignment <= 8)
 				return tlsf_malloc(mPool, size);
 			return tlsf_memalign(mPool, alignment, size);
 		}
 
-		virtual void*			reallocate(void* ptr, u32 size, u32 alignment)
+		virtual void*			reallocate(void* ptr, xsize_t size, u32 alignment)
 		{
 			if (alignment <= 8)
 			{

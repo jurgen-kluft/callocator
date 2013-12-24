@@ -1,5 +1,4 @@
 #include "xbase\x_target.h"
-#include "xbase\x_types.h"
 #include "xbase\x_integer.h"
 #include "xbase\x_memory_std.h"
 #include "xbase\x_allocator.h"
@@ -12,10 +11,12 @@
 
 namespace xcore
 {
+	typedef u32 msize_t;														///< Described below */
+
 	struct malloc_chunk
 	{
-		xsize_t					prev_foot;										///< Size of previous chunk (if free).  */
-		xsize_t					head;											///< Size and inuse bits. */
+		msize_t					prev_foot;										///< Size of previous chunk (if free).  */
+		msize_t					head;											///< Size and inuse bits. */
 		struct malloc_chunk*	fd;												///< double links -- used only if free. */
 		struct malloc_chunk*	bk;
 	};
@@ -30,8 +31,8 @@ namespace xcore
 	struct malloc_tree_chunk 
 	{
 		///< The first four fields must be compatible with malloc_chunk
-		xsize_t						prev_foot;
-		xsize_t						head;
+		msize_t						prev_foot;
+		msize_t						head;
 		struct malloc_tree_chunk*	fd;
 		struct malloc_tree_chunk*	bk;
 
@@ -47,7 +48,7 @@ namespace xcore
 	struct malloc_segment 
 	{
 		xbyte*					base;											///< base address */
-		xsize_t					size;											///< allocated size */
+		msize_t					size;											///< allocated size */
 		struct malloc_segment*	next;											///< ptr to next segment */
 		flag_t					sflags;											///< user and extern flag */
 	};
@@ -62,17 +63,17 @@ namespace xcore
 	{
 		binmap_t			smallmap;
 		binmap_t			treemap;
-		xsize_t				dvsize;
-		xsize_t				topsize;
+		msize_t				dvsize;
+		msize_t				topsize;
 		xbyte*				least_addr;
 		mchunkptr			dv;
 		mchunkptr			top;
-		xsize_t				release_checks;
-		xsize_t				magic;
+		msize_t				release_checks;
+		msize_t				magic;
 		mchunkptr			smallbins[(NSMALLBINS+1)*2];
 		tbinptr				treebins[NTREEBINS];
-		xsize_t				footprint;
-		xsize_t				max_footprint;
+		msize_t				footprint;
+		msize_t				max_footprint;
 		flag_t				mflags;
 		msegment			seg;
 	};
@@ -81,12 +82,12 @@ namespace xcore
 
 	struct malloc_params 
 	{
-		volatile xsize_t	magic;
-		xsize_t				page_size;
+		volatile msize_t	magic;
+		msize_t				page_size;
 		flag_t				default_mflags;
 	};
 
-	typedef				void*	(*SysAllocFunc)(xsize_t size);
+	typedef				void*	(*SysAllocFunc)(msize_t size);
 	typedef				void	(*SysFreeFunc)(void* ptrsize);
 
 	/**
@@ -102,29 +103,29 @@ namespace xcore
 		SysFreeFunc			mSysFree;
 
 	public:
-		void*				__alloc(xsize_t bytes);													///< Normal allocation
-		void*				__allocA(xsize_t alignment, xsize_t size);								///< Aligned allocation
-		void*				__allocR(void* ptr, xsize_t alignment, xsize_t size);										///< Re allocation
-		void*				__allocN(xsize_t n_elements, xsize_t element_size);						///< Elements allocation
-		void**				__allocIC(xsize_t n_elements, xsize_t element_size, void** chunks);		///< Independent continues with equal sized elements
-		void**				__allocICO(xsize_t n_elements, xsize_t* element_sizes, void** chunks);	///< Independent continues with different size specified for every element
+		void*				__alloc(msize_t bytes);													///< Normal allocation
+		void*				__allocA(msize_t alignment, msize_t size);								///< Aligned allocation
+		void*				__allocR(void* ptr, msize_t alignment, msize_t size);										///< Re allocation
+		void*				__allocN(msize_t n_elements, msize_t element_size);						///< Elements allocation
+		void**				__allocIC(msize_t n_elements, msize_t element_size, void** chunks);		///< Independent continues with equal sized elements
+		void**				__allocICO(msize_t n_elements, msize_t* element_sizes, void** chunks);	///< Independent continues with different size specified for every element
 		void				__free(void* ptr);
 
 		u32					__usable_size(void* mem);
 
 	protected:
-		void*				__internal_realloc(mstate m, void* oldmem, xsize_t alignment, xsize_t bytes);
-		void*				__internal_memalign(xsize_t alignment, xsize_t bytes);
-		void**				__internal_ic_alloc(xsize_t n_elements, xsize_t* sizes, s32 opts, void* chunks[]);
+		void*				__internal_realloc(mstate m, void* oldmem, msize_t alignment, msize_t bytes);
+		void*				__internal_memalign(msize_t alignment, msize_t bytes);
+		void**				__internal_ic_alloc(msize_t n_elements, msize_t* sizes, s32 opts, void* chunks[]);
 
-		void				__add_segment(void* tbase, xsize_t tsize, s32 sflags);
-		xsize_t				__release_unused_segments(mstate m);
+		void				__add_segment(void* tbase, msize_t tsize, s32 sflags);
+		msize_t				__release_unused_segments(mstate m);
 
-		void*				__tmalloc_large(mstate m, xsize_t nb);
-		void*				__tmalloc_small(mstate m, xsize_t nb);
+		void*				__tmalloc_large(mstate m, msize_t nb);
+		void*				__tmalloc_small(mstate m, msize_t nb);
 
-		xsize_t				__footprint();
-		xsize_t				__max_footprint();
+		msize_t				__footprint();
+		msize_t				__max_footprint();
 
 		s32					__init_mparams();
 		s32					__change_mparam(s32 param_number, s32 value);
@@ -140,7 +141,7 @@ namespace xcore
 		void				__initialize();
 		void				__destroy();
 
-		void				__manage(void* mem, xsize_t size);
+		void				__manage(void* mem, msize_t size);
 
 		static xcore::u32	__sGetMemSize(void* mem);
 
@@ -159,14 +160,14 @@ namespace xcore
 	#define INSECURE										0
 	#define REALLOC_ZERO_BYTES_FREES						1
 
-	#define MALLOC_ALIGNMENT								((xsize_t) X_MEMALIGN )
+	#define MALLOC_ALIGNMENT								((msize_t) X_MEMALIGN )
 
-	#define DEFAULT_GRANULARITY								((xsize_t)64U * (xsize_t)1024U)
+	#define DEFAULT_GRANULARITY								((msize_t)64U * (msize_t)1024U)
 
 	#define DLMALLOC_VERSION								20804
 
-	/* The maximum possible xsize_t value has all bits set */
-	#define MAX_SIZE_T										(~(xsize_t)0)
+	/* The maximum possible msize_t value has all bits set */
+	#define MAX_SIZE_T										(~(msize_t)0)
 
 	#ifndef ABORT_ON_ASSERT_FAILURE
 		#define ABORT_ON_ASSERT_FAILURE						1
@@ -217,18 +218,18 @@ namespace xcore
 		#define malloc_getpagesize 65536
 	#endif
 
-	/* ------------------- xsize_t and alignment properties -------------------- */
+	/* ------------------- msize_t and alignment properties -------------------- */
 
-	/* The byte and bit size of a xsize_t */
-	#define SIZE_T_SIZE					(sizeof(xsize_t))
-	#define SIZE_T_BITSIZE				(sizeof(xsize_t) << 3)
+	/* The byte and bit size of a msize_t */
+	#define SIZE_T_SIZE					(sizeof(msize_t))
+	#define SIZE_T_BITSIZE				(sizeof(msize_t) << 3)
 
-	/* Some constants coerced to xsize_t */
+	/* Some constants coerced to msize_t */
 	/* Annoying but necessary to avoid errors on some platforms */
-	#define SIZE_T_ZERO					((xsize_t)0)
-	#define SIZE_T_ONE 					((xsize_t)1)
-	#define SIZE_T_TWO 					((xsize_t)2)
-	#define SIZE_T_FOUR					((xsize_t)4)
+	#define SIZE_T_ZERO					((msize_t)0)
+	#define SIZE_T_ONE 					((msize_t)1)
+	#define SIZE_T_TWO 					((msize_t)2)
+	#define SIZE_T_FOUR					((msize_t)4)
 	#define TWO_SIZE_T_SIZES			(SIZE_T_SIZE<<1)
 	#define FOUR_SIZE_T_SIZES			(SIZE_T_SIZE<<2)
 	#define SIX_SIZE_T_SIZES			(FOUR_SIZE_T_SIZES+TWO_SIZE_T_SIZES)
@@ -238,10 +239,10 @@ namespace xcore
 	#define CHUNK_ALIGN_MASK			(MALLOC_ALIGNMENT - SIZE_T_ONE)
 
 	/* True if address a has acceptable alignment */
-	#define is_aligned(A)				(((xsize_t)((A)) & (CHUNK_ALIGN_MASK)) == 0)
+	#define is_aligned(A)				(((msize_t)((A)) & (CHUNK_ALIGN_MASK)) == 0)
 
 	/* the number of bytes to offset an address to align it */
-	#define align_offset(A)				((((xsize_t)(A) & CHUNK_ALIGN_MASK) == 0)? 0 : ((MALLOC_ALIGNMENT - ((xsize_t)(A) & CHUNK_ALIGN_MASK)) & CHUNK_ALIGN_MASK))
+	#define align_offset(A)				((((msize_t)(A) & CHUNK_ALIGN_MASK) == 0)? 0 : ((MALLOC_ALIGNMENT - ((msize_t)(A) & CHUNK_ALIGN_MASK)) & CHUNK_ALIGN_MASK))
 
 	/* -------------------------- MMAP preliminaries ------------------------- */
 
@@ -495,13 +496,13 @@ namespace xcore
 		static void   do_check_top_chunk(mstate m, mchunkptr p);
 		static void   do_check_inuse_chunk(mstate m, malloc_params& mparams, mchunkptr p);
 		static void   do_check_free_chunk(mstate m, mchunkptr p);
-		static void   do_check_malloced_chunk(mstate m, malloc_params& mparams, void* mem, xsize_t s);
+		static void   do_check_malloced_chunk(mstate m, malloc_params& mparams, void* mem, msize_t s);
 		static void   do_check_tree(mstate m, tchunkptr t);
 		static void   do_check_treebin(mstate m, bindex_t i);
 		static void   do_check_smallbin(mstate m, malloc_params& mparams, bindex_t i);
 		static void   do_check_malloc_state(mstate m, malloc_params& mparams);
 		static s32    bin_find(mstate m, mchunkptr x);
-		static xsize_t traverse_and_check(mstate m, malloc_params& mparams);
+		static msize_t traverse_and_check(mstate m, malloc_params& mparams);
 	#endif /* XMEM_HEAP_DEBUG */
 
 	/* ---------------------------- Indexing Bins ---------------------------- */
@@ -517,7 +518,7 @@ namespace xcore
 
 	#define compute_tree_index(S, I)\
 	{\
-		xsize_t X = S >> TREEBIN_SHIFT;\
+		msize_t X = S >> TREEBIN_SHIFT;\
 		if (X == 0)\
 			I = 0;\
 		else if (X > 0xFFFF)\
@@ -547,7 +548,7 @@ namespace xcore
 	/* The size of the smallest chunk held in bin with index i */
 	#define minsize_for_tree_index(i) \
 		((SIZE_T_ONE << (((i) >> 1) + TREEBIN_SHIFT)) |  \
-		(((xsize_t)((i) & SIZE_T_ONE)) << (((i) >> 1) + TREEBIN_SHIFT - 1)))
+		(((msize_t)((i) & SIZE_T_ONE)) << (((i) >> 1) + TREEBIN_SHIFT - 1)))
 
 
 	/* ------------------------ Operations on bin maps ----------------------- */
@@ -672,7 +673,7 @@ namespace xcore
 
 		/* Set foot of inuse chunk to be xor of mstate and seed */
 		#define mark_inuse_foot(M,p,s)\
-			(((mchunkptr)((xbyte*)(p) + (s)))->prev_foot = ((xsize_t)(M) ^ mParams.magic))
+			(((mchunkptr)((xbyte*)(p) + (s)))->prev_foot = ((msize_t)(M) ^ mParams.magic))
 
 		#define get_mstate_for(p)\
 			((mstate)(((mchunkptr)((xbyte*)(p) +\
@@ -700,23 +701,23 @@ namespace xcore
 	{
 		x_memset(&mParams, 0, sizeof(malloc_params));
 		{
-			xsize_t magic;
-			xsize_t psize;
-			xsize_t gsize;
+			msize_t magic;
+			msize_t psize;
+			msize_t gsize;
 
 			psize = malloc_getpagesize;
 			gsize = ((DEFAULT_GRANULARITY != 0)? DEFAULT_GRANULARITY : psize);
 
 			/* Sanity-check configuration:
-			xsize_t must be unsigned and as wide as pointer type.
+			msize_t must be unsigned and as wide as pointer type.
 			ints must be at least 4 bytes.
 			alignment must be at least 8.
 			Alignment, min chunk size, and page size must all be powers of 2.
 			*/
-			if ((sizeof(xsize_t) != sizeof(xbyte*)) ||
+			if ((sizeof(msize_t) != sizeof(xbyte*)) ||
 				(MAX_SIZE_T < MIN_CHUNK_SIZE)  ||
 				(sizeof(s32) < 4)  ||
-				(MALLOC_ALIGNMENT < (xsize_t)8U) ||
+				(MALLOC_ALIGNMENT < (msize_t)8U) ||
 				((MALLOC_ALIGNMENT & (MALLOC_ALIGNMENT-SIZE_T_ONE)) != 0) ||
 				((MCHUNK_SIZE      & (MCHUNK_SIZE-SIZE_T_ONE))      != 0) ||
 				((gsize            & (gsize-SIZE_T_ONE))            != 0) ||
@@ -733,9 +734,9 @@ namespace xcore
 			mState->mflags = mParams.default_mflags;
 
 			{
-				magic = (xsize_t)((xsize_t)&mParams ^ (xsize_t)0x55555555U);
-				magic |= (xsize_t)8U;    /* ensure nonzero */
-				magic &= ~(xsize_t)7U;   /* improve chances of fault for bad values */
+				magic = (msize_t)((msize_t)&mParams ^ (msize_t)0x55555555U);
+				magic |= (msize_t)8U;    /* ensure nonzero */
+				magic &= ~(msize_t)7U;   /* improve chances of fault for bad values */
 				mParams.magic = magic;
 			}
 		}
@@ -746,9 +747,9 @@ namespace xcore
 	/* support for mallopt */
 	s32 xmem_heap_base::__change_mparam(s32 param_number, s32 value)
 	{
-		xsize_t val;
+		msize_t val;
 		ensure_initialization();
-		val = (value == -1)? MAX_SIZE_T : (xsize_t)value;
+		val = (value == -1)? MAX_SIZE_T : (msize_t)value;
 		switch(param_number)
 		{
 		case M_GRANULARITY:
@@ -777,7 +778,7 @@ namespace xcore
 	static void do_check_top_chunk(mstate m, mchunkptr p) 
 	{
 		msegmentptr sp = segment_holding(m, (xbyte*)p);
-		xsize_t  sz = p->head & ~INUSE_BITS; /* third-lowest bit can be set! */
+		msize_t  sz = p->head & ~INUSE_BITS; /* third-lowest bit can be set! */
 		ASSERT(sp != 0);
 		ASSERT((is_aligned(chunk2mem(p))) || (p->head == FENCEPOST_HEAD));
 		ASSERT(ok_address(m, p));
@@ -801,7 +802,7 @@ namespace xcore
 	/* Check properties of free chunks */
 	static void do_check_free_chunk(mstate m, mchunkptr p)
 	{
-		xsize_t sz = chunksize(p);
+		msize_t sz = chunksize(p);
 		mchunkptr next = chunk_plus_offset(p, sz);
 		do_check_any_chunk(m, p);
 		ASSERT(!is_inuse(p));
@@ -824,12 +825,12 @@ namespace xcore
 	}
 
 	/* Check properties of malloced chunks at the point they are malloced */
-	static void do_check_malloced_chunk(mstate m, malloc_params& mparams, void* mem, xsize_t s)
+	static void do_check_malloced_chunk(mstate m, malloc_params& mparams, void* mem, msize_t s)
 	{
 		if (mem != 0)
 		{
 			mchunkptr p = mem2chunk(mem);
-			xsize_t sz = p->head & ~INUSE_BITS;
+			msize_t sz = p->head & ~INUSE_BITS;
 			do_check_inuse_chunk(m, mparams, p);
 			ASSERT((sz & CHUNK_ALIGN_MASK) == 0);
 			ASSERT(sz >= MIN_CHUNK_SIZE);
@@ -845,7 +846,7 @@ namespace xcore
 		tchunkptr head = 0;
 		tchunkptr u = t;
 		bindex_t tindex = t->index;
-		xsize_t tsize = chunksize(t);
+		msize_t tsize = chunksize(t);
 		bindex_t idx;
 		compute_tree_index(tsize, idx);
 		ASSERT(tindex == idx);
@@ -920,7 +921,7 @@ namespace xcore
 		{
 			for (; p != b; p = p->bk)
 			{
-				xsize_t size = chunksize(p);
+				msize_t size = chunksize(p);
 				mchunkptr q;
 				/* each chunk claims to be free */
 				do_check_free_chunk(m, p);
@@ -938,7 +939,7 @@ namespace xcore
 	/* Find x in a bin. Used in other check functions. */
 	static s32 bin_find(mstate m, mchunkptr x)
 	{
-		xsize_t size = chunksize(x);
+		msize_t size = chunksize(x);
 		if (is_small(size))
 		{
 			bindex_t sidx = small_index(size);
@@ -960,7 +961,7 @@ namespace xcore
 			if (treemap_is_marked(m, tidx))
 			{
 				tchunkptr t = *treebin_at(m, tidx);
-				xsize_t sizebits = size << leftshift_for_tree_index(tidx);
+				msize_t sizebits = size << leftshift_for_tree_index(tidx);
 				while (t != 0 && chunksize(t) != size)
 				{
 					t = t->child[(sizebits >> (SIZE_T_BITSIZE-SIZE_T_ONE)) & 1];
@@ -981,9 +982,9 @@ namespace xcore
 	}
 
 	/* Traverse each chunk and check it; return total */
-	static xsize_t traverse_and_check(mstate m, malloc_params& mparams)
+	static msize_t traverse_and_check(mstate m, malloc_params& mparams)
 	{
-		xsize_t sum = 0;
+		msize_t sum = 0;
 		if (is_initialized(m))
 		{
 			msegmentptr s = &m->seg;
@@ -1019,7 +1020,7 @@ namespace xcore
 	static void do_check_malloc_state(mstate m, malloc_params& mparams) 
 	{
 		bindex_t i;
-		xsize_t total;
+		msize_t total;
 		/* check bins */
 		for (i = 0; i < NSMALLBINS; ++i)
 			do_check_smallbin(m, mparams, i);
@@ -1058,9 +1059,9 @@ namespace xcore
 //		ensure_initialization();
 //		if (!PREACTION(m))
 //		{
-//			xsize_t maxfp = 0;
-//			xsize_t fp = 0;
-//			xsize_t used = 0;
+//			msize_t maxfp = 0;
+//			msize_t fp = 0;
+//			msize_t used = 0;
 //			check_malloc_state(m, mParams);
 //			if (is_initialized(m))
 //			{
@@ -1162,7 +1163,7 @@ namespace xcore
 	/* Replace dv node, binning the old one */
 	/* Used only when dvsize known to be small */
 	#define replace_dv(M, P, S) {\
-		xsize_t DVS = M->dvsize;\
+		msize_t DVS = M->dvsize;\
 		if (DVS != 0) {\
 			mchunkptr DV = M->dv;\
 			ASSERT(is_small(DVS));\
@@ -1190,7 +1191,7 @@ namespace xcore
 		}\
 		else {\
 			tchunkptr T = *H;\
-			xsize_t K = S << leftshift_for_tree_index(I);\
+			msize_t K = S << leftshift_for_tree_index(I);\
 			for (;;) {\
 				if (chunksize(T) != S) {\
 					tchunkptr* C = &(T->child[(K >> (SIZE_T_BITSIZE-SIZE_T_ONE)) & 1]);\
@@ -1329,10 +1330,10 @@ namespace xcore
 	/* -------------------------- xmem_space management -------------------------- */
 
 	/* Initialize top chunk and its size */
-	static void init_top(mstate m, mchunkptr p, xsize_t psize) 
+	static void init_top(mstate m, mchunkptr p, msize_t psize) 
 	{
 		/* Ensure alignment */
-		xsize_t offset = align_offset(chunk2mem(p));
+		msize_t offset = align_offset(chunk2mem(p));
 		p = (mchunkptr)((xbyte*)p + offset);
 		psize -= offset;
 
@@ -1377,7 +1378,7 @@ namespace xcore
 	#endif /* PROCEED_ON_ERROR */
 
 	/* Add a segment to hold a new noncontiguous region */
-	void xmem_heap_base::__add_segment(void* tbase, xsize_t tsize, s32 sflags)
+	void xmem_heap_base::__add_segment(void* tbase, msize_t tsize, s32 sflags)
 	{
 		mstate m = mState;
 
@@ -1385,9 +1386,9 @@ namespace xcore
 		xbyte* old_top = (xbyte*)m->top;
 		msegmentptr oldsp = segment_holding(m, old_top);
 		xbyte* old_end = oldsp->base + oldsp->size;
-		xsize_t ssize = pad_request(sizeof(struct malloc_segment));
+		msize_t ssize = pad_request(sizeof(struct malloc_segment));
 		xbyte* rawsp = old_end - (ssize + FOUR_SIZE_T_SIZES + CHUNK_ALIGN_MASK);
-		xsize_t offset = align_offset(chunk2mem(rawsp));
+		msize_t offset = align_offset(chunk2mem(rawsp));
 		xbyte* asp = rawsp + offset;
 		xbyte* csp = (asp < (old_top + MIN_CHUNK_SIZE))? old_top : asp;
 		mchunkptr sp = (mchunkptr)csp;
@@ -1425,7 +1426,7 @@ namespace xcore
 		if (csp != old_top)
 		{
 			mchunkptr q = (mchunkptr)old_top;
-			xsize_t psize = csp - old_top;
+			msize_t psize = (msize_t)(csp - old_top);
 			mchunkptr tn = chunk_plus_offset(q, psize);
 			set_free_with_pinuse(q, psize, tn);
 			insert_chunk(m, q, psize);
@@ -1435,22 +1436,22 @@ namespace xcore
 	}
 
 
-	xsize_t xmem_heap_base::__release_unused_segments(mstate m)
+	msize_t xmem_heap_base::__release_unused_segments(mstate m)
 	{
-		xsize_t released = 0;
+		msize_t released = 0;
 		int nsegs = 0;
 		msegmentptr pred = &m->seg;
 		msegmentptr sp = pred->next;
 		while (sp != 0)
 		{
 			xbyte* base = sp->base;
-			xsize_t size = sp->size;
+			msize_t size = sp->size;
 			msegmentptr next = sp->next;
 			++nsegs;
 			if (is_extern_segment(sp))
 			{
 				mchunkptr p = align_as_chunk(base);
-				xsize_t psize = chunksize(p);
+				msize_t psize = chunksize(p);
 				
 				/* Can free if first chunk holds entire segment and not pinned */
 				if (!is_inuse(p) && (xbyte*)p + psize >= base + size - TOP_FOOT_SIZE)
@@ -1518,17 +1519,17 @@ namespace xcore
 
 
 	/* mstate, give block of memory*/
-	void xmem_heap::__manage(void* block, xsize_t nb)
+	void xmem_heap::__manage(void* block, msize_t nb)
 	{
 		x_memset(block, 0, nb);
 
 		mstate m = mState;
 
 		xbyte* tbase = 0;
-		xsize_t tsize = 0;
+		msize_t tsize = 0;
 		{
 			msegmentptr ss = (m->top == 0) ? 0 : segment_holding(m, (xbyte*)m->top);
-			xsize_t asize = 0;
+			msize_t asize = 0;
 
 			xbyte* base = (xbyte*)block;
 			asize = nb;
@@ -1564,22 +1565,22 @@ namespace xcore
 	/* ---------------------------- malloc support --------------------------- */
 
 	/* allocate a large request from the best fitting chunk in a treebin */
-	void* xmem_heap_base::__tmalloc_large(mstate m, xsize_t nb)
+	void* xmem_heap_base::__tmalloc_large(mstate m, msize_t nb)
 	{
 		tchunkptr v = 0;
-		xsize_t rsize = -nb; /* Unsigned negation */
+		msize_t rsize = -nb; /* Unsigned negation */
 		tchunkptr t;
 		bindex_t idx;
 		compute_tree_index(nb, idx);
 		if ((t = *treebin_at(m, idx)) != 0) 
 		{
 			/* Traverse tree for this bin looking for node with size == nb */
-			xsize_t sizebits = nb << leftshift_for_tree_index(idx);
+			msize_t sizebits = nb << leftshift_for_tree_index(idx);
 			tchunkptr rst = 0;  /* The deepest untaken right subtree */
 			for (;;) 
 			{
 				tchunkptr rt;
-				xsize_t trem = chunksize(t) - nb;
+				msize_t trem = chunksize(t) - nb;
 				if (trem < rsize)
 				{
 					v = t;
@@ -1612,7 +1613,7 @@ namespace xcore
 
 		while (t != 0) 
 		{ /* find smallest of tree or subtree */
-			xsize_t trem = chunksize(t) - nb;
+			msize_t trem = chunksize(t) - nb;
 			if (trem < rsize)
 			{
 				rsize = trem;
@@ -1622,7 +1623,7 @@ namespace xcore
 		}
 
 		/*  If dv is a better fit, return 0 so malloc will use it */
-		if (v != 0 && rsize < (xsize_t)(m->dvsize - nb))
+		if (v != 0 && rsize < (msize_t)(m->dvsize - nb))
 		{
 			if (RTCHECK(ok_address(m, v))) { /* split */
 				mchunkptr r = chunk_plus_offset(v, nb);
@@ -1647,10 +1648,10 @@ namespace xcore
 	}
 
 	/* allocate a small request from the best fitting chunk in a treebin */
-	void* xmem_heap_base::__tmalloc_small(mstate m, xsize_t nb)
+	void* xmem_heap_base::__tmalloc_small(mstate m, msize_t nb)
 	{
 		tchunkptr t, v;
-		xsize_t rsize;
+		msize_t rsize;
 		bindex_t i;
 		binmap_t leastbit = least_bit(m->treemap);
 		compute_bit2idx(leastbit, i);
@@ -1659,7 +1660,7 @@ namespace xcore
 
 		while ((t = leftmost_child(t)) != 0)
 		{
-			xsize_t trem = chunksize(t) - nb;
+			msize_t trem = chunksize(t) - nb;
 			if (trem < rsize)
 			{
 				rsize = trem;
@@ -1694,7 +1695,7 @@ namespace xcore
 
 	/* --------------------------- realloc support --------------------------- */
 
-	void* xmem_heap_base::__internal_realloc(mstate m, void* oldmem, xsize_t alignment, xsize_t bytes)
+	void* xmem_heap_base::__internal_realloc(mstate m, void* oldmem, msize_t alignment, msize_t bytes)
 	{
 		if (bytes >= MAX_REQUEST)
 		{
@@ -1704,7 +1705,7 @@ namespace xcore
 		if (!PREACTION(m))
 		{
 			mchunkptr oldp = mem2chunk(oldmem);
-			xsize_t oldsize = chunksize(oldp);
+			msize_t oldsize = chunksize(oldp);
 			mchunkptr next = chunk_plus_offset(oldp, oldsize);
 			mchunkptr newp = 0;
 			void* extra = 0;
@@ -1713,10 +1714,10 @@ namespace xcore
 
 			if (RTCHECK(ok_address(m, oldp) && ok_inuse(oldp) && ok_next(oldp, next) && ok_pinuse(next)))
 			{
-				xsize_t nb = request2size(bytes);
+				msize_t nb = request2size(bytes);
 				if (oldsize >= nb)
 				{ /* already big enough */
-					xsize_t rsize = oldsize - nb;
+					msize_t rsize = oldsize - nb;
 					newp = oldp;
 					if (rsize >= MIN_CHUNK_SIZE)
 					{
@@ -1729,8 +1730,8 @@ namespace xcore
 				else if (next == m->top && oldsize + m->topsize > nb)
 				{
 					/* Expand into top */
-					xsize_t newsize = oldsize + m->topsize;
-					xsize_t newtopsize = newsize - nb;
+					msize_t newsize = oldsize + m->topsize;
+					msize_t newtopsize = newsize - nb;
 					mchunkptr newtop = chunk_plus_offset(oldp, nb);
 					set_inuse(m, oldp, nb);
 					newtop->head = newtopsize | PINUSE_BIT;
@@ -1768,7 +1769,7 @@ namespace xcore
 				newmem = __allocA(alignment, bytes);
 				if (newmem != 0)
 				{
-					xsize_t oc = oldsize - overhead_for(oldp);
+					msize_t oc = oldsize - overhead_for(oldp);
 					x_memcpy(newmem, oldmem, (oc < bytes)? oc : bytes);
 					__free(oldmem);
 				}
@@ -1784,7 +1785,7 @@ namespace xcore
 
 	/* --------------------------- memalign support -------------------------- */
 
-	void* xmem_heap_base::__internal_memalign(xsize_t alignment, xsize_t bytes)
+	void* xmem_heap_base::__internal_memalign(msize_t alignment, msize_t bytes)
 	{
 		mstate m = mState;
 
@@ -1797,7 +1798,7 @@ namespace xcore
 		if ((alignment & (alignment-SIZE_T_ONE)) != 0)
 		{
 			/* Ensure a power of 2 */
-			xsize_t a = MALLOC_ALIGNMENT << 1;
+			msize_t a = MALLOC_ALIGNMENT << 1;
 			while (a < alignment)
 				a <<= 1;
 			alignment = a;
@@ -1813,8 +1814,8 @@ namespace xcore
 		}
 		else
 		{
-			xsize_t nb = request2size(bytes);
-			xsize_t req = nb + alignment + MIN_CHUNK_SIZE - CHUNK_OVERHEAD;
+			msize_t nb = request2size(bytes);
+			msize_t req = nb + alignment + MIN_CHUNK_SIZE - CHUNK_OVERHEAD;
 			xbyte* mem = (xbyte*)(__alloc(req));
 			if (mem != 0)
 			{
@@ -1825,7 +1826,7 @@ namespace xcore
 				if (PREACTION(m))
 					return 0;
 
-				if ((((xsize_t)(mem)) % alignment) != 0)
+				if ((((msize_t)(mem)) % alignment) != 0)
 				{	/* misaligned */
 					/*
 					Find an aligned spot inside chunk.  Since we need to give
@@ -1835,11 +1836,11 @@ namespace xcore
 					We've allocated enough total room so that this is always
 					possible.
 					*/
-					xbyte* br = (xbyte*)mem2chunk((xsize_t)(((xsize_t)(mem + alignment - SIZE_T_ONE)) & -alignment));
-					xbyte* pos = ((xsize_t)(br - (xbyte*)(p)) >= MIN_CHUNK_SIZE)?br : br+alignment;
+					xbyte* br = (xbyte*)mem2chunk((msize_t)(((msize_t)(mem + alignment - SIZE_T_ONE)) & -alignment));
+					xbyte* pos = ((msize_t)(br - (xbyte*)(p)) >= MIN_CHUNK_SIZE)?br : br+alignment;
 					mchunkptr newp = (mchunkptr)pos;
-					xsize_t leadsize = pos - (xbyte*)(p);
-					xsize_t newsize = chunksize(p) - leadsize;
+					msize_t leadsize = (msize_t)(pos - (xbyte*)(p));
+					msize_t newsize = chunksize(p) - leadsize;
 
 					{	/* Give back leader, use the rest */
 						set_inuse(m, newp, newsize);
@@ -1851,10 +1852,10 @@ namespace xcore
 
 				/* Give back spare room at the end */
 				{
-					xsize_t size = chunksize(p);
+					msize_t size = chunksize(p);
 					if (size > nb + MIN_CHUNK_SIZE)
 					{
-						xsize_t remainder_size = size - nb;
+						msize_t remainder_size = size - nb;
 						mchunkptr remainder = chunk_plus_offset(p, nb);
 						set_inuse(m, p, nb);
 						set_inuse(m, remainder, remainder_size);
@@ -1863,7 +1864,7 @@ namespace xcore
 				}
 
 				ASSERT (chunksize(p) >= nb);
-				ASSERT((((xsize_t)(chunk2mem(p))) % alignment) == 0);
+				ASSERT((((msize_t)(chunk2mem(p))) % alignment) == 0);
 				check_inuse_chunk(m, mParams, p);
 				POSTACTION(m);
 				if (leader != 0)
@@ -1881,7 +1882,7 @@ namespace xcore
 	}
 
 	/* ------------------------ comalloc/coalloc support --------------------- */
-	void** xmem_heap_base::__internal_ic_alloc(xsize_t n_elements, xsize_t* sizes, s32 opts, void* chunks[])
+	void** xmem_heap_base::__internal_ic_alloc(msize_t n_elements, msize_t* sizes, s32 opts, void* chunks[])
 	{
 		/*
 		This provides common support for independent_X routines, handling
@@ -1892,16 +1893,16 @@ namespace xcore
 		bit 1 set if elements should be zeroed
 		*/
 
-		xsize_t    element_size;   /* chunksize of each element, if all same */
-		xsize_t    contents_size;  /* total size of elements */
-		xsize_t    array_size;     /* request size of pointer array */
+		msize_t    element_size;   /* chunksize of each element, if all same */
+		msize_t    contents_size;  /* total size of elements */
+		msize_t    array_size;     /* request size of pointer array */
 		void*     mem;            /* malloced aggregate space */
 		mchunkptr p;              /* corresponding chunk */
-		xsize_t    remainder_size; /* remaining bytes while splitting */
+		msize_t    remainder_size; /* remaining bytes while splitting */
 		void**    marray;         /* either "chunks" or malloced ptr array */
 		mchunkptr array_chunk;    /* chunk for malloced ptr array */
-		xsize_t    size;
-		xsize_t    i;
+		msize_t    size;
+		msize_t    i;
 
 		mstate m = mState;
 
@@ -1955,13 +1956,13 @@ namespace xcore
 
 		if (opts & 0x2)
 		{       /* optionally clear the elements */
-			x_memset((xsize_t*)mem, 0, remainder_size - SIZE_T_SIZE - array_size);
+			x_memset((msize_t*)mem, 0, remainder_size - SIZE_T_SIZE - array_size);
 		}
 
 		/* If not provided, allocate the pointer array as final part of chunk */
 		if (marray == 0) 
 		{
-			xsize_t  array_chunk_size;
+			msize_t  array_chunk_size;
 			array_chunk = chunk_plus_offset(p, contents_size);
 			array_chunk_size = remainder_size - contents_size;
 			marray = (void**) (chunk2mem(array_chunk));
@@ -2017,7 +2018,7 @@ namespace xcore
 
 	/* -------------------------- public routines ---------------------------- */
 
-	void* xmem_heap_base::__alloc(xsize_t bytes)
+	void* xmem_heap_base::__alloc(msize_t bytes)
 	{
 		/*
 		Basic algorithm:
@@ -2045,7 +2046,7 @@ namespace xcore
 		if (!PREACTION(mState)) 
 		{
 			void* mem;
-			xsize_t nb;
+			msize_t nb;
 			if (bytes <= MAX_SMALL_REQUEST)
 			{
 				bindex_t idx;
@@ -2072,7 +2073,7 @@ namespace xcore
 					if (smallbits != 0) 
 					{ /* Use chunk in next nonempty smallbin */
 						mchunkptr b, p, r;
-						xsize_t rsize;
+						msize_t rsize;
 						bindex_t i;
 						binmap_t leftbits = (smallbits << idx) & left_bits(idx2bit(idx));
 						binmap_t leastbit = least_bit(leftbits);
@@ -2125,7 +2126,7 @@ namespace xcore
 
 			if (nb <= mState->dvsize)
 			{
-				xsize_t rsize = mState->dvsize - nb;
+				msize_t rsize = mState->dvsize - nb;
 				mchunkptr p = mState->dv;
 				if (rsize >= MIN_CHUNK_SIZE)
 				{ /* split dv */
@@ -2136,7 +2137,7 @@ namespace xcore
 				}
 				else
 				{ /* exhaust dv */
-					xsize_t dvs = mState->dvsize;
+					msize_t dvs = mState->dvsize;
 					mState->dvsize = 0;
 					mState->dv = 0;
 					set_inuse_and_pinuse(mState, p, dvs);
@@ -2147,7 +2148,7 @@ namespace xcore
 			}
 			else if (nb < mState->topsize)
 			{ /* Split top */
-				xsize_t rsize = mState->topsize -= nb;
+				msize_t rsize = mState->topsize -= nb;
 				mchunkptr p = mState->top;
 				mchunkptr r = mState->top = chunk_plus_offset(p, nb);
 				r->head = rsize | PINUSE_BIT;
@@ -2174,7 +2175,7 @@ namespace xcore
 				nb = pad_request(bytes);
 				if (nb < mState->topsize)
 				{	/* Allocate from new or extended top space */
-					xsize_t rsize = mState->topsize -= nb;
+					msize_t rsize = mState->topsize -= nb;
 					mchunkptr p = mState->top;
 					mchunkptr r = mState->top = chunk_plus_offset(p, nb);
 					r->head = rsize | PINUSE_BIT;
@@ -2224,11 +2225,11 @@ namespace xcore
 				check_inuse_chunk(fm, mParams, p);
 				if (RTCHECK(ok_address(fm, p) && ok_inuse(p))) 
 				{
-					xsize_t psize = chunksize(p);
+					msize_t psize = chunksize(p);
 					mchunkptr next = chunk_plus_offset(p, psize);
 					if (!pinuse(p)) 
 					{
-						xsize_t prevsize = p->prev_foot;
+						msize_t prevsize = p->prev_foot;
 						{
 							mchunkptr prev = chunk_minus_offset(p, prevsize);
 							psize += prevsize;
@@ -2259,7 +2260,7 @@ namespace xcore
 						{  /* consolidate forward */
 							if (next == fm->top) 
 							{
-								xsize_t tsize = fm->topsize += psize;
+								msize_t tsize = fm->topsize += psize;
 								fm->top = p;
 								p->head = tsize | PINUSE_BIT;
 								if (p == fm->dv)
@@ -2272,14 +2273,14 @@ namespace xcore
 							}
 							else if (next == fm->dv)
 							{
-								xsize_t dsize = fm->dvsize += psize;
+								msize_t dsize = fm->dvsize += psize;
 								fm->dv = p;
 								set_size_and_pinuse_of_free_chunk(p, dsize);
 								goto postaction;
 							}
 							else
 							{
-								xsize_t nsize = chunksize(next);
+								msize_t nsize = chunksize(next);
 								psize += nsize;
 								unlink_chunk(fm, next, nsize);
 								set_size_and_pinuse_of_free_chunk(p, psize);
@@ -2319,10 +2320,10 @@ namespace xcore
 		}
 	}
 
-	void* xmem_heap_base::__allocN(xsize_t n_elements, xsize_t elem_size)
+	void* xmem_heap_base::__allocN(msize_t n_elements, msize_t elem_size)
 	{
 		void* mem;
-		xsize_t req = 0;
+		msize_t req = 0;
 		mstate ms = mState;
 		if (!ok_magic(ms))
 		{
@@ -2332,7 +2333,7 @@ namespace xcore
 		if (n_elements != 0)
 		{
 			req = n_elements * elem_size;
-			if (((n_elements | elem_size) & ~(xsize_t)0xffff) && (req / n_elements != elem_size))
+			if (((n_elements | elem_size) & ~(msize_t)0xffff) && (req / n_elements != elem_size))
 				req = MAX_SIZE_T;												/* force downstream failure on overflow */
 		}
 		mem = __alloc(req);
@@ -2341,7 +2342,7 @@ namespace xcore
 		return mem;
 	}
 
-	void* xmem_heap_base::__allocR(void* oldmem, xsize_t alignment, xsize_t bytes)
+	void* xmem_heap_base::__allocR(void* oldmem, msize_t alignment, msize_t bytes)
 	{
 		if (oldmem == 0)
 			return __allocA(alignment, bytes);
@@ -2369,7 +2370,7 @@ namespace xcore
 		}
 	}
 
-	void* xmem_heap_base::__allocA(xsize_t alignment, xsize_t bytes)
+	void* xmem_heap_base::__allocA(msize_t alignment, msize_t bytes)
 	{
 		if (!ok_magic(mState))
 		{
@@ -2379,9 +2380,9 @@ namespace xcore
 		return __internal_memalign(alignment, bytes);
 	}
 
-	void** xmem_heap_base::__allocIC(xsize_t n_elements, xsize_t elem_size, void* chunks[]) 
+	void** xmem_heap_base::__allocIC(msize_t n_elements, msize_t elem_size, void* chunks[]) 
 	{
-		xsize_t sz = elem_size;													/* serves as 1-element array */
+		msize_t sz = elem_size;													/* serves as 1-element array */
 		mstate ms = mState;
 		if (!ok_magic(ms)) 
 		{
@@ -2391,7 +2392,7 @@ namespace xcore
 		return __internal_ic_alloc(n_elements, &sz, 3, chunks);
 	}
 
-	void** xmem_heap_base::__allocICO(xsize_t n_elements, xsize_t sizes[], void* chunks[])
+	void** xmem_heap_base::__allocICO(msize_t n_elements, msize_t sizes[], void* chunks[])
 	{
 		mstate ms = mState;
 		if (!ok_magic(ms))
@@ -2413,9 +2414,9 @@ namespace xcore
 		return 0;
 	}
 
-	xsize_t xmem_heap_base::__footprint()
+	msize_t xmem_heap_base::__footprint()
 	{
-		xsize_t result = 0;
+		msize_t result = 0;
 		mstate ms = mState;
 		if (ok_magic(ms)) 
 		{
@@ -2429,9 +2430,9 @@ namespace xcore
 	}
 
 
-	xsize_t xmem_heap_base::__max_footprint()
+	msize_t xmem_heap_base::__max_footprint()
 	{
-		xsize_t result = 0;
+		msize_t result = 0;
 		mstate ms = mState;
 		if (ok_magic(ms))
 		{
@@ -2481,20 +2482,20 @@ namespace xcore
 			mDlMallocHeap.__manage(mem, mem_size);
 		}
 
-		virtual void*			allocate(u32 size, u32 alignment)
+		virtual void*			allocate(xsize_t size, u32 alignment)
 		{
 			if (alignment <= X_MEMALIGN)
-				return mDlMallocHeap.__alloc(size);
+				return mDlMallocHeap.__alloc((msize_t)size);
 
-			return mDlMallocHeap.__allocA(alignment, size);
+			return mDlMallocHeap.__allocA(alignment, (msize_t)size);
 		}
 		
-		virtual void*			reallocate(void* ptr, u32 size, u32 alignment)
+		virtual void*			reallocate(void* ptr, xsize_t size, u32 alignment)
 		{
 			if (alignment <= X_MEMALIGN)
-				return mDlMallocHeap.__allocR(ptr, alignment, size);
+				return mDlMallocHeap.__allocR(ptr, alignment, (msize_t)size);
 
-				return mDlMallocHeap.__allocR(ptr, alignment, size);
+				return mDlMallocHeap.__allocR(ptr, alignment, (msize_t)size);
 		}
 
 		virtual void			deallocate(void* ptr)
