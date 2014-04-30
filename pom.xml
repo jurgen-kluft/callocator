@@ -35,11 +35,7 @@
 		<Item Src="libs\**\*.*" Dst="libs\" />
 		<Item Src="docs\**\*.*" Dst="docs\" />
 		<Item Src="tools\**\*.*" Dst="Tools\" />
-		<Item Src="target\${Name}\outdir\${Name}_DevDebug_${Platform}_${ToolSet}\${Name}_DevDebug_${Platform}_${ToolSet}.lib" Dst="libs\" Required="True"/>
-		<Item Src="target\${Name}\outdir\${Name}_DevRelease_${Platform}_${ToolSet}\${Name}_DevRelease_${Platform}_${ToolSet}.lib" Dst="libs\" Required="True"/>
-		<Item Src="target\${Name}\outdir\${Name}_DevFinal_${Platform}_${ToolSet}\${Name}_DevFinal_${Platform}_${ToolSet}.lib" Dst="libs\" Required="True"/>
-		<Item Src="target\${Name}\outdir\${Name}_TestDebug_${Platform}_${ToolSet}\${Name}_TestDebug_${Platform}_${ToolSet}.lib" Dst="libs\" Required="True"/>
-		<Item Src="target\${Name}\outdir\${Name}_TestRelease_${Platform}_${ToolSet}\${Name}_TestRelease_${Platform}_${ToolSet}.lib" Dst="libs\" Required="True"/>
+		<Item Src="target\${Name}\outdir\${Name}_*_${Platform}_${ToolSet}\${Name}_*_${Platform}_${ToolSet}.lib" Dst="libs\" />
 	</Content>
 
 	<Dependency Package="xbase">
