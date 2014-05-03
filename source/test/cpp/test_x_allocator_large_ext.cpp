@@ -78,7 +78,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_large_ext)
 		{
 			void* ptr1 = (void*)0x00000;
 			void* ptr2 = (void*)0x00010;
-			u32 d1 = xexternal::diff_ptr(ptr1, ptr2);
+			uptr d1 = xexternal::diff_ptr(ptr1, ptr2);
 			CHECK_EQUAL(0x00010, d1);
 		}
 

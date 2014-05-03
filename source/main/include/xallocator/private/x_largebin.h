@@ -49,7 +49,7 @@ namespace xcore
 		static inline void*		mark_ptr_1(void* ptr, u8 bit)			{ return (void*)((X_PTR_SIZED_INT)ptr | ((X_PTR_SIZED_INT)1<<bit)); }
 		static inline bool		get_ptr_mark(void* ptr, u8 bit)			{ u32 const field = (1<<bit); return ((X_PTR_SIZED_INT)ptr&field) != 0; }
 		static inline void*		get_ptr(void* ptr, u8 used_bits)		{ return (void*)((X_PTR_SIZED_INT)ptr & ~(((X_PTR_SIZED_INT)1<<used_bits)-1)); }
-		static u32				diff_ptr(void* ptr, void* next_ptr)		{ return (u32)((xbyte*)next_ptr - (xbyte*)ptr); }
+		static xsize_t			diff_ptr(void* ptr, void* next_ptr)		{ return (xsize_t)((xbyte*)next_ptr - (xbyte*)ptr); }
 
 		struct xlnode : public xrbnode15
 		{
@@ -90,10 +90,10 @@ namespace xcore
 			return 0;
 		}
 
-		static inline u32		get_size(xlnode* nodePtr, x_iidx_allocator* a)
+		static inline xsize_t	get_size(xlnode* nodePtr, x_iidx_allocator* a)
 		{
 			xlnode* nextNodePtr = (xlnode*)a->to_ptr(nodePtr->next);
-			u32 const nodeSize  = diff_ptr(get_ptr(nextNodePtr->ptr, xlnode::USED_BITS), get_ptr(nodePtr->ptr, xlnode::USED_BITS));
+			xsize_t const nodeSize  = diff_ptr(get_ptr(nextNodePtr->ptr, xlnode::USED_BITS), get_ptr(nodePtr->ptr, xlnode::USED_BITS));
 			return nodeSize;
 		}
 	}

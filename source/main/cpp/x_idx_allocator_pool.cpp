@@ -7,7 +7,7 @@
 namespace xcore
 {
 	/**
-     *  ------------------------------------------------------------------------------
+	 *  ------------------------------------------------------------------------------
 	 *  Indexed pool allocator
 	 *  ------------------------------------------------------------------------------
 	 *  The indexed pool allocator uses blocks to allocate items from. Initially this
@@ -88,7 +88,7 @@ namespace xcore
 
 			u32					to_idx(xbyte* ptr, u32 size_of_item)
 			{
-				u32 idx = (u32)((ptr - mData) / size_of_item);
+				u32 idx = ((u32)(ptr - mData) / size_of_item);
 				return idx;
 			}
 
@@ -175,26 +175,37 @@ namespace xcore
 			if (NILL_IDX == idx)
 				return;
 
+			ASSERT(idx < mNumBlocks);
 			block_idx_t next = mBlocks[idx].mNext;
 			block_idx_t prev = mBlocks[idx].mPrev;
 			mBlocks[idx].mNext = NILL_IDX;
 			mBlocks[idx].mPrev = NILL_IDX;
 
 			if (NILL_IDX != prev)
+			{
+				ASSERT(prev < mNumBlocks);
 				mBlocks[prev].mNext = next;
+			}
 			if (NILL_IDX != next)
+			{
+				ASSERT(next < mNumBlocks);
 				mBlocks[next].mPrev = prev;
+			}
 				
 			if (idx == mBlockTailAlloc)
 				mBlockTailAlloc = prev;
 			if (idx == mBlockHeadAlloc)
 				mBlockHeadAlloc = next;
+
+			ASSERT(mBlockTailAlloc==NILL_IDX || mBlockTailAlloc < mNumBlocks);
+			ASSERT(mBlockHeadAlloc==NILL_IDX || mBlockHeadAlloc < mNumBlocks);
+			ASSERT(mBlockHeadFree < mNumBlocks);
 		}
 
 		void			link_alloc_block(block_idx_t block_idx)
 		{
 			/**
-             *  Note:
+			 *  Note:
 			 *       Adding it to the tail gives us more chance to
 			 *       shrink the block array. If we insert it as the
 			 *       block to allocate from then theoretically the
@@ -218,10 +229,15 @@ namespace xcore
 				mBlocks[block_idx].mNext = NILL_IDX;
 				mBlockTailAlloc = block_idx;
 			}
+
+			ASSERT(mBlockTailAlloc==NILL_IDX || mBlockTailAlloc < mNumBlocks);
+			ASSERT(mBlockHeadAlloc==NILL_IDX || mBlockHeadAlloc < mNumBlocks);
+			ASSERT(mBlockHeadFree < mNumBlocks);
 		}
 
 		void			add_free_block(block_idx_t block_idx)
 		{
+			ASSERT(block_idx<mNumBlocks);
 			if (NILL_IDX == mBlockHeadFree)
 			{
 				mBlockHeadFree = block_idx;
@@ -230,11 +246,38 @@ namespace xcore
 			}
 			else
 			{
+				ASSERT(mBlockHeadFree<mNumBlocks);
 				mBlocks[mBlockHeadFree].mPrev = block_idx;
 				mBlocks[block_idx].mPrev = NILL_IDX;
 				mBlocks[block_idx].mNext = mBlockHeadFree;
 				mBlockHeadFree = block_idx;
 			}
+
+			ASSERT(mBlockTailAlloc==NILL_IDX || mBlockTailAlloc < mNumBlocks);
+			ASSERT(mBlockHeadAlloc==NILL_IDX || mBlockHeadAlloc < mNumBlocks);
+			ASSERT(mBlockHeadFree < mNumBlocks);
+		}
+
+		void				unlink_block(block_idx_t block_idx)
+		{
+			block_idx_t prev_block_idx = mBlocks[block_idx].mPrev;
+			xblock* prev_block = prev_block_idx==NILL_IDX ? NULL : &mBlocks[prev_block_idx];
+			block_idx_t next_block_idx = mBlocks[block_idx].mNext;
+			xblock* next_block = next_block_idx==NILL_IDX ? NULL : &mBlocks[next_block_idx];
+
+			xblock* cur_block = &mBlocks[block_idx];
+			cur_block->mPrev = NILL_IDX;
+			cur_block->mNext = NILL_IDX;
+
+			if (prev_block!=NULL)
+				prev_block->mNext = next_block_idx;
+			if (next_block!=NULL)
+				next_block->mPrev = prev_block_idx;
+
+			if (mBlockHeadAlloc==block_idx) mBlockHeadAlloc = next_block_idx;
+			if (mBlockTailAlloc==block_idx) mBlockTailAlloc = prev_block_idx;
+
+			if (mBlockHeadFree==block_idx) mBlockHeadFree = next_block_idx;
 		}
 
 		block_idx_t		pop_free_blocks(u32 count)
@@ -242,10 +285,12 @@ namespace xcore
 			if (mBlockHeadFree != NILL_IDX)
 			{
 				block_idx_t block_head_alloc = mBlockHeadFree;
+				ASSERT(mBlockHeadFree < mNumBlocks);
 
 				/// Only give 'mGrowNumBlocks' out of the free blocks
 				for (block_idx_t i=1; i<mGrowNumBlocks; i++)
 				{
+					ASSERT(mBlockHeadFree < mNumBlocks);
 					mBlockHeadFree = mBlocks[mBlockHeadFree].mNext;
 					if (NILL_IDX == mBlockHeadFree)
 						break;
@@ -295,6 +340,7 @@ namespace xcore
 			for (u32 i=num_blocks; i<mNumBlocks; ++i)
 			{
 				ASSERT(mBlocks[i].mData == NULL);
+				unlink_block(i);
 			}
 
 			if (NULL!=mBlocks)
@@ -302,9 +348,11 @@ namespace xcore
 
 			mBlocks = new_blocks;
 			mNumBlocks = num_blocks;
-		}
-		
 
+			ASSERT(mBlockTailAlloc==NILL_IDX || mBlockTailAlloc < mNumBlocks);
+			ASSERT(mBlockHeadAlloc==NILL_IDX || mBlockHeadAlloc < mNumBlocks);
+			ASSERT(mBlockHeadFree ==NILL_IDX || mBlockHeadFree  < mNumBlocks);
+		}		
 
 		virtual void		init()
 		{
@@ -349,7 +397,7 @@ namespace xcore
 			}
 			else
 			{
-				u32 total_items = (0xffffffff << mBlockIndexBitShift) | (mItemsPerBlock-1);
+				u32 total_items = (0x7fffffff >> mBlockIndexBitShift) * (mItemsPerBlock);
 				return total_items;
 			}
 		}
@@ -409,9 +457,7 @@ namespace xcore
 		{
 			if (new_size < mSizeOfItem)
 			{
-				u32 alignment = 1 << x_intu::countTrailingZeros((u32)p);
-				if (new_alignment <= alignment)
-					return p;
+				return p;
 			}
 			ASSERTS(false, "Error: this indexed pool allocator has a fixed size allocation and the requested size is larger");
 			return NULL;
@@ -439,7 +485,7 @@ namespace xcore
 				if ((block->mFreeListCnt == mItemsPerBlock) && mShrinkNumBlocks>0)
 				{
 					/**
-                     *  This block could be removed since no one is using it
+					 *  This block could be removed since no one is using it
 					 *  We can only shrink the mBlock array when this block is
 					 *  at the end, we cannot erase items since that will kill
 					 *  the indices that we have given to the user.
