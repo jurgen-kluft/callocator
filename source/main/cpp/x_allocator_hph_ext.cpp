@@ -665,7 +665,7 @@ namespace xcore
 					if (size >= block->mSize)
 					{
 						// Verify the alignment
-						u32 align_shift = (u32)block->mPtr & align_mask;
+						u32 align_shift = (uptr)block->mPtr & align_mask;
 						if (align_shift!=0)
 						{
 							// How many bytes do we have to add to the pointer to reach
@@ -1049,12 +1049,12 @@ namespace xcore
 		static block_free*		split_block(block_free*& block, xsize_t size, u32 alignment, x_iallocator* node_allocator, xsize_t minimum_size, u32 minimum_alignment)
 		{
 			void*     split_ptr  = get_aligned_ptr(add_to_ptr(get_aligned_ptr(block->mPtr, alignment), size), minimum_alignment);
-			u32 const split_size = block->mSize - ((u32)split_ptr - (u32)block->mPtr);
+			u32 const split_size = block->mSize - (u32)((uptr)split_ptr - (uptr)block->mPtr);
 
 			block_free* split_block = NULL;
 			if (split_size > minimum_size)
 			{
-				split_block = (block_free*)node_allocator->allocate(sizeof(block_free), 4);
+				split_block = (block_free*)node_allocator->allocate(sizeof(block_free), sizeof(void*));
 				split_block->mNext = NULL;
 				split_block->mPrev = NULL;
 				split_block->mPtr  = split_ptr;
@@ -1082,7 +1082,7 @@ namespace xcore
 
 		static void				encode_bin_ptr(block_alloc* block, smallbin* bin)
 		{
-			block->mBin = (smallbin*)((u32)bin | 1);
+			block->mBin = (smallbin*)((uptr)bin | 1);
 		}
 		static void				encode_bin_ptr(block_alloc* block, largebin* bin)
 		{
@@ -1091,13 +1091,13 @@ namespace xcore
 
 		static void				decode_bin_ptr(void* ptr, largebin*& large_bin, smallbin*& small_bin)
 		{
-			if (((u32)ptr & 1) == 0)
+			if (((uptr)ptr & 1) == 0)
 			{
 				large_bin = (largebin*)ptr;
 			}
 			else
 			{
-				small_bin = (smallbin*)((u32)ptr & 0xfffffffe);
+				small_bin = (smallbin*)((uptr)ptr & ~(uptr)2);
 			}
 		}
 

@@ -228,7 +228,7 @@ namespace xcore
 			xlnode* nodePtr = (xlnode*)a->to_ptr(node);
 		
 			xlnode* nextNodePtr = (xlnode*)a->to_ptr(nodePtr->next);
-			u32 const nodeSize  = diff_ptr(get_ptr(nextNodePtr->ptr, xlnode::USED_BITS), get_ptr(nodePtr->ptr, xlnode::USED_BITS));
+			xsize_t const nodeSize  = diff_ptr(get_ptr(nextNodePtr->ptr, xlnode::USED_BITS), get_ptr(nodePtr->ptr, xlnode::USED_BITS));
 
 			u16     lastNode  = root;
 			xlnode* lastNodep = rootPtr;
@@ -241,7 +241,7 @@ namespace xcore
 				lastNodep = curNodep;
 
 				xlnode* nextNodep  = (xlnode*)xrbnode15::to_ptr(a, curNodep->next);
-				u32 const curSize = diff_ptr(get_ptr(curNodep->ptr, xlnode::USED_BITS), get_ptr(nextNodep, xlnode::USED_BITS));
+				xsize_t const curSize = diff_ptr(get_ptr(curNodep->ptr, xlnode::USED_BITS), get_ptr(nextNodep, xlnode::USED_BITS));
 
 				if (nodeSize < curSize)
 				{ s = xlnode::LEFT; }
@@ -273,7 +273,7 @@ namespace xcore
 			// Compute the 'size' that 'node' can allocate. This is done by taking
 			// the 'external mem ptr' of the current node and the 'external mem ptr'
 			// of the next node and substracting them.
-			u32 const node_size = diff_ptr(get_ptr(nodep->ptr, xlnode::USED_BITS), get_ptr(nextp->ptr, xlnode::USED_BITS));
+			xsize_t const node_size = diff_ptr(get_ptr(nodep->ptr, xlnode::USED_BITS), get_ptr(nextp->ptr, xlnode::USED_BITS));
 
 			ASSERT(x_intu::isPowerOf2(alignment));
 			u32 align_mask = alignment - 1;
@@ -282,7 +282,7 @@ namespace xcore
 			if (size <= node_size)
 			{
 				// Verify the alignment
-				u32 align_shift = (u32)nodep->ptr & align_mask;
+				u32 align_shift = (u32)((uptr)nodep->ptr & align_mask);
 				if (align_shift!=0)
 				{
 					// How many bytes do we have to add to the pointer to reach
@@ -296,7 +296,7 @@ namespace xcore
 					if ((size + align_shift) <= node_size)
 					{
 						// Ok, we found a block which satisfies our request
-						outSize = node_size;
+						outSize = (u32)node_size;
 						return true;
 					}
 				}
@@ -304,7 +304,7 @@ namespace xcore
 				{
 					// The alignment of the pointer is already enough to satisfy
 					// our request, so here we can say we have found a best-fit.
-					outSize = node_size;
+					outSize = (u32)node_size;
 					return true;
 				}
 			}
@@ -326,7 +326,7 @@ namespace xcore
 				lastNodep = curNodep;
 
 				xlnode* nextNodep = (xlnode*)xrbnode15::to_ptr(a, curNodep->next);
-				u32 const curSize = diff_ptr(get_ptr(curNodep->ptr, xlnode::USED_BITS), get_ptr(nextNodep->ptr, xlnode::USED_BITS));
+				xsize_t const curSize = diff_ptr(get_ptr(curNodep->ptr, xlnode::USED_BITS), get_ptr(nextNodep->ptr, xlnode::USED_BITS));
 
 				if (size < curSize)
 				{ s = xlnode::LEFT; }
@@ -503,14 +503,14 @@ namespace xcore
 			if (nodep->is_sibling(nill))
 			{
 				// First determine the 'size' that this node represents
-				u32 const nodeSize = get_size(nodep, a);
+				u32 const nodeSize = (u32)get_size(nodep, a);
 
 				u16     curNode   = rootp->get_child(xlnode::LEFT);
 				xlnode* curNodep  = (xlnode*)(xlnode::to_ptr(a, curNode));
 				s32 s = xlnode::LEFT;
 				while (curNodep != rootp)
 				{
-					u32 const curNodeSize = get_size(curNodep, a);
+					u32 const curNodeSize = (u32)get_size(curNodep, a);
 
 					if (nodeSize < curNodeSize)
 					{ s = xlnode::LEFT; }

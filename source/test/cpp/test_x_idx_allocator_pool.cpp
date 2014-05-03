@@ -35,7 +35,7 @@ UNITTEST_SUITE_BEGIN(x_idx_allocator_pool)
 			x_iidx_allocator* allocator = gCreatePoolIdxAllocator(gSystemAllocator, sizeof(f64), 8);
 			allocator->init();
 
-			CHECK_EQUAL(0xffffffff, allocator->max_size());
+			CHECK_EQUAL(0x7ffffff0, allocator->max_size());
 			CHECK_EQUAL(0, allocator->size());
 			for (u32 i=0; i<size; ++i)
 			{
@@ -69,7 +69,7 @@ UNITTEST_SUITE_BEGIN(x_idx_allocator_pool)
 
 		struct myobject
 		{
-			u32		mIndex;
+			u64		mIndex;
 		};
 
 		UNITTEST_TEST(pool_1_3)

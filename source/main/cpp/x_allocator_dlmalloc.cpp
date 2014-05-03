@@ -49,8 +49,8 @@ namespace xcore
 	{
 		xbyte*					base;											///< base address */
 		msize_t					size;											///< allocated size */
-		struct malloc_segment*	next;											///< ptr to next segment */
 		flag_t					sflags;											///< user and extern flag */
+		struct malloc_segment*	next;											///< ptr to next segment */
 	};
 
 	typedef struct malloc_segment  msegment;
@@ -160,7 +160,7 @@ namespace xcore
 	#define INSECURE										0
 	#define REALLOC_ZERO_BYTES_FREES						1
 
-	#define MALLOC_ALIGNMENT								((msize_t) X_MEMALIGN )
+	#define MALLOC_ALIGNMENT								((msize_t) 8 )
 
 	#define DEFAULT_GRANULARITY								((msize_t)64U * (msize_t)1024U)
 
@@ -2521,7 +2521,7 @@ namespace xcore
 		x_allocator_dlmalloc* allocator = new (mem) x_allocator_dlmalloc();
 
 		s32 allocator_class_size = x_intu::ceilPower2(sizeof(x_allocator_dlmalloc));
-		mem = (void*)((u32)mem + allocator_class_size);
+		mem = (void*)((u8*)mem + allocator_class_size);
 
 		allocator->init(mem, memsize - allocator_class_size);
 		return allocator;

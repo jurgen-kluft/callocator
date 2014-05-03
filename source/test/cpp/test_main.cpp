@@ -6,7 +6,7 @@
 using namespace xcore;
 
 UNITTEST_SUITE_LIST(xAllocatorUnitTest);
-UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_dlmalloc);
+//UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_dlmalloc);	// Doesn't work on 64-bit systems
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_tlfs);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_freelist);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_pool);

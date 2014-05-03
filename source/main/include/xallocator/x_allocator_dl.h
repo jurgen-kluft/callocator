@@ -17,7 +17,7 @@ namespace xcore
 	class x_iallocator;
 
 	/// A custom allocator; Doug Lea malloc
-	extern x_iallocator*		gCreateDlAllocator(void* mem, u32 memsize);
+	// extern x_iallocator*		gCreateDlAllocator(void* mem, u32 memsize);
 
 };
 

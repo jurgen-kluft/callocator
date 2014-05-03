@@ -189,7 +189,7 @@ namespace xcore
 
 		inline static u32	gAlignPtr(xbyte* ptr, u32 alignment, xbyte*& outPtr)
 		{
-			u32 const diff = (alignment - ((u32)ptr & (alignment-1))) & (alignment-1);
+			u32 const diff = (alignment - ((uptr)ptr & (alignment-1))) & (alignment-1);
 			outPtr = ptr + diff;
 			return diff;
 		}
@@ -309,7 +309,7 @@ namespace xcore
 			//}
 			//else
 			{
-				chunk* c = (chunk*)((u32)p - sizeof(chunk));
+				chunk* c = (chunk*)((uptr)p - sizeof(chunk));
 				gIsValidChunk(mBegin, mEnd, c);
 
 				// Coalesce (unite) chunks can only happen when:

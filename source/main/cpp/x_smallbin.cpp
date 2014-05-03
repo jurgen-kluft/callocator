@@ -95,7 +95,7 @@ namespace xcore
 						null_branch_idx = i;
 						our_state = (our_state<<1) | 1;								// Shift in a '1', meaning that we have free chunks
 					}
-					else if (((u32)node & 1) == 0)									// This node is not full if the low-bit == 0
+					else if (((uptr)node & 1) == 0)									// This node is not full if the low-bit == 0
 					{
 						child_idx = i;
 						our_state = (our_state<<1) | 1;								// Shift in a '1', meaning that we have free chunks
@@ -119,7 +119,7 @@ namespace xcore
 					if (state == 0)
 					{
 						our_state = our_state & ~(1<<child_idx);					// This branch is full, mark it in our state
-						*child = (xsnode*)((u32)(*child) | 1);				// This child has no more free chunks, mark our child pointer
+						*child = (xsnode*)((uptr)(*child) | 1);				// This child has no more free chunks, mark our child pointer
 					}
 				}
 				else if (null_branch_idx>=0 && null_branch_idx<4)
@@ -172,13 +172,13 @@ namespace xcore
 			{
 				xsnode** node = &snode->mNodes[idx];
 				sb_deallocate(--level_idx, chunk_idx, *node);
-				*node = (xsnode*)((u32)(*node) & 0xfffffffe);		// Sure that it now has a free chunk
+				*node = (xsnode*)((uptr)(*node) & ~(uptr)1);		// Sure that it now has a free chunk
 			}
 			else
 			{
 				xbnode** node = (xbnode**)&snode->mNodes[idx];
 				sb_deallocate(chunk_idx, *node);
-				*node = (xbnode*)((u32)(*node) & 0xfffffffe);		// Sure that it now has a free chunk
+				*node = (xbnode*)((uptr)(*node) & ~(uptr)1);		// Sure that it now has a free chunk
 			}
 		}
 
@@ -208,7 +208,7 @@ namespace xcore
 				xsnode* node = info.node;
 				for (s32 i=0; i<4; ++i)
 				{
-					xbnode* bnode = (xbnode*)((u32)node->mNodes[i] & 0xfffffffe);
+					xbnode* bnode = (xbnode*)((uptr)node->mNodes[i] & ~(uptr)1);
 					if (bnode != NULL)
 						info.node_allocator->deallocate(bnode);
 				}
@@ -247,7 +247,7 @@ namespace xcore
 
 		void*		xsmallbin::allocate(u32 size, u32 alignment, x_iallocator* node_allocator)
 		{
-			if (((u32)mNode & 1) == 1)
+			if (((uptr)mNode & 1) == 1)
 			{
 				// Full
 				return NULL;
@@ -273,16 +273,16 @@ namespace xcore
 
 			u32 chunk_idx;
 			if (sb_allocate(mLevels,level_idxs, mNode, node_allocator, chunk_idx) == 0)
-				mNode = (xsnode*)((u32)mNode | 0x00000001);
+				mNode = (xsnode*)((uptr)mNode | 0x00000001);
 
-			void* ptr = (void*)((u32)mBaseAddress + (chunk_idx*mChunkSize));
+			void* ptr = (void*)((uptr)mBaseAddress + (chunk_idx*mChunkSize));
 			return ptr;
 		}
 
 		void		xsmallbin::deallocate(void* ptr)
 		{
 			ptr = ptr_relative(mBaseAddress, ptr);
-			u32 const chunk_idx = (u32)ptr / mChunkSize;
+			u32 const chunk_idx = (u32)ptr / (u32)mChunkSize;
 			if (mLevels == 0)
 			{
 				sb_deallocate(chunk_idx, (xbnode*)mNode);
@@ -291,7 +291,7 @@ namespace xcore
 			{
 				sb_deallocate(mLevels, chunk_idx, mNode);
 			}
-			mNode = (xsnode*)((u32)mNode & 0xfffffffe);
+			mNode = (xsnode*)((uptr)mNode & ~(uptr)1);
 		}
 
 

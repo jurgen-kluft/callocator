@@ -150,12 +150,12 @@ namespace xcore
 			return NILL_IDX;
 		}
 
-		u32 idx = ((u32)mFreeObjectList - (u32)mObjectArray) / mSizeOfObject;
+		u32 idx = (u32)((uptr)mFreeObjectList - (uptr)mObjectArray) / mSizeOfObject;
 		p = (void*)mFreeObjectList;
 
 		u32 next_object = *mFreeObjectList;
 		if (next_object != NILL_IDX)
-			mFreeObjectList = (u32*)((u32)mObjectArray + (next_object * mSizeOfObject));
+			mFreeObjectList = (u32*)((uptr)mObjectArray + (next_object * mSizeOfObject));
 		else
 			mFreeObjectList = NULL;
 
@@ -192,7 +192,7 @@ namespace xcore
 		if (idx == NILL_IDX)
 			return NULL;
 		ASSERT(mObjectArray!=NULL && idx < mObjectArraySize);
-		void* p = (void*)((u32)mObjectArray + (mSizeOfObject * idx));
+		void* p = (void*)((uptr)mObjectArray + (mSizeOfObject * idx));
 		return p;
 	}
 
@@ -201,7 +201,7 @@ namespace xcore
 		ASSERT(mObjectArray!=NULL && mObjectArrayEnd!=NULL);
 		if ((xbyte*)p >= mObjectArray && (xbyte*)p < mObjectArrayEnd)
 		{
-			u32 idx = ((u32)p - (u32)mObjectArray) / mSizeOfObject;
+			u32 idx = (u32)((uptr)p - (uptr)mObjectArray) / mSizeOfObject;
 			return idx;
 		}
 		else
