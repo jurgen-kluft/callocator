@@ -1,5 +1,6 @@
 #include "xbase\x_target.h"
 #include "xbase\x_allocator.h"
+#include "xbase\x_console.h"
 
 #include "xunittest\xunittest.h"
 
@@ -17,40 +18,70 @@ UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_small_ext);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_large_ext);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_memento);
 
-xcore::x_iallocator* gSystemAllocator;
-
-class UnitTestAllocator : public UnitTest::Allocator
+namespace xcore
 {
-public:
-	xcore::x_iallocator*	mAllocator;
-	int						mNumAllocations;
 
-	UnitTestAllocator(xcore::x_iallocator* allocator)
-		: mNumAllocations(0)
+	class UnitTestAllocator : public UnitTest::Allocator
 	{
-		mAllocator = allocator;
-	}
+		xcore::x_iallocator*	mAllocator;
+	public:
+		inline			UnitTestAllocator(xcore::x_iallocator* allocator)	{ mAllocator = allocator; mNumAllocations = 0; }
+		virtual void*	Allocate(xsize_t size)								{ ++mNumAllocations; return mAllocator->allocate((u32)size, 4); }
+		virtual void	Deallocate(void* ptr)								{ --mNumAllocations; mAllocator->deallocate(ptr); }
 
-	virtual void*	Allocate(size_t size)
+		u64				mNumAllocations;
+	};
+
+	class TestAllocator : public x_iallocator
 	{
-		++mNumAllocations;
-		return mAllocator->allocate(size, 4);
-	}
-	virtual void	Deallocate(void* ptr)
-	{
-		--mNumAllocations;
-		mAllocator->deallocate(ptr);
-	}
-};
+		x_iallocator*		mAllocator;
+	public:
+		TestAllocator(x_iallocator* allocator) : mAllocator(allocator) { }
+
+		virtual const char*	name() const										{ return "xbase unittest test heap allocator"; }
+
+		virtual void*		allocate(xsize_t size, u32 alignment)
+		{
+			UnitTest::IncNumAllocations();
+			return mAllocator->allocate(size, alignment);
+		}
+
+		virtual void*		reallocate(void* mem, xsize_t size, u32 alignment)
+		{
+			if (mem == NULL)
+				return allocate(size, alignment);
+			else
+				return mAllocator->reallocate(mem, size, alignment);
+		}
+
+		virtual void		deallocate(void* mem)
+		{
+			UnitTest::DecNumAllocations();
+			mAllocator->deallocate(mem);
+		}
+
+		virtual void		release()
+		{
+			mAllocator->release();
+			mAllocator = NULL;
+		}
+	};
+}
+
+xcore::x_iallocator* gSystemAllocator = NULL;
 
 bool gRunUnitTest(UnitTest::TestReporter& reporter)
 {
-	xcore::x_iallocator* systemAllocator = xcore::gCreateSystemAllocator();
-		
-	UnitTestAllocator unittestAllocator( systemAllocator );
+	xcore::x_iallocator* systemAllocator = gCreateSystemAllocator();
+	xcore::UnitTestAllocator unittestAllocator(systemAllocator);
 	UnitTest::SetAllocator(&unittestAllocator);
 
-	gSystemAllocator = systemAllocator;
+	xcore::xconsole::addDefault();
+	xcore::xconsole::write("Configuration: ");
+	xcore::xconsole::writeLine(TARGET_FULL_DESCR_STR);
+
+	xcore::TestAllocator testAllocator(systemAllocator);
+	gSystemAllocator = &testAllocator;
 
 	int r = UNITTEST_SUITE_RUN(reporter, xAllocatorUnitTest);
 	if (unittestAllocator.mNumAllocations!=0)
@@ -61,7 +92,9 @@ bool gRunUnitTest(UnitTest::TestReporter& reporter)
 
 	gSystemAllocator = NULL;
 	systemAllocator->release();
-	return r==0;
+	UnitTest::SetAllocator(NULL);
+
+	return r == 0;
 }
 
 

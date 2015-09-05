@@ -138,54 +138,43 @@
 //==============================================================================
 namespace xcore
 {
+	class x_memento_print
+	{
+	public:
+		virtual void			print(const char* format, const char* str) = 0;
+		virtual void			print(const char* format, void* ptr) = 0;
+		virtual void			print(const char* format, int n, int value1, int value2 = 0, int value3 = 0, int value4 = 0) = 0;
+	};
+
 	struct x_memento_config
 	{
-		int failat;
-		int paranoia;
-		int paranoidAt;
-		int pattern;
-		s64 maxmemory;
+		x_memento_print*	m_print;
 
-		void init()
+		int					m_freemaxsizekeep;		/// The maximum size of memory to keep in the free list
+		int					m_freeskipsizemin;		/// Do not add those that are smaller than this size in the free list
+		int					m_freeskipsizemax;		/// Do not add those that are larger than this size in the free list
+		int					m_failat;
+		int					m_paranoia;
+		int					m_paranoidAt;
+		int					m_pattern;
+		s64					m_maxmemory;
+
+		void init(x_memento_print* print)
 		{
-			failat = 0;
-			paranoia = 1024;
-			paranoidAt = 0;
-			pattern = 0;
-			maxmemory = 128 * 1024 * 1024;
-			maxmemory *= 1024;
+			m_print = print;
+			m_freemaxsizekeep = 32 * 1024 * 1024;	/// 32 MB 
+			m_freeskipsizemin = 0;
+			m_freeskipsizemax = 1 * 1024 * 1024;	/// 1 MB
+			m_failat = 0;
+			m_paranoia = 1024;
+			m_paranoidAt = 0;
+			m_pattern = 0;
+			m_maxmemory = 128 * 1024 * 1024;
+			m_maxmemory *= 1024;
 		}
 	};
 
-	struct memento_instance;
-
-	class x_memento_allocator : public x_iallocator
-	{
-	public:
-
-
-		virtual const char*		name() const									{ return TARGET_FULL_DESCR_STR " memento allocator"; }
-
-		void					init(x_memento_config const& config, x_iallocator* internal_mem_allocator);
-
-		virtual void*			allocate(xsize_t size, u32 alignment);
-		virtual void*			reallocate(void* ptr, xsize_t size, u32 alignment);
-		virtual void			deallocate(void* ptr);
-
-		virtual void			release();
-
-		void*					operator new(xsize_t num_bytes)					{ return NULL; }
-		void*					operator new(xsize_t num_bytes, void* mem)		{ return mem; }
-		void					operator delete(void* pMem)						{ }
-		void					operator delete(void* pMem, void*)				{ }
-
-	protected:
-		virtual					~x_memento_allocator()							{ }
-
-		x_iallocator*			m_internal_mem_allocator;
-		x_memento_config		m_config;
-		memento_instance*		m_memento;
-	};
+	x_iallocator*				gCreateMementoAllocator(x_memento_config const& config, x_iallocator* internal_mem_allocator);
 
 };
 
