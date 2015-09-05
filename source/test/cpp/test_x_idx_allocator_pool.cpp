@@ -69,7 +69,7 @@ UNITTEST_SUITE_BEGIN(x_idx_allocator_pool)
 
 		struct myobject
 		{
-			u64		mIndex;
+			u32		mIndex;
 		};
 
 		UNITTEST_TEST(pool_1_3)
