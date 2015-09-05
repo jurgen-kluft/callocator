@@ -1,8 +1,9 @@
-#include "xbase\x_target.h"
+#include "xbase\x_base.h"
 #include "xbase\x_allocator.h"
 #include "xbase\x_console.h"
 
 #include "xunittest\xunittest.h"
+#include "xunittest\private\ut_ReportAssert.h"
 
 using namespace xcore;
 
@@ -20,6 +21,24 @@ UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_memento);
 
 namespace xcore
 {
+	// Our own assert handler
+	class UnitTestAssertHandler : public xcore::x_asserthandler
+	{
+	public:
+		UnitTestAssertHandler()
+		{
+			NumberOfAsserts = 0;
+		}
+
+		virtual xcore::xbool	HandleAssert(u32& flags, const char* fileName, s32 lineNumber, const char* exprString, const char* messageString)
+		{
+			UnitTest::reportAssert(exprString, fileName, lineNumber);
+			NumberOfAsserts++;
+			return false;
+		}
+
+		xcore::s32		NumberOfAsserts;
+	};
 
 	class UnitTestAllocator : public UnitTest::Allocator
 	{
@@ -69,6 +88,7 @@ namespace xcore
 }
 
 xcore::x_iallocator* gSystemAllocator = NULL;
+xcore::UnitTestAssertHandler gAssertHandler;
 
 bool gRunUnitTest(UnitTest::TestReporter& reporter)
 {
@@ -76,7 +96,12 @@ bool gRunUnitTest(UnitTest::TestReporter& reporter)
 	xcore::UnitTestAllocator unittestAllocator(systemAllocator);
 	UnitTest::SetAllocator(&unittestAllocator);
 
-	xcore::xconsole::addDefault();
+	xbase::x_Init();
+
+#ifdef TARGET_DEBUG
+	xcore::x_asserthandler::sRegisterHandler(&gAssertHandler);
+#endif
+
 	xcore::xconsole::write("Configuration: ");
 	xcore::xconsole::writeLine(TARGET_FULL_DESCR_STR);
 
@@ -94,6 +119,7 @@ bool gRunUnitTest(UnitTest::TestReporter& reporter)
 	systemAllocator->release();
 	UnitTest::SetAllocator(NULL);
 
+	xbase::x_Exit();
 	return r == 0;
 }
 

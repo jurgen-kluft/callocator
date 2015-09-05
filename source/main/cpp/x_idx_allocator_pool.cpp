@@ -150,7 +150,10 @@ namespace xcore
 				if (NULL!=mBlocks)
 					x_memcopy(new_blocks, mBlocks, sizeof(xblock) * mNumBlocks);
 
-				for (u32 i=mNumBlocks; i<num_blocks; ++i)
+				u32 const n = mNumBlocks;
+				mNumBlocks = num_blocks;
+
+				for (u32 i = n; i<num_blocks; ++i)
 				{
 					new_blocks[i].mFreeListCnt = 0;
 					new_blocks[i].mFreeListHead = NILL_IDX;
@@ -163,10 +166,8 @@ namespace xcore
 					mBlockAllocator->deallocate(mBlocks);
 				
 				mBlocks = new_blocks;
-				for (u32 i=mNumBlocks; i<num_blocks; ++i)
+				for (u32 i=n; i<num_blocks; ++i)
 					link_alloc_block(i);
-
-				mNumBlocks = num_blocks;
 			}
 		}
 
@@ -199,7 +200,7 @@ namespace xcore
 
 			ASSERT(mBlockTailAlloc==NILL_IDX || mBlockTailAlloc < mNumBlocks);
 			ASSERT(mBlockHeadAlloc==NILL_IDX || mBlockHeadAlloc < mNumBlocks);
-			ASSERT(mBlockHeadFree < mNumBlocks);
+			ASSERT(mBlockHeadFree ==NILL_IDX || mBlockHeadFree < mNumBlocks);
 		}
 
 		void			link_alloc_block(block_idx_t block_idx)
@@ -232,7 +233,7 @@ namespace xcore
 
 			ASSERT(mBlockTailAlloc==NILL_IDX || mBlockTailAlloc < mNumBlocks);
 			ASSERT(mBlockHeadAlloc==NILL_IDX || mBlockHeadAlloc < mNumBlocks);
-			ASSERT(mBlockHeadFree < mNumBlocks);
+			ASSERT(mBlockHeadFree ==NILL_IDX || mBlockHeadFree < mNumBlocks);
 		}
 
 		void			add_free_block(block_idx_t block_idx)
@@ -255,7 +256,7 @@ namespace xcore
 
 			ASSERT(mBlockTailAlloc==NILL_IDX || mBlockTailAlloc < mNumBlocks);
 			ASSERT(mBlockHeadAlloc==NILL_IDX || mBlockHeadAlloc < mNumBlocks);
-			ASSERT(mBlockHeadFree < mNumBlocks);
+			ASSERT(mBlockHeadFree ==NILL_IDX || mBlockHeadFree < mNumBlocks);
 		}
 
 		void				unlink_block(block_idx_t block_idx)
