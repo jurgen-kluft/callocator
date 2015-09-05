@@ -1,7 +1,5 @@
 #include "xallocator/x_allocator_memento.h"
 
-
-#include <stdio.h>
 #include <memory.h>
 #include <alg.h>
 
@@ -126,15 +124,25 @@ namespace xcore
 		MEMENTO_FREEFILL = 0xa9,
 		MEMENTO_FREEFILL16 = 0xa9a9,
 		MEMENTO_FREEFILL32 = 0xa9a9a9a9,
-		MEMENTO_FREELIST_MAX = 0x2000000
+	};
+
+
+	class x_memento_print_null : public x_memento_print
+	{
+	public:
+		virtual void			print(const char* format, const char* str) { }
+		virtual void			print(const char* format, void* ptr) { }
+		virtual void			print(const char* format, int n, int value1, int value2 = 0, int value3 = 0, int value4 = 0) { }
 	};
 
 	struct memento_instance
 	{
-		memento_globals			globals;
 		x_iallocator*			m_internal_mem_allocator;
+		x_memento_print_null	m_stdout_null;
+		x_memento_config		m_config;
+		memento_globals			m_globals;
 
-		void					Memento_init(void);
+		void					Memento_init(x_memento_config const& config);
 		void					Memento_signal(void);
 
 		void					Memento_startFailing(void);
@@ -184,6 +192,7 @@ namespace xcore
 		int						Memento_Internal_checkAllAlloced(Memento_BlkHeader *memblk, void *arg);
 	};
 
+
 	#define MEMENTO_EXTRASIZE		(sizeof(Memento_BlkHeader) + Memento_PostSize)
 
 	/// Round up size S to the next multiple of N (where N is a power of 2)
@@ -195,7 +204,7 @@ namespace xcore
 	#define MEMBLK_TOBLK(B)			((void*)(&((Memento_BlkHeader*)(void*)(B))[1]))
 	#define MEMBLK_POSTPTR(B)		(&((char *)(void *)(B))[(B)->rawsize + sizeof(Memento_BlkHeader)])
 
-	void Memento_breakpoint(void)
+	void memento_instance::Memento_breakpoint(void)
 	{
 		/// A handy externally visible function for breakpointing
 	}
@@ -210,7 +219,7 @@ namespace xcore
 		b->next = blks->head;
 		blks->head = b;
 		
-		if (!globals.leaksonly)
+		if (!m_globals.leaksonly)
 		{
 			memset(b->preblk, MEMENTO_PREFILL, Memento_PreSize);
 			memset(MEMBLK_POSTPTR(b), MEMENTO_POSTFILL, Memento_PostSize);
@@ -222,7 +231,7 @@ namespace xcore
 		*blks->tail = b;
 		blks->tail = &b->next;
 		b->next = NULL;
-		if (!globals.leaksonly)
+		if (!m_globals.leaksonly)
 		{
 			memset(b->preblk, MEMENTO_PREFILL, Memento_PreSize);
 			memset(MEMBLK_POSTPTR(b), MEMENTO_POSTFILL, Memento_PostSize);
@@ -240,7 +249,7 @@ namespace xcore
 
 	int memento_instance::Memento_Internal_checkAllocedBlock(Memento_BlkHeader *b, void *arg)
 	{
-		if (!globals.leaksonly)
+		if (!m_globals.leaksonly)
 		{
 			int           i;
 			char         *p;
@@ -249,22 +258,32 @@ namespace xcore
 
 			p = b->preblk;
 			i = Memento_PreSize;
-			do {
+			do 
+			{
 				corrupt |= (*p++ ^ (char)MEMENTO_PREFILL);
 			} while (--i);
-			if (corrupt) {
+
+			if (corrupt) 
+			{
 				data->preCorrupt = 1;
+				corrupt = 0;
 			}
 			p = MEMBLK_POSTPTR(b);
 			i = Memento_PreSize;
-			do {
+			do 
+			{
 				corrupt |= (*p++ ^ (char)MEMENTO_POSTFILL);
 			} while (--i);
-			if (corrupt) {
+
+			if (corrupt) 
+			{
 				data->postCorrupt = 1;
+				corrupt = 0;
 			}
-			if ((data->freeCorrupt | data->preCorrupt | data->postCorrupt) == 0) {
-				b->lastCheckedOK = globals.sequence;
+
+			if ((data->freeCorrupt | data->preCorrupt | data->postCorrupt) == 0) 
+			{
+				b->lastCheckedOK = m_globals.sequence;
 			}
 			data->found |= 1;
 		}
@@ -273,7 +292,7 @@ namespace xcore
 
 	int memento_instance::Memento_Internal_checkFreedBlock(Memento_BlkHeader *b, void *arg)
 	{
-		if (!globals.leaksonly)
+		if (!m_globals.leaksonly)
 		{
 			int           i;
 			char         *p;
@@ -348,6 +367,7 @@ namespace xcore
 	{
 		Memento_BlkHeader *head = blks->head;
 		Memento_BlkHeader *prev = NULL;
+
 		while ((head) && (head != b)) 
 		{
 			prev = head;
@@ -388,23 +408,34 @@ namespace xcore
 
 	int memento_instance::Memento_Internal_makeSpace(size_t space)
 	{
-		/* If too big, it can never go on the freelist */
-		if (space > MEMENTO_FREELIST_MAX_SINGLE_BLOCK)
+		/// Do we store it in the free-list ?
+		if (space > m_config.m_freeskipsizemax || space < m_config.m_freeskipsizemin)
 			return 0;
 
-		/* Pretend we added it on. */
-		globals.freeListSize += space;
-		/* Ditch blocks until it fits within our limit */
-		while (globals.freeListSize > MEMENTO_FREELIST_MAX) 
+		/// Pretend we added it on
+		m_globals.freeListSize += space;
+
+		/// Ditch blocks until it fits within our limit or our list is empty
+		while (m_globals.free.head!=NULL && m_globals.freeListSize > m_config.m_freemaxsizekeep)
 		{
-			Memento_BlkHeader *head = globals.free.head;
-			globals.free.head = head->next;
-			globals.freeListSize -= MEMBLK_SIZE(head->rawsize);
+			Memento_BlkHeader *head = m_globals.free.head;
+			m_globals.free.head = head->next;
+			m_globals.freeListSize -= MEMBLK_SIZE(head->rawsize);
 		}
-		/* Make sure we haven't just completely emptied the free list */
-		/* (This should never happen, but belt and braces... */
-		if (globals.free.head == NULL)
-			globals.free.tail = &globals.free.head;
+
+		/// Make sure we haven't just completely emptied the free list
+		if (m_globals.free.head == NULL)
+			m_globals.free.tail = &m_globals.free.head;
+
+		/// Make sure the configuration is such that it allows us to keep this 
+		/// allocation in our free list.
+		if (m_globals.freeListSize > m_config.m_freemaxsizekeep)
+		{
+			/// We cannot add this allocation, rollback the size increment
+			m_globals.freeListSize -= space;
+			return 0;
+		}
+
 		return 1;
 	}
 
@@ -452,19 +483,26 @@ namespace xcore
 		return 0;
 	}
 
-	static void showBlock(Memento_BlkHeader *b, int space)
+	static void showBlock(Memento_BlkHeader *b, int space, x_memento_print* printer)
 	{
-		fprintf(stderr, "0x%p:(size=%d,num=%d)", MEMBLK_TOBLK(b), (int)b->rawsize, b->sequence);
+		printer->print("0x%p:", MEMBLK_TOBLK(b));
+		printer->print("(size=%d,num=%d)", 2, (int)b->rawsize, b->sequence);
 		if (b->label)
-			fprintf(stderr, "%c(%s)", space, b->label);
+		{
+			char cstr[2];
+			cstr[0] = (char)space;
+			cstr[1] = '\0';
+			printer->print("%s", cstr);
+			printer->print("(%s)", b->label);
+		}
 	}
 
-	static void blockDisplay(Memento_BlkHeader *b, int n)
+	static void blockDisplay(Memento_BlkHeader *b, int n, x_memento_print* printer)
 	{
 		n++;
 		while (n > 40)
 		{
-			fprintf(stderr, "*");
+			printer->print("%s", "*");
 			n -= 40;
 		}
 		while (n > 0)
@@ -473,52 +511,55 @@ namespace xcore
 			if (i > 32)
 				i = 32;
 			n -= i;
-			fprintf(stderr, "%s", &"                                "[32 - i]);
+			printer->print("%s", &"                                "[32 - i]);
 		}
-		showBlock(b, '\t');
-		fprintf(stderr, "\n");
+		showBlock(b, '\t', printer);
+		printer->print("%s", "\n");
 	}
 
-	static int Memento_listBlock(Memento_BlkHeader *b, void *arg)
+	static int Memento_listBlock(Memento_BlkHeader *b, void *arg, x_memento_print* printer)
 	{
 		int *counts = (int *)arg;
-		blockDisplay(b, 0);
+		blockDisplay(b, 0, printer);
 		counts[0]++;
 		counts[1] += b->rawsize;
 		return 0;
 	}
 
-	static int Memento_listNewBlock(Memento_BlkHeader *b, void *arg)
+	static int Memento_listNewBlock(Memento_BlkHeader *b, void *arg, x_memento_print* printer)
 	{
 		if (b->flags & Memento_Flag_OldBlock)
 			return 0;
 		b->flags |= Memento_Flag_OldBlock;
-		return Memento_listBlock(b, arg);
+		return Memento_listBlock(b, arg, printer);
 	}
 
 	class memento_listnewblock_functor : public memento_functor
 	{
+		x_memento_print* m_printer;
 	public:
-		inline		memento_listnewblock_functor() {}
+		inline		memento_listnewblock_functor(x_memento_print* printer) : m_printer(printer) {}
 
 		virtual int dofunc(Memento_BlkHeader * blkh, void * arg)
 		{
-			return Memento_listNewBlock(blkh, arg);
+			return Memento_listNewBlock(blkh, arg, m_printer);
 		}
 	};
 
-	static void doNestedDisplay(Memento_BlkHeader *b,
-		int depth)
+	static void doNestedDisplay(Memento_BlkHeader *b, int depth, x_memento_print* printer)
 	{
 		/* Try and avoid recursion if we can help it */
-		do {
-			blockDisplay(b, depth);
-			if (b->sibling) {
+		do 
+		{
+			blockDisplay(b, depth, printer);
+			if (b->sibling) 
+			{
 				if (b->child)
-					doNestedDisplay(b->child, depth + 1);
+					doNestedDisplay(b->child, depth + 1, printer);
 				b = b->sibling;
 			}
-			else {
+			else 
+			{
 				b = b->child;
 				depth++;
 			}
@@ -546,7 +587,7 @@ namespace xcore
 		/* Count the blocks */
 		count = 0;
 		size = 0;
-		for (b = globals.used.head; b; b = b->next) 
+		for (b = m_globals.used.head; b; b = b->next) 
 		{
 			VALGRIND_MAKE_MEM_DEFINED(b, sizeof(*b));
 			size += b->rawsize;
@@ -559,7 +600,7 @@ namespace xcore
 			return 1;
 
 		/* Populate our block list */
-		b = globals.used.head;
+		b = m_globals.used.head;
 		minptr = maxptr = MEMBLK_TOBLK(b);
 		mask = (long)minptr;
 		for (i = 0; b; b = b->next, i++) 
@@ -579,11 +620,11 @@ namespace xcore
 		qsort(blocks, count, sizeof(void *), ptrcmp);
 
 		/* Now, calculate tree */
-		for (b = globals.used.head; b; b = b->next) 
+		for (b = m_globals.used.head; b; b = b->next) 
 		{
 			char *p = (char*)MEMBLK_TOBLK(b);
 			int end = (b->rawsize < MEMENTO_PTRSEARCH ? b->rawsize : MEMENTO_PTRSEARCH);
-			for (i = globals.searchskip; i < end; i += sizeof(void *)) 
+			for (i = m_globals.searchskip; i < end; i += sizeof(void *)) 
 			{
 				void *q = *(void **)(&p[i]);
 				void **r;
@@ -628,18 +669,18 @@ namespace xcore
 		}
 
 		/* Now display with nesting */
-		for (b = globals.used.head; b; b = b->next) 
+		for (b = m_globals.used.head; b; b = b->next) 
 		{
 			if ((b->flags & Memento_Flag_HasParent) == 0)
-				doNestedDisplay(b, 0);
+				doNestedDisplay(b, 0, m_config.m_print);
 		}
-		fprintf(stderr, " Total number of blocks = %d\n", count);
-		fprintf(stderr, " Total size of blocks = %d\n", size);
+		m_config.m_print->print(" Total number of blocks = %d\n", 1, count);
+		m_config.m_print->print(" Total size of blocks = %d\n", 1, size);
 
 		MEMENTO_UNDERLYING_FREE(blocks);
 
 		/* Now put the blocks back for valgrind */
-		for (b = globals.used.head; b;) 
+		for (b = m_globals.used.head; b;) 
 		{
 			Memento_BlkHeader *next = b->next;
 			VALGRIND_MAKE_MEM_NOACCESS(b, sizeof(*b));
@@ -652,16 +693,16 @@ namespace xcore
 
 	void memento_instance::Memento_listBlocks(void)
 	{
-		fprintf(stderr, "Allocated blocks:\n");
+		m_config.m_print->print("%s", "Allocated blocks:\n");
 		if (Memento_listBlocksNested())
 		{
 			int counts[2];
 			counts[0] = 0;
 			counts[1] = 0;
-			memento_listnewblock_functor f;
-			Memento_appBlocks(&globals.used, f, &counts[0]);
-			fprintf(stderr, " Total number of blocks = %d\n", counts[0]);
-			fprintf(stderr, " Total size of blocks = %d\n", counts[1]);
+			memento_listnewblock_functor f(m_config.m_print);
+			Memento_appBlocks(&m_globals.used, f, &counts[0]);
+			m_config.m_print->print(" Total number of blocks = %d\n", 1, counts[0]);
+			m_config.m_print->print(" Total size of blocks = %d\n", 1, counts[1]);
 		}
 	}
 
@@ -670,24 +711,24 @@ namespace xcore
 		int counts[2];
 		counts[0] = 0;
 		counts[1] = 0;
-		fprintf(stderr, "Blocks allocated and still extant since last list:\n");
-		memento_listnewblock_functor f;
-		Memento_appBlocks(&globals.used, f, &counts[0]);
-		fprintf(stderr, "  Total number of blocks = %d\n", counts[0]);
-		fprintf(stderr, "  Total size of blocks = %d\n", counts[1]);
+		m_config.m_print->print("%s", "Blocks allocated and still extant since last list:\n");
+		memento_listnewblock_functor f(m_config.m_print);
+		Memento_appBlocks(&m_globals.used, f, &counts[0]);
+		m_config.m_print->print("  Total number of blocks = %d\n", 1, counts[0]);
+		m_config.m_print->print("  Total size of blocks = %d\n", 1, counts[1]);
 	}
 
 	void memento_instance::Memento_endStats(void)
 	{
-		fprintf(stderr, "Total memory malloced = %u bytes\n", (unsigned int)globals.totalAlloc);
-		fprintf(stderr, "Peak memory malloced = %u bytes\n", (unsigned int)globals.peakAlloc);
-		fprintf(stderr, "%u mallocs, %u frees, %u reallocs\n", (unsigned int)globals.numMallocs, (unsigned int)globals.numFrees, (unsigned int)globals.numReallocs);
-		fprintf(stderr, "Average allocation size %u bytes\n", (unsigned int)(globals.numMallocs != 0 ? globals.totalAlloc / globals.numMallocs : 0));
+		m_config.m_print->print("Total memory malloced = %u bytes\n", 1, (unsigned int)m_globals.totalAlloc);
+		m_config.m_print->print("Peak memory malloced = %u bytes\n", 1, (unsigned int)m_globals.peakAlloc);
+		m_config.m_print->print("%u mallocs, %u frees, %u reallocs\n", 3, (unsigned int)m_globals.numMallocs, (unsigned int)m_globals.numFrees, (unsigned int)m_globals.numReallocs);
+		m_config.m_print->print("Average allocation size %u bytes\n", 1, (unsigned int)(m_globals.numMallocs != 0 ? m_globals.totalAlloc / m_globals.numMallocs : 0));
 	}
 
 	void memento_instance::Memento_stats(void)
 	{
-		fprintf(stderr, "Current memory malloced = %u bytes\n", (unsigned int)globals.alloc);
+		m_config.m_print->print("Current memory malloced = %u bytes\n", 1, (unsigned int)m_globals.alloc);
 		Memento_endStats();
 	}
 
@@ -696,34 +737,34 @@ namespace xcore
 		Memento_checkAllMemory();
 		Memento_endStats();
 
-		if (globals.used.head != NULL) 
+		if (m_globals.used.head != NULL) 
 		{
 			Memento_listBlocks();
 			Memento_breakpoint();
 		}
 
-		if (globals.segv) 
+		if (m_globals.segv) 
 		{
-			fprintf(stderr, "Memory dumped on SEGV while squeezing @ %d\n", globals.failAt);
+			m_config.m_print->print("Memory dumped on SEGV while squeezing @ %d\n", 1, m_globals.failAt);
 		}
-		else if (globals.squeezing)
+		else if (m_globals.squeezing)
 		{
-			if (globals.pattern == 0)
-				fprintf(stderr, "Memory squeezing @ %d complete\n", globals.squeezeAt);
+			if (m_globals.pattern == 0)
+				m_config.m_print->print("Memory squeezing @ %d complete\n", 1, m_globals.squeezeAt);
 			else
-				fprintf(stderr, "Memory squeezing @ %d (%d) complete\n", globals.squeezeAt, globals.pattern);
+				m_config.m_print->print("Memory squeezing @ %d (%d) complete\n", 2, m_globals.squeezeAt, m_globals.pattern);
 		}
 
-		if (globals.failing)
+		if (m_globals.failing)
 		{
-			fprintf(stderr, "MEMENTO_FAILAT=%d\n", globals.failAt);
-			fprintf(stderr, "MEMENTO_PATTERN=%d\n", globals.pattern);
+			m_config.m_print->print("MEMENTO_FAILAT=%d\n", 1, m_globals.failAt);
+			m_config.m_print->print("MEMENTO_PATTERN=%d\n", 1, m_globals.pattern);
 		}
 		
-		if (globals.nextFailAt != 0)
+		if (m_globals.nextFailAt != 0)
 		{
-			fprintf(stderr, "MEMENTO_NEXTFAILAT=%d\n", globals.nextFailAt);
-			fprintf(stderr, "MEMENTO_NEXTPATTERN=%d\n", globals.nextPattern);
+			m_config.m_print->print("MEMENTO_NEXTFAILAT=%d\n", 1, m_globals.nextFailAt);
+			m_config.m_print->print("MEMENTO_NEXTPATTERN=%d\n", 1, m_globals.nextPattern);
 		}
 	}
 
@@ -732,17 +773,19 @@ namespace xcore
 		/* A good place for a breakpoint */
 	}
 
-	void memento_instance::Memento_init(void)
+	void memento_instance::Memento_init(x_memento_config const& config)
 	{
-		memset(&globals, 0, sizeof(globals));
+		memset(&m_globals, 0, sizeof(m_globals));
 
-		globals.inited = 1;
-		globals.used.head = NULL;
-		globals.used.tail = &globals.used.head;
-		globals.free.head = NULL;
-		globals.free.tail = &globals.free.head;
-		globals.sequence = 0;
-		globals.countdown = 1024;
+		m_config = config;
+
+		m_globals.inited = 1;
+		m_globals.used.head = NULL;
+		m_globals.used.tail = &m_globals.used.head;
+		m_globals.free.head = NULL;
+		m_globals.free.tail = &m_globals.free.head;
+		m_globals.sequence = 0;
+		m_globals.countdown = 1024;
 
 		//@JURGEN
 		//atexit(Memento_fin);
@@ -750,15 +793,13 @@ namespace xcore
 		Memento_inited();
 	}
 
-	#include <signal.h>
-
 	void memento_instance::Memento_signal(void)
 	{
-		globals.segv = 1;
+		m_globals.segv = 1;
 
 		/* If we just return from this function the SEGV will be unhandled, and
 		 * we'll launch into whatever JIT debugging system the OS provides. At
-		 * least fprintf(stderr, something useful first. If MEMENTO_NOJIT is set, then
+		 * least m_config.m_print->print(something useful first. If MEMENTO_NOJIT is set, then
 		 * just exit to avoid the JIT (and get the usual atexit handling). */
 
 		Memento_fin();
@@ -766,15 +807,15 @@ namespace xcore
 
 	void memento_instance::Memento_startFailing(void)
 	{
-		if (!globals.failing) 
+		if (!m_globals.failing) 
 		{
-			fprintf(stderr, "Starting to fail...\n");
-			fflush(stderr);
-			globals.failing = 1;
-			globals.failAt = globals.sequence;
-			globals.nextFailAt = globals.sequence + 1;
-			globals.pattern = 0;
-			globals.patternBit = 0;
+			m_config.m_print->print("%s", "Starting to fail...\n");
+
+			m_globals.failing = 1;
+			m_globals.failAt = m_globals.sequence;
+			m_globals.nextFailAt = m_globals.sequence + 1;
+			m_globals.pattern = 0;
+			m_globals.patternBit = 0;
 			//signal(SIGSEGV, &xcore::memento_instance::Memento_signal);
 			//signal(SIGABRT, Memento_signal);
 			Memento_breakpoint();
@@ -783,28 +824,28 @@ namespace xcore
 
 	void memento_instance::Memento_event(void)
 	{
-		globals.sequence++;
-		if ((globals.sequence >= globals.paranoidAt) && (globals.paranoidAt != 0)) 
+		m_globals.sequence++;
+		if ((m_globals.sequence >= m_globals.paranoidAt) && (m_globals.paranoidAt != 0)) 
 		{
-			globals.paranoia = 1;
-			globals.countdown = 1;
+			m_globals.paranoia = 1;
+			m_globals.countdown = 1;
 		}
-		if (--globals.countdown == 0) 
+		if (--m_globals.countdown == 0) 
 		{
 			Memento_checkAllMemory();
-			globals.countdown = globals.paranoia;
+			m_globals.countdown = m_globals.paranoia;
 		}
 
-		if (globals.sequence == globals.breakAt) 
+		if (m_globals.sequence == m_globals.breakAt) 
 		{
-			fprintf(stderr, "Breaking at event %d\n", globals.breakAt);
+			m_config.m_print->print("Breaking at event %d\n", 1, m_globals.breakAt);
 			Memento_breakpoint();
 		}
 	}
 
 	int memento_instance::Memento_breakAt(int event)
 	{
-		globals.breakAt = event;
+		m_globals.breakAt = event;
 		return event;
 	}
 
@@ -825,30 +866,34 @@ namespace xcore
 	{
 		int failThisOne;
 
-		if (!globals.inited)
-			Memento_init();
+		if (!m_globals.inited)
+		{
+			x_memento_config config;
+			config.init(&m_stdout_null);
+			Memento_init(config);
+		}
 
 		Memento_event();
 
-		if ((globals.sequence >= globals.failAt) && (globals.failAt != 0))
+		if ((m_globals.sequence >= m_globals.failAt) && (m_globals.failAt != 0))
 			Memento_startFailing();
 
-		if (!globals.failing)
+		if (!m_globals.failing)
 			return 0;
 
-		failThisOne = ((globals.patternBit & globals.pattern) == 0);
+		failThisOne = ((m_globals.patternBit & m_globals.pattern) == 0);
 
 		/* If we are failing, and we've reached the end of the pattern and we've
 		 * still got bits available in the pattern word, and we haven't already
 		 * set a nextPattern, then extend the pattern. */
-		if (globals.failing && ((~(globals.patternBit - 1) & globals.pattern) == 0) && (globals.patternBit != 0) && globals.nextPattern == 0)
+		if (m_globals.failing && ((~(m_globals.patternBit - 1) & m_globals.pattern) == 0) && (m_globals.patternBit != 0) && m_globals.nextPattern == 0)
 		{
 			/* We'll fail this one, and set the 'next' one to pass it. */
-			globals.nextFailAt = globals.failAt;
-			globals.nextPattern = globals.pattern | globals.patternBit;
+			m_globals.nextFailAt = m_globals.failAt;
+			m_globals.nextPattern = m_globals.pattern | m_globals.patternBit;
 		}
 
-		globals.patternBit = (globals.patternBit ? globals.patternBit << 1 : 1);
+		m_globals.patternBit = (m_globals.patternBit ? m_globals.patternBit << 1 : 1);
 
 		return failThisOne;
 	}
@@ -864,33 +909,33 @@ namespace xcore
 		if (s == 0)
 			return NULL;
 
-		globals.numMallocs++;
+		m_globals.numMallocs++;
 
-		if (globals.maxMemory != 0 && globals.alloc + s > globals.maxMemory)
+		if (m_globals.maxMemory != 0 && m_globals.alloc + s > m_globals.maxMemory)
 			return NULL;
 
 		memblk = (Memento_BlkHeader*)MEMENTO_UNDERLYING_MALLOC(smem);
 		if (memblk == NULL)
 			return NULL;
 
-		globals.alloc += s;
-		globals.totalAlloc += s;
-		if (globals.peakAlloc < globals.alloc)
-			globals.peakAlloc = globals.alloc;
+		m_globals.alloc += s;
+		m_globals.totalAlloc += s;
+		if (m_globals.peakAlloc < m_globals.alloc)
+			m_globals.peakAlloc = m_globals.alloc;
 
-		if (!globals.leaksonly)
+		if (!m_globals.leaksonly)
 		{
 			memset(MEMBLK_TOBLK(memblk), MEMENTO_ALLOCFILL, s);
 		}
 
 		memblk->rawsize = s;
-		memblk->sequence = globals.sequence;
+		memblk->sequence = m_globals.sequence;
 		memblk->lastCheckedOK = memblk->sequence;
 		memblk->flags = 0;
 		memblk->label = 0;
 		memblk->child = NULL;
 		memblk->sibling = NULL;
-		Memento_addBlockHead(&globals.used, memblk, 0);
+		Memento_addBlockHead(&m_globals.used, memblk, 0);
 
 		return MEMBLK_TOBLK(memblk);
 	}
@@ -908,33 +953,36 @@ namespace xcore
 
 	int memento_instance::checkBlock(Memento_BlkHeader *memblk, const char *action)
 	{
-		if (!globals.leaksonly)
+		if (!m_globals.leaksonly)
 		{
 			BlkCheckData data;
 			memento_checkallocedblock_functor f(this);
 
 			memset(&data, 0, sizeof(data));
-			Memento_appBlock(&globals.used, f, &data, memblk);
-			if (!data.found) {
+			Memento_appBlock(&m_globals.used, f, &data, memblk);
+			if (!data.found) 
+			{
 				/* Failure! */
-				fprintf(stderr, "Attempt to %s block ", action);
-				showBlock(memblk, 32);
-				fprintf(stderr, "\n");
+				m_config.m_print->print("Attempt to %s block ", action);
+				showBlock(memblk, 32, m_config.m_print);
+				m_config.m_print->print("%s", "\n");
 				Memento_breakpoint();
 				return 1;
 			}
-			else if (data.preCorrupt || data.postCorrupt) {
-				fprintf(stderr, "Block ");
-				showBlock(memblk, ' ');
-				fprintf(stderr, " found to be corrupted on %s!\n", action);
-				if (data.preCorrupt) {
-					fprintf(stderr, "Preguard corrupted\n");
+			else if (data.preCorrupt || data.postCorrupt) 
+			{
+				m_config.m_print->print("%s", "Block ");
+				showBlock(memblk, ' ', m_config.m_print);
+				m_config.m_print->print(" found to be corrupted on %s!\n", action);
+				if (data.preCorrupt) 
+				{
+					m_config.m_print->print("%s", "Preguard corrupted\n");
 				}
-				if (data.postCorrupt) {
-					fprintf(stderr, "Postguard corrupted\n");
+				if (data.postCorrupt) 
+				{
+					m_config.m_print->print("%s", "Postguard corrupted\n");
 				}
-				fprintf(stderr, "Block last checked OK at allocation %d. Now %d.\n",
-					memblk->lastCheckedOK, globals.sequence);
+				m_config.m_print->print("Block last checked OK at allocation %d. Now %d.\n", 2, memblk->lastCheckedOK, m_globals.sequence);
 				Memento_breakpoint();
 				return 1;
 			}
@@ -946,8 +994,12 @@ namespace xcore
 	{
 		Memento_BlkHeader *memblk;
 
-		if (!globals.inited)
-			Memento_init();
+		if (!m_globals.inited)
+		{
+			x_memento_config config;
+			config.init(&m_stdout_null);
+			Memento_init(config);
+		}
 
 		Memento_event();
 
@@ -963,21 +1015,21 @@ namespace xcore
 		if (memblk->flags & Memento_Flag_BreakOnFree)
 			Memento_breakpoint();
 
-		globals.alloc -= memblk->rawsize;
-		globals.numFrees++;
+		m_globals.alloc -= memblk->rawsize;
+		m_globals.numFrees++;
 
-		Memento_removeBlock(&globals.used, memblk);
+		Memento_removeBlock(&m_globals.used, memblk);
 
 		VALGRIND_MAKE_MEM_DEFINED(memblk, sizeof(*memblk));
 		if (Memento_Internal_makeSpace(MEMBLK_SIZE(memblk->rawsize))) 
 		{
 			VALGRIND_MAKE_MEM_DEFINED(memblk, sizeof(*memblk));
 			VALGRIND_MAKE_MEM_DEFINED(MEMBLK_TOBLK(memblk),	memblk->rawsize + Memento_PostSize);
-			if (!globals.leaksonly)
+			if (!m_globals.leaksonly)
 			{
 				memset(MEMBLK_TOBLK(memblk), MEMENTO_FREEFILL, memblk->rawsize);
 			}
-			Memento_addBlockTail(&globals.free, memblk, 1);
+			Memento_addBlockTail(&m_globals.free, memblk, 1);
 		}
 		else 
 		{
@@ -1010,39 +1062,39 @@ namespace xcore
 			Memento_breakpoint();
 
 		VALGRIND_MAKE_MEM_DEFINED(memblk, sizeof(*memblk));
-		if (globals.maxMemory != 0 && globals.alloc - memblk->rawsize + newsize > globals.maxMemory)
+		if (m_globals.maxMemory != 0 && m_globals.alloc - memblk->rawsize + newsize > m_globals.maxMemory)
 			return NULL;
 
 		newsizemem = MEMBLK_SIZE(newsize);
-		Memento_removeBlock(&globals.used, memblk);
+		Memento_removeBlock(&m_globals.used, memblk);
 		VALGRIND_MAKE_MEM_DEFINED(memblk, sizeof(*memblk));
 		flags = memblk->flags;
 		newmemblk = (Memento_BlkHeader*)MEMENTO_UNDERLYING_REALLOC(memblk, newsizemem);
 		if (newmemblk == NULL)
 		{
-			Memento_addBlockHead(&globals.used, memblk, 2);
+			Memento_addBlockHead(&m_globals.used, memblk, 2);
 			return NULL;
 		}
-		globals.numReallocs++;
-		globals.totalAlloc += newsize;
-		globals.alloc -= newmemblk->rawsize;
-		globals.alloc += newsize;
-		if (globals.peakAlloc < globals.alloc)
-			globals.peakAlloc = globals.alloc;
+		m_globals.numReallocs++;
+		m_globals.totalAlloc += newsize;
+		m_globals.alloc -= newmemblk->rawsize;
+		m_globals.alloc += newsize;
+		if (m_globals.peakAlloc < m_globals.alloc)
+			m_globals.peakAlloc = m_globals.alloc;
 
 		newmemblk->flags = flags;
 		if (newmemblk->rawsize < newsize) 
 		{
 			char *newbytes = ((char *)MEMBLK_TOBLK(newmemblk)) + newmemblk->rawsize;
 			VALGRIND_MAKE_MEM_DEFINED(newbytes, newsize - newmemblk->rawsize);
-			if (!globals.leaksonly)
+			if (!m_globals.leaksonly)
 			{
 				memset(newbytes, MEMENTO_ALLOCFILL, newsize - newmemblk->rawsize);
 			}
 			VALGRIND_MAKE_MEM_UNDEFINED(newbytes, newsize - newmemblk->rawsize);
 		}
 		newmemblk->rawsize = newsize;
-		if (!globals.leaksonly)
+		if (!m_globals.leaksonly)
 		{
 			VALGRIND_MAKE_MEM_DEFINED(newmemblk->preblk, Memento_PreSize);
 			memset(newmemblk->preblk, MEMENTO_PREFILL, Memento_PreSize);
@@ -1051,7 +1103,7 @@ namespace xcore
 			memset(MEMBLK_POSTPTR(newmemblk), MEMENTO_POSTFILL, Memento_PostSize);
 			VALGRIND_MAKE_MEM_UNDEFINED(MEMBLK_POSTPTR(newmemblk), Memento_PostSize);
 		}
-		Memento_addBlockHead(&globals.used, newmemblk, 2);
+		Memento_addBlockHead(&m_globals.used, newmemblk, 2);
 		return MEMBLK_TOBLK(newmemblk);
 	}
 
@@ -1070,29 +1122,31 @@ namespace xcore
 		BlkCheckData *data = (BlkCheckData *)arg;
 
 		Memento_Internal_checkAllocedBlock(memblk, data);
-		if (data->preCorrupt || data->postCorrupt) {
-			if ((data->found & 2) == 0) {
-				fprintf(stderr, "Allocated blocks:\n");
+		if (data->preCorrupt || data->postCorrupt) 
+		{
+			if ((data->found & 2) == 0) 
+			{
+				m_config.m_print->print("%s", "Allocated blocks:\n");
 				data->found |= 2;
 			}
-			fprintf(stderr, "  Block ");
-			showBlock(memblk, ' ');
-			if (data->preCorrupt) {
-				fprintf(stderr, " Preguard ");
+			m_config.m_print->print("%s", "  Block ");
+			showBlock(memblk, ' ', m_config.m_print);
+			if (data->preCorrupt)
+			{
+				m_config.m_print->print("%s", " Preguard ");
 			}
-			if (data->postCorrupt) {
-				fprintf(stderr, "%s Postguard ",
-					(data->preCorrupt ? "&" : ""));
+			if (data->postCorrupt)
+			{
+				m_config.m_print->print("%s Postguard ", (data->preCorrupt ? "&" : ""));
 			}
-			fprintf(stderr, "corrupted.\n    "
-				"Block last checked OK at allocation %d. Now %d.\n",
-				memblk->lastCheckedOK, globals.sequence);
+			m_config.m_print->print("%s", "corrupted.\n");
+			m_config.m_print->print("    Block last checked OK at allocation %d. Now %d.\n", 2,	memblk->lastCheckedOK, m_globals.sequence);
 			data->preCorrupt = 0;
 			data->postCorrupt = 0;
 			data->freeCorrupt = 0;
 		}
 		else
-			memblk->lastCheckedOK = globals.sequence;
+			memblk->lastCheckedOK = m_globals.sequence;
 		return 0;
 	}
 
@@ -1101,41 +1155,48 @@ namespace xcore
 		BlkCheckData *data = (BlkCheckData *)arg;
 
 		Memento_Internal_checkFreedBlock(memblk, data);
-		if (data->preCorrupt || data->postCorrupt || data->freeCorrupt) {
-			if ((data->found & 4) == 0) {
-				fprintf(stderr, "Freed blocks:\n");
+		if (data->preCorrupt || data->postCorrupt || data->freeCorrupt) 
+		{
+			if ((data->found & 4) == 0) 
+			{
+				m_config.m_print->print("%s", "Freed blocks:\n");
 				data->found |= 4;
 			}
-			fprintf(stderr, "  ");
-			showBlock(memblk, ' ');
-			if (data->freeCorrupt) {
-				fprintf(stderr, " index %d (address 0x%p) onwards", data->index,
-					&((char *)MEMBLK_TOBLK(memblk))[data->index]);
-				if (data->preCorrupt) {
-					fprintf(stderr, "+ preguard");
+			m_config.m_print->print("%s", "  ");
+			showBlock(memblk, ' ', m_config.m_print);
+			
+			if (data->freeCorrupt) 
+			{
+				m_config.m_print->print(" index %d", 1, data->index);
+				m_config.m_print->print(" (address 0x%p) onwards", &((char *)MEMBLK_TOBLK(memblk))[data->index]);
+				if (data->preCorrupt)
+				{
+					m_config.m_print->print("%s", "+ preguard");
 				}
-				if (data->postCorrupt) {
-					fprintf(stderr, "+ postguard");
-				}
-			}
-			else {
-				if (data->preCorrupt) {
-					fprintf(stderr, " preguard");
-				}
-				if (data->postCorrupt) {
-					fprintf(stderr, "%s Postguard",
-						(data->preCorrupt ? "+" : ""));
+				if (data->postCorrupt) 
+				{
+					m_config.m_print->print("%s", "+ postguard");
 				}
 			}
-			fprintf(stderr, " corrupted.\n"
-				"    Block last checked OK at allocation %d. Now %d.\n",
-				memblk->lastCheckedOK, globals.sequence);
+			else
+			{
+				if (data->preCorrupt) 
+				{
+					m_config.m_print->print("%s", " preguard");
+				}
+				if (data->postCorrupt) 
+				{
+					m_config.m_print->print("%s Postguard",	(data->preCorrupt ? "+" : ""));
+				}
+			}
+			m_config.m_print->print("%s", " corrupted.\n");
+			m_config.m_print->print("    Block last checked OK at allocation %d. Now %d.\n", 2, memblk->lastCheckedOK, m_globals.sequence);
 			data->preCorrupt = 0;
 			data->postCorrupt = 0;
 			data->freeCorrupt = 0;
 		}
 		else
-			memblk->lastCheckedOK = globals.sequence;
+			memblk->lastCheckedOK = m_globals.sequence;
 		return 0;
 	}
 
@@ -1163,15 +1224,15 @@ namespace xcore
 
 	int memento_instance::Memento_checkAllMemory(void)
 	{
-		if (!globals.leaksonly)
+		if (!m_globals.leaksonly)
 		{
 			BlkCheckData data;
 
 			memset(&data, 0, sizeof(data));
 			memento_checkallalloced_functor checkAllAlloced(this);
-			Memento_appBlocks(&globals.used, checkAllAlloced, &data);
+			Memento_appBlocks(&m_globals.used, checkAllAlloced, &data);
 			memento_checkallfreed_functor checkAllFreed(this);
-			Memento_appBlocks(&globals.free, checkAllFreed, &data);
+			Memento_appBlocks(&m_globals.free, checkAllFreed, &data);
 			if (data.found & 6) {
 				Memento_breakpoint();
 				return 1;
@@ -1182,14 +1243,14 @@ namespace xcore
 
 	int memento_instance::Memento_setParanoia(int i)
 	{
-		globals.paranoia = i;
-		globals.countdown = globals.paranoia;
+		m_globals.paranoia = i;
+		m_globals.countdown = m_globals.paranoia;
 		return i;
 	}
 
 	int memento_instance::Memento_paranoidAt(int i)
 	{
-		globals.paranoidAt = i;
+		m_globals.paranoidAt = i;
 		return i;
 	}
 
@@ -1206,9 +1267,9 @@ namespace xcore
 	{
 		int result;
 
-		fprintf(stderr, "Checking memory\n");
+		m_config.m_print->print("%s", "Checking memory\n");
 		result = Memento_checkAllMemory();
-		fprintf(stderr, "Memory checked!\n");
+		m_config.m_print->print("%s", "Memory checked!\n");
 		return result;
 	}
 
@@ -1263,28 +1324,24 @@ namespace xcore
 		data.blk = NULL;
 		data.flags = 0;
 		memento_containsaddr_functor containsAddr;
-		Memento_appBlocks(&globals.used, containsAddr, &data);
+		Memento_appBlocks(&m_globals.used, containsAddr, &data);
 		if (data.blk != NULL) 
 		{
-			fprintf(stderr, "Address 0x%p is in %sallocated block ",
-				data.addr,
-				(data.flags == 1 ? "" : (data.flags == 2 ?
-				"preguard of " : "postguard of ")));
-			showBlock(data.blk, ' ');
-			fprintf(stderr, "\n");
+			m_config.m_print->print("Address 0x%p ", data.addr);
+			m_config.m_print->print("is in %s allocated block ", (data.flags == 1 ? "" : (data.flags == 2 ?	"preguard of " : "postguard of ")));
+			showBlock(data.blk, ' ', m_config.m_print);
+			m_config.m_print->print("%s", "\n");
 			return data.blk->sequence;
 		}
 		data.blk = NULL;
 		data.flags = 0;
-		Memento_appBlocks(&globals.free, containsAddr, &data);
+		Memento_appBlocks(&m_globals.free, containsAddr, &data);
 		if (data.blk != NULL) 
 		{
-			fprintf(stderr, "Address 0x%p is in %sfreed block ",
-				data.addr,
-				(data.flags == 1 ? "" : (data.flags == 2 ?
-				"preguard of " : "postguard of ")));
-			showBlock(data.blk, ' ');
-			fprintf(stderr, "\n");
+			m_config.m_print->print("Address 0x%p ", data.addr);
+			m_config.m_print->print("is in %s freed block ", (data.flags == 1 ? "" : (data.flags == 2 ? "preguard of " : "postguard of ")));
+			showBlock(data.blk, ' ', m_config.m_print);
+			m_config.m_print->print("%s", "\n");
 			return data.blk->sequence;
 		}
 		return 0;
@@ -1298,32 +1355,28 @@ namespace xcore
 		data.addr = a;
 		data.blk = NULL;
 		data.flags = 0;
-		Memento_appBlocks(&globals.used, containsAddr, &data);
+		Memento_appBlocks(&m_globals.used, containsAddr, &data);
 		if (data.blk != NULL) 
 		{
-			fprintf(stderr, "Will stop when address 0x%p (in %sallocated block ",
-				data.addr,
-				(data.flags == 1 ? "" : (data.flags == 2 ?
-				"preguard of " : "postguard of ")));
-			showBlock(data.blk, ' ');
-			fprintf(stderr, ") is freed\n");
+			m_config.m_print->print("Will stop when address 0x%p ", data.addr);
+			m_config.m_print->print("(in %sallocated block ", (data.flags == 1 ? "" : (data.flags == 2 ? "preguard of " : "postguard of ")));
+			showBlock(data.blk, ' ', m_config.m_print);
+			m_config.m_print->print("%s", ") is freed\n");
 			data.blk->flags |= Memento_Flag_BreakOnFree;
 			return;
 		}
 		data.blk = NULL;
 		data.flags = 0;
-		Memento_appBlocks(&globals.free, containsAddr, &data);
+		Memento_appBlocks(&m_globals.free, containsAddr, &data);
 		if (data.blk != NULL) 
 		{
-			fprintf(stderr, "Can't stop on free; address 0x%p is in %sfreed block ",
-				data.addr,
-				(data.flags == 1 ? "" : (data.flags == 2 ?
-				"preguard of " : "postguard of ")));
-			showBlock(data.blk, ' ');
-			fprintf(stderr, "\n");
+			m_config.m_print->print("Can't stop on free; address 0x%p ", data.addr);
+			m_config.m_print->print("is in %sfreed block ",	(data.flags == 1 ? "" : (data.flags == 2 ? "preguard of " : "postguard of ")));
+			showBlock(data.blk, ' ', m_config.m_print);
+			m_config.m_print->print("%s", "\n");
 			return;
 		}
-		fprintf(stderr, "Can't stop on free; address 0x%p is not in a known block.\n", a);
+		m_config.m_print->print("Can't stop on free; address 0x%p is not in a known block.\n", a);
 	}
 
 	void memento_instance::Memento_breakOnRealloc(void *a)
@@ -1334,44 +1387,93 @@ namespace xcore
 		data.addr = a;
 		data.blk = NULL;
 		data.flags = 0;
-		Memento_appBlocks(&globals.used, containsAddr, &data);
-		if (data.blk != NULL) {
-			fprintf(stderr, "Will stop when address 0x%p (in %sallocated block ",
-				data.addr,
-				(data.flags == 1 ? "" : (data.flags == 2 ?
-				"preguard of " : "postguard of ")));
-			showBlock(data.blk, ' ');
-			fprintf(stderr, ") is freed (or realloced)\n");
+		Memento_appBlocks(&m_globals.used, containsAddr, &data);
+		if (data.blk != NULL) 
+		{
+			m_config.m_print->print("Will stop when address 0x%p ", data.addr);
+			m_config.m_print->print("(in %sallocated block ", (data.flags == 1 ? "" : (data.flags == 2 ? "preguard of " : "postguard of ")));
+			showBlock(data.blk, ' ', m_config.m_print);
+			m_config.m_print->print("%s", ") is freed (or realloced)\n");
 			data.blk->flags |= Memento_Flag_BreakOnFree | Memento_Flag_BreakOnRealloc;
 			return;
 		}
+
 		data.blk = NULL;
 		data.flags = 0;
-		Memento_appBlocks(&globals.free, containsAddr, &data);
-		if (data.blk != NULL) {
-			fprintf(stderr, "Can't stop on free/realloc; address 0x%p is in %sfreed block ",
-				data.addr,
-				(data.flags == 1 ? "" : (data.flags == 2 ?
-				"preguard of " : "postguard of ")));
-			showBlock(data.blk, ' ');
-			fprintf(stderr, "\n");
+		Memento_appBlocks(&m_globals.free, containsAddr, &data);
+		if (data.blk != NULL) 
+		{
+			m_config.m_print->print("Can't stop on free/realloc; address 0x%p ", (data.flags == 1 ? "" : (data.flags == 2 ? "preguard of " : "postguard of ")));
+			m_config.m_print->print("is in %sfreed block ", (data.flags == 1 ? "" : (data.flags == 2 ? "preguard of " : "postguard of ")));
+			showBlock(data.blk, ' ', m_config.m_print);
+			m_config.m_print->print("%s", "\n");
 			return;
 		}
-		fprintf(stderr, "Can't stop on free/realloc; address 0x%p is not in a known block.\n", a);
+		m_config.m_print->print("Can't stop on free/realloc; address 0x%p is not in a known block.\n", a);
 	}
 
 	int memento_instance::Memento_failAt(int i)
 	{
-		globals.failAt = i;
-		if ((globals.sequence > globals.failAt) && (globals.failing != 0))
+		m_globals.failAt = i;
+		if ((m_globals.sequence > m_globals.failAt) && (m_globals.failing != 0))
 			Memento_startFailing();
 		return i;
 	}
 
 	size_t memento_instance::Memento_setMax(size_t max)
 	{
-		globals.maxMemory = max;
+		m_globals.maxMemory = max;
 		return max;
+	}
+
+
+	class x_memento_allocator : public x_iallocator
+	{
+	public:
+		virtual const char*		name() const									{ return TARGET_FULL_DESCR_STR " memento allocator"; }
+
+		virtual void*			allocate(xsize_t size, u32 alignment)
+		{
+			return m_memento.Memento_malloc((u32)size);
+		}
+
+		virtual void*			reallocate(void* ptr, xsize_t size, u32 alignment)
+		{
+			return m_memento.Memento_realloc(ptr, (u32)size);
+		}
+
+		virtual void			deallocate(void* ptr)
+		{
+			return m_memento.Memento_free(ptr);
+		}
+
+		virtual void			release()
+		{
+			m_memento.Memento_fin();
+			m_allocator->deallocate(this);
+		}
+
+		void*					operator new(xsize_t num_bytes)					{ return NULL; }
+		void*					operator new(xsize_t num_bytes, void* mem)		{ return mem; }
+		void					operator delete(void* pMem)						{ }
+		void					operator delete(void* pMem, void*)				{ }
+
+		x_iallocator*			m_allocator;
+		memento_instance		m_memento;
+
+	private:
+		virtual					~x_memento_allocator()							{ }
+
+	};
+
+	x_iallocator*				gCreateMementoAllocator(x_memento_config const& config, x_iallocator* allocator)
+	{
+		void* mem = allocator->allocate(sizeof(x_memento_allocator), sizeof(void*));
+		x_memento_allocator* memento_allocator = new (mem)x_memento_allocator();
+		memento_allocator->m_allocator = allocator;
+		memento_allocator->m_memento.m_internal_mem_allocator = allocator;
+		memento_allocator->m_memento.Memento_init(config);
+		return memento_allocator;
 	}
 
 }
