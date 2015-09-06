@@ -153,9 +153,9 @@ namespace xcore
 		int					m_freemaxsizekeep;		/// The maximum size of memory to keep in the free list
 		int					m_freeskipsizemin;		/// Do not add those that are smaller than this size in the free list
 		int					m_freeskipsizemax;		/// Do not add those that are larger than this size in the free list
-		int					m_failat;
 		int					m_paranoia;
 		int					m_paranoidAt;
+		int					m_breakAt;
 		int					m_pattern;
 		s64					m_maxmemory;
 		unsigned int		m_ptrsearch;			/// 65536
@@ -171,9 +171,9 @@ namespace xcore
 			m_freemaxsizekeep = 32 * 1024 * 1024;	/// 32 MB 
 			m_freeskipsizemin = 0;
 			m_freeskipsizemax = 1 * 1024 * 1024;	/// 1 MB
-			m_failat = 0;
 			m_paranoia = 1024;
 			m_paranoidAt = 0;
+			m_breakAt = 0;
 			m_pattern = 0;
 			m_maxmemory = 128 * 1024 * 1024;
 			m_maxmemory *= 1024;
