@@ -8,7 +8,8 @@ using namespace xcore;
 
 extern x_iallocator* gSystemAllocator;
 
-class x_memento_testreporter : public x_memento_report
+
+class x_memento_testreporter : public x_memento_reporter
 {
 public:
 	virtual void print(const char* format, const char* str) 
@@ -39,20 +40,30 @@ public:
 };
 
 
+class x_memento_testhandler : public x_memento_handler
+{
+public:
+	virtual void			breakpoint(x_memento* m)
+	{
+
+	}
+};
+
+
 UNITTEST_SUITE_BEGIN(x_allocator_memento)
 {
 	UNITTEST_FIXTURE(main)
 	{
 		x_memento_testreporter	memento_reporter;
-		x_iallocator*			memento_allocator;
-		x_memento_config		memento_config;
+		x_memento_testhandler	memento_handler;
+		x_memento*				memento_allocator;
 
 		UNITTEST_FIXTURE_SETUP()
 		{
-			memento_config.init(&memento_reporter);
-			memento_config.m_freemaxsizekeep = 0;	/// Do not keep any allocations
-
-			memento_allocator = gCreateMementoAllocator(memento_config, gSystemAllocator);
+			memento_allocator = gCreateMementoAllocator(gSystemAllocator);
+			memento_allocator->set_handler(&memento_handler);
+			memento_allocator->set_reporter(&memento_reporter);
+			memento_allocator->set_freelist(0, 0, 0);
 		}
 
 		UNITTEST_FIXTURE_TEARDOWN()
@@ -62,7 +73,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_memento)
 
 		UNITTEST_TEST(alloc_preguard)
 		{
-			u32* data = (u32*)memento_allocator->allocate(32, 8);
+			u32* data = (u32*)memento_allocator->allocate(32, 8, __FILE__, __LINE__);
 			u32 const g = data[-1];
 			data[-1] = 100;
 			memento_allocator->deallocate(data);
