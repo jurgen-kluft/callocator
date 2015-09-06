@@ -8,7 +8,7 @@ using namespace xcore;
 
 extern x_iallocator* gSystemAllocator;
 
-class x_memento_print_test : public x_memento_print
+class x_memento_testreporter : public x_memento_report
 {
 public:
 	virtual void print(const char* format, const char* str) 
@@ -43,13 +43,13 @@ UNITTEST_SUITE_BEGIN(x_allocator_memento)
 {
 	UNITTEST_FIXTURE(main)
 	{
-		x_memento_print_test	memento_printer;
+		x_memento_testreporter	memento_reporter;
 		x_iallocator*			memento_allocator;
 		x_memento_config		memento_config;
 
 		UNITTEST_FIXTURE_SETUP()
 		{
-			memento_config.init(&memento_printer);
+			memento_config.init(&memento_reporter);
 			memento_config.m_freemaxsizekeep = 0;	/// Do not keep any allocations
 
 			memento_allocator = gCreateMementoAllocator(memento_config, gSystemAllocator);

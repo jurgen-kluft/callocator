@@ -138,7 +138,7 @@
 //==============================================================================
 namespace xcore
 {
-	class x_memento_print
+	class x_memento_report
 	{
 	public:
 		virtual void			print(const char* format, const char* str) = 0;
@@ -148,7 +148,7 @@ namespace xcore
 
 	struct x_memento_config
 	{
-		x_memento_print*	m_print;
+		x_memento_report*	m_report;
 
 		int					m_freemaxsizekeep;		/// The maximum size of memory to keep in the free list
 		int					m_freeskipsizemin;		/// Do not add those that are smaller than this size in the free list
@@ -158,10 +158,16 @@ namespace xcore
 		int					m_paranoidAt;
 		int					m_pattern;
 		s64					m_maxmemory;
+		unsigned int		m_ptrsearch;			/// 65536
 
-		void init(x_memento_print* print)
+		int					m_headguardfillpattern;
+		int					m_tailguardfillpattern;
+		int					m_allocfillpattern;
+		int					m_freefillpattern;
+
+		void init(x_memento_report* report)
 		{
-			m_print = print;
+			m_report = report;
 			m_freemaxsizekeep = 32 * 1024 * 1024;	/// 32 MB 
 			m_freeskipsizemin = 0;
 			m_freeskipsizemax = 1 * 1024 * 1024;	/// 1 MB
@@ -171,6 +177,11 @@ namespace xcore
 			m_pattern = 0;
 			m_maxmemory = 128 * 1024 * 1024;
 			m_maxmemory *= 1024;
+			m_ptrsearch = 65536;
+			m_headguardfillpattern = 0xAFAFAFAF;
+			m_tailguardfillpattern = 0xDBDBDBDB;
+			m_allocfillpattern = 0xCDCDCDCD;
+			m_freefillpattern = 0xFEFEFEFE;
 		}
 	};
 
