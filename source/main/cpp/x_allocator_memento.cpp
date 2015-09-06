@@ -116,12 +116,11 @@ namespace xcore
 			BlockHeaderList	free;
 			size_t			freeListSize;
 			int				sequence;
-			int				paranoia;
-			int				paranoidAt;
 			int				countdown;
 			int				lastChecked;
-			int				breakAt;
 			int				failAt;
+			int				breakAt;
+			int				paranoia;
 			int				failing;
 			int				nextFailAt;
 			int				squeezeAt;
@@ -172,8 +171,6 @@ namespace xcore
 			int						check_all_memory(void);
 			int						check(void);
 
-			int						set_paranoia(int);
-			int						paranoid_at(int);
 			int						break_at(int);
 			void					break_on_free(void *a);
 			void					break_on_realloc(void *a);
@@ -466,10 +463,6 @@ namespace xcore
 			return 0;
 		}
 
-#define VALGRIND_MAKE_MEM_DEFINED(a,b)
-#define VALGRIND_MAKE_MEM_NOACCESS(a,b)
-#define VALGRIND_MAKE_MEM_UNDEFINED(a,b)
-
 		int Instance::app_block(BlockHeaderList *blks, Functor& func, void *arg, BlockHeader *b)
 		{
 			BlockHeader *head = blks->head;
@@ -575,10 +568,6 @@ namespace xcore
 			return (int)(*a - *b);
 		}
 
-#define MEMENTO_UNDERLYING_MALLOC(size, align)	m_internal_mem_allocator->allocate(size, align)
-#define MEMENTO_UNDERLYING_FREE(ptr) m_internal_mem_allocator->deallocate(ptr)
-#define MEMENTO_UNDERLYING_REALLOC(ptr, size) m_internal_mem_allocator->reallocate(ptr, size, 4)
-
 		int Instance::list_blocks_nested(void)
 		{
 			int count, size, i;
@@ -596,7 +585,7 @@ namespace xcore
 			}
 
 			/* Make our block list */
-			blocks = (void**)MEMENTO_UNDERLYING_MALLOC(sizeof(void *) * count, sizeof(void*));
+			blocks = (void**)m_internal_mem_allocator->allocate(sizeof(void *) * count, sizeof(void*));
 			if (blocks == NULL)
 				return 1;
 
@@ -678,13 +667,12 @@ namespace xcore
 			m_config.m_report->print(" Total number of blocks = %d\n", 1, count);
 			m_config.m_report->print(" Total size of blocks = %d\n", 1, size);
 
-			MEMENTO_UNDERLYING_FREE(blocks);
+			m_internal_mem_allocator->deallocate(blocks);
 
 			/* Now put the blocks back for valgrind */
 			for (b = m_globals.used.head; b;)
 			{
 				BlockHeader *next = b->next;
-				VALGRIND_MAKE_MEM_NOACCESS(b, sizeof(*b));
 				b = next;
 			}
 
@@ -769,9 +757,9 @@ namespace xcore
 			}
 		}
 
-		static void Memento_inited(void)
+		static void initialized(void)
 		{
-			/* A good place for a breakpoint */
+			/// -> A good place for a breakpoint
 		}
 
 		void Instance::initialize(x_memento_config const& config)
@@ -785,23 +773,28 @@ namespace xcore
 			m_globals.used.tail = &m_globals.used.head;
 			m_globals.free.head = NULL;
 			m_globals.free.tail = &m_globals.free.head;
+
 			m_globals.sequence = 0;
 			m_globals.countdown = 1024;
 
-			//@JURGEN
-			//atexit(finalize);
+			m_globals.paranoia = m_config.m_paranoia;
+			m_globals.countdown = m_globals.paranoia;
 
-			Memento_inited();
+			m_globals.breakAt = m_config.m_breakAt;
+
+			m_globals.pattern = m_config.m_pattern;
+
+			initialized();
 		}
 
 		void Instance::signal(void)
 		{
 			m_globals.segv = 1;
 
-			/* If we just return from this function the SEGV will be unhandled, and
-			 * we'll launch into whatever JIT debugging system the OS provides. At
-			 * least m_config.m_report->print(something useful first. If MEMENTO_NOJIT is set, then
-			 * just exit to avoid the JIT (and get the usual atexit handling). */
+			/// If we just return from this function the SEGV will be unhandled, and
+			/// we'll launch into whatever JIT debugging system the OS provides. At
+			/// least m_config.m_report->print(something useful first. If MEMENTO_NOJIT is set, then
+			/// just exit to avoid the JIT (and get the usual atexit handling).
 
 			finalize();
 		}
@@ -817,8 +810,7 @@ namespace xcore
 				m_globals.nextFailAt = m_globals.sequence + 1;
 				m_globals.pattern = 0;
 				m_globals.patternBit = 0;
-				//signal(SIGSEGV, &xcore::Instance::Memento_signal);
-				//signal(SIGABRT, Memento_signal);
+
 				breakpoint();
 			}
 		}
@@ -826,15 +818,15 @@ namespace xcore
 		void Instance::event(void)
 		{
 			m_globals.sequence++;
-			if ((m_globals.sequence >= m_globals.paranoidAt) && (m_globals.paranoidAt != 0))
+			if ((m_globals.sequence >= m_config.m_paranoidAt) && (m_config.m_paranoidAt != 0))
 			{
-				m_globals.paranoia = 1;
+				m_config.m_paranoia = 1;
 				m_globals.countdown = 1;
 			}
 			if (--m_globals.countdown == 0)
 			{
 				check_all_memory();
-				m_globals.countdown = m_globals.paranoia;
+				m_globals.countdown = m_config.m_paranoia;
 			}
 
 			if (m_globals.sequence == m_globals.breakAt)
@@ -844,21 +836,13 @@ namespace xcore
 			}
 		}
 
-		int Instance::break_at(int event)
-		{
-			m_globals.breakAt = event;
-			return event;
-		}
-
 		void * Instance::label(void *ptr, const char *label)
 		{
 			BlockHeader *block;
 			if (ptr == NULL)
 				return NULL;
 			block = BlockHeader::s_blocktoheader(ptr);
-			VALGRIND_MAKE_MEM_DEFINED(&block->label, sizeof(block->label));
 			block->label = label;
-			VALGRIND_MAKE_MEM_UNDEFINED(&block->label, sizeof(block->label));
 			return ptr;
 		}
 
@@ -875,7 +859,7 @@ namespace xcore
 
 			event();
 
-			if ((m_globals.sequence >= m_globals.failAt) && (m_globals.failAt != 0))
+			if ((m_globals.sequence >= m_config.m_failat) && (m_config.m_failat != 0))
 				start_failing();
 
 			if (!m_globals.failing)
@@ -883,13 +867,13 @@ namespace xcore
 
 			failThisOne = ((m_globals.patternBit & m_globals.pattern) == 0);
 
-			/* If we are failing, and we've reached the end of the pattern and we've
-			 * still got bits available in the pattern word, and we haven't already
-			 * set a nextPattern, then extend the pattern. */
+			/// If we are failing, and we've reached the end of the pattern and we've
+			/// still got bits available in the pattern word, and we haven't already
+			/// set a nextPattern, then extend the pattern.
 			if (m_globals.failing && ((~(m_globals.patternBit - 1) & m_globals.pattern) == 0) && (m_globals.patternBit != 0) && m_globals.nextPattern == 0)
 			{
-				/* We'll fail this one, and set the 'next' one to pass it. */
-				m_globals.nextFailAt = m_globals.failAt;
+				/// We'll fail this one, and set the 'next' one to pass it.
+				m_globals.nextFailAt = m_config.m_failat;
 				m_globals.nextPattern = m_globals.pattern | m_globals.patternBit;
 			}
 
@@ -913,7 +897,7 @@ namespace xcore
 			if (m_globals.maxMemory != 0 && m_globals.alloc + s > m_globals.maxMemory)
 				return NULL;
 
-			void * alloc = MEMENTO_UNDERLYING_MALLOC(smem, a);
+			void * alloc = m_internal_mem_allocator->allocate(smem, a);
 			if (alloc == NULL)
 				return NULL;
 
@@ -1032,7 +1016,7 @@ namespace xcore
 			}
 			else
 			{
-				MEMENTO_UNDERLYING_FREE(memblk->toalloc());
+				m_internal_mem_allocator->deallocate(memblk->toalloc());
 			}
 		}
 
@@ -1055,19 +1039,16 @@ namespace xcore
 			if (check_block_action(memblk, "realloc"))
 				return NULL;
 
-			VALGRIND_MAKE_MEM_DEFINED(memblk, sizeof(*memblk));
 			if (memblk->flags & Flag_BreakOnRealloc)
 				breakpoint();
 
-			VALGRIND_MAKE_MEM_DEFINED(memblk, sizeof(*memblk));
 			if (m_globals.maxMemory != 0 && m_globals.alloc - memblk->blksize + newsize > m_globals.maxMemory)
 				return NULL;
 
 			u32 newsizemem = BlockHeader::s_allocsize(newsize, align);
 			remove_block(&m_globals.used, memblk);
-			VALGRIND_MAKE_MEM_DEFINED(memblk, sizeof(*memblk));
 			int flags = memblk->flags;
-			BlockHeader *newmemblk = (BlockHeader*)MEMENTO_UNDERLYING_REALLOC(memblk->toalloc(), newsizemem);
+			BlockHeader *newmemblk = (BlockHeader*)m_internal_mem_allocator->reallocate(memblk->toalloc(), newsizemem, align);
 			if (newmemblk == NULL)
 			{
 				add_blockhead(&m_globals.used, memblk, 2);
@@ -1234,19 +1215,6 @@ namespace xcore
 				}
 			}
 			return 0;
-		}
-
-		int Instance::set_paranoia(int i)
-		{
-			m_globals.paranoia = i;
-			m_globals.countdown = m_globals.paranoia;
-			return i;
-		}
-
-		int Instance::paranoid_at(int i)
-		{
-			m_globals.paranoidAt = i;
-			return i;
 		}
 
 		int Instance::get_blocknum(void *b)
