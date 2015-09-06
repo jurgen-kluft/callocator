@@ -156,9 +156,9 @@ namespace xcore
 		struct Instance
 		{
 			Globals					m_globals;
-			NullPrint				m_stdout_null;
+			NullPrint				m_null_reporter;
 
-			x_iallocator*			m_internal_mem_allocator;
+			x_iallocator*			m_allocator;
 			x_memento_config		m_config;
 
 			void					initialize(x_memento_config const& config);
@@ -190,8 +190,8 @@ namespace xcore
 			void *					mrealloc(void *, unsigned int s);
 			void					mfree(void *);
 
-			void					add_blockhead(BlockHeaderList *blks, BlockHeader *b, int type);
-			void					add_blocktail(BlockHeaderList *blks, BlockHeader *b, int type);
+			void					add_blockhead(BlockHeaderList *blks, BlockHeader *b);
+			void					add_blocktail(BlockHeaderList *blks, BlockHeader *b);
 			int						internal_check_allocedblock(BlockHeader *b, void *arg);
 			int						internal_check_freedblock(BlockHeader *b, void *arg);
 			void					remove_block(BlockHeaderList *blks, BlockHeader *b);
@@ -214,7 +214,7 @@ namespace xcore
 			/// A handy externally visible function for breakpointing
 		}
 
-		void Instance::add_blockhead(BlockHeaderList *blks, BlockHeader *b, int type)
+		void Instance::add_blockhead(BlockHeaderList *blks, BlockHeader *b)
 		{
 			if (blks->tail == &blks->head)
 			{
@@ -231,7 +231,7 @@ namespace xcore
 			}
 		}
 
-		void Instance::add_blocktail(BlockHeaderList *blks, BlockHeader *b, int type)
+		void Instance::add_blocktail(BlockHeaderList *blks, BlockHeader *b)
 		{
 			*blks->tail = b;
 			blks->tail = &b->next;
@@ -246,8 +246,8 @@ namespace xcore
 		struct BlkCheckData
 		{
 			int found;
-			int preCorrupt;
-			int postCorrupt;
+			int corrupted_headguard;
+			int corrupted_tailguard;
 			int freeCorrupt;
 			int index;
 		};
@@ -271,7 +271,7 @@ namespace xcore
 
 				if (corrupt)
 				{
-					data->preCorrupt = 1;
+					data->corrupted_headguard = 1;
 					corrupt = 0;
 				}
 
@@ -285,11 +285,11 @@ namespace xcore
 
 				if (corrupt)
 				{
-					data->postCorrupt = 1;
+					data->corrupted_tailguard = 1;
 					corrupt = 0;
 				}
 
-				if ((data->freeCorrupt | data->preCorrupt | data->postCorrupt) == 0)
+				if ((data->freeCorrupt | data->corrupted_headguard | data->corrupted_tailguard) == 0)
 				{
 					b->lastOk = m_globals.sequence;
 				}
@@ -478,9 +478,9 @@ namespace xcore
 			return result;
 		}
 
-		static void showBlock(BlockHeader *b, int space, x_memento_report* printer)
+		static void show_block(BlockHeader *b, int space, x_memento_report* printer)
 		{
-			printer->print("0x%p:", b->toblock());
+			printer->print("0x%016x:", b->toblock());
 			printer->print("(size=%d,num=%d)", 2, (int)b->blksize, b->sequence);
 			if (b->label)
 			{
@@ -508,11 +508,11 @@ namespace xcore
 				n -= i;
 				printer->print("%s", &"                                "[32 - i]);
 			}
-			showBlock(b, '\t', printer);
+			show_block(b, '\t', printer);
 			printer->print("%s", "\n");
 		}
 
-		static int Memento_listBlock(BlockHeader *b, void *arg, x_memento_report* printer)
+		static int s_list_block(BlockHeader *b, void *arg, x_memento_report* printer)
 		{
 			int *counts = (int *)arg;
 			blockDisplay(b, 0, printer);
@@ -521,29 +521,29 @@ namespace xcore
 			return 0;
 		}
 
-		static int Memento_listNewBlock(BlockHeader *b, void *arg, x_memento_report* printer)
+		static int s_list_newblock(BlockHeader *b, void *arg, x_memento_report* printer)
 		{
 			if (b->flags & Flag_OldBlock)
 				return 0;
 			b->flags |= Flag_OldBlock;
-			return Memento_listBlock(b, arg, printer);
+			return s_list_block(b, arg, printer);
 		}
 
-		class memento_listnewblock_functor : public Functor
+		class listnewblock_functor : public Functor
 		{
 			x_memento_report* m_printer;
 		public:
-			inline		memento_listnewblock_functor(x_memento_report* printer) : m_printer(printer) {}
+			inline		listnewblock_functor(x_memento_report* printer) : m_printer(printer) {}
 
 			virtual int dofunc(BlockHeader * blkh, void * arg)
 			{
-				return Memento_listNewBlock(blkh, arg, m_printer);
+				return s_list_newblock(blkh, arg, m_printer);
 			}
 		};
 
 		static void doNestedDisplay(BlockHeader *b, int depth, x_memento_report* printer)
 		{
-			/* Try and avoid recursion if we can help it */
+			/// Try and avoid recursion if we can help it
 			do
 			{
 				blockDisplay(b, depth, printer);
@@ -575,7 +575,7 @@ namespace xcore
 			void **blocks, *minptr, *maxptr;
 			long mask;
 
-			/* Count the blocks */
+			/// Count the blocks
 			count = 0;
 			size = 0;
 			for (b = m_globals.used.head; b; b = b->next)
@@ -584,12 +584,12 @@ namespace xcore
 				count++;
 			}
 
-			/* Make our block list */
-			blocks = (void**)m_internal_mem_allocator->allocate(sizeof(void *) * count, sizeof(void*));
+			/// Make our block list 
+			blocks = (void**)m_allocator->allocate(sizeof(void *) * count, sizeof(void*));
 			if (blocks == NULL)
 				return 1;
 
-			/* Populate our block list */
+			/// Populate our block list
 			b = m_globals.used.head;
 			minptr = maxptr = b->toblock();
 			mask = (long)minptr;
@@ -609,7 +609,7 @@ namespace xcore
 			}
 			qsort(blocks, count, sizeof(void *), ptrcmp);
 
-			/* Now, calculate tree */
+			/// Now, calculate tree
 			for (b = m_globals.used.head; b; b = b->next)
 			{
 				char *p = (char*)b->toblock();
@@ -619,20 +619,20 @@ namespace xcore
 					void *q = *(void **)(&p[i]);
 					void **r;
 
-					/* Do trivial checks on pointer */
+					/// Do trivial checks on pointer
 					if ((mask & (int)q) != mask || q < minptr || q > maxptr)
 						continue;
 
-					/* Search for pointer */
+					/// Search for pointer
 					r = (void**)bsearch(&q, blocks, count, sizeof(void *), ptrcmp);
 					if (r)
 					{
-						/* Found child */
+						/// Found child
 						BlockHeader *child = BlockHeader::s_blocktoheader(*r);
 						BlockHeader *parent;
 
-						/* We're assuming tree structure, not graph - ignore second
-						 * and subsequent pointers. */
+						/// We're assuming tree structure, not graph - ignore second
+						/// and subsequent pointers.
 						if (child->parent != NULL)
 							continue;
 						if (child->flags & Flag_HasParent)
@@ -642,8 +642,8 @@ namespace xcore
 						if (child == b)
 							continue;
 
-						/* We're also assuming acyclicness here. If this is one of
-						 * our parents, ignore it. */
+						/// We're also assuming acyclicness here. If this is one of
+						/// our parents, ignore it.
 						parent = b->parent;
 						while (parent != NULL && parent != child)
 							parent = parent->parent;
@@ -658,7 +658,7 @@ namespace xcore
 				}
 			}
 
-			/* Now display with nesting */
+			/// Now display with nesting
 			for (b = m_globals.used.head; b; b = b->next)
 			{
 				if ((b->flags & Flag_HasParent) == 0)
@@ -667,14 +667,7 @@ namespace xcore
 			m_config.m_report->print(" Total number of blocks = %d\n", 1, count);
 			m_config.m_report->print(" Total size of blocks = %d\n", 1, size);
 
-			m_internal_mem_allocator->deallocate(blocks);
-
-			/* Now put the blocks back for valgrind */
-			for (b = m_globals.used.head; b;)
-			{
-				BlockHeader *next = b->next;
-				b = next;
-			}
+			m_allocator->deallocate(blocks);
 
 			return 0;
 		}
@@ -688,7 +681,7 @@ namespace xcore
 				int counts[2];
 				counts[0] = 0;
 				counts[1] = 0;
-				memento_listnewblock_functor f(m_config.m_report);
+				listnewblock_functor f(m_config.m_report);
 				app_blocks(&m_globals.used, f, &counts[0]);
 				m_config.m_report->print(" Total number of blocks = %d\n", 1, counts[0]);
 				m_config.m_report->print(" Total size of blocks = %d\n", 1, counts[1]);
@@ -701,7 +694,7 @@ namespace xcore
 			counts[0] = 0;
 			counts[1] = 0;
 			m_config.m_report->print("%s", "Blocks allocated and still extant since last list:\n");
-			memento_listnewblock_functor f(m_config.m_report);
+			listnewblock_functor f(m_config.m_report);
 			app_blocks(&m_globals.used, f, &counts[0]);
 			m_config.m_report->print("  Total number of blocks = %d\n", 1, counts[0]);
 			m_config.m_report->print("  Total size of blocks = %d\n", 1, counts[1]);
@@ -775,8 +768,6 @@ namespace xcore
 			m_globals.free.tail = &m_globals.free.head;
 
 			m_globals.sequence = 0;
-			m_globals.countdown = 1024;
-
 			m_globals.paranoia = m_config.m_paranoia;
 			m_globals.countdown = m_globals.paranoia;
 
@@ -853,13 +844,13 @@ namespace xcore
 			if (!m_globals.inited)
 			{
 				x_memento_config config;
-				config.init(&m_stdout_null);
+				config.init(&m_null_reporter);
 				initialize(config);
 			}
 
 			event();
 
-			if ((m_globals.sequence >= m_config.m_failat) && (m_config.m_failat != 0))
+			if ((m_globals.sequence >= m_globals.failAt) && (m_globals.failAt != 0))
 				start_failing();
 
 			if (!m_globals.failing)
@@ -873,7 +864,7 @@ namespace xcore
 			if (m_globals.failing && ((~(m_globals.patternBit - 1) & m_globals.pattern) == 0) && (m_globals.patternBit != 0) && m_globals.nextPattern == 0)
 			{
 				/// We'll fail this one, and set the 'next' one to pass it.
-				m_globals.nextFailAt = m_config.m_failat;
+				m_globals.nextFailAt = m_globals.failAt;
 				m_globals.nextPattern = m_globals.pattern | m_globals.patternBit;
 			}
 
@@ -897,7 +888,7 @@ namespace xcore
 			if (m_globals.maxMemory != 0 && m_globals.alloc + s > m_globals.maxMemory)
 				return NULL;
 
-			void * alloc = m_internal_mem_allocator->allocate(smem, a);
+			void * alloc = m_allocator->allocate(smem, a);
 			if (alloc == NULL)
 				return NULL;
 
@@ -923,7 +914,7 @@ namespace xcore
 			memblk->label = 0;
 			memblk->child = NULL;
 			memblk->sibling = NULL;
-			add_blockhead(&m_globals.used, memblk, 0);
+			add_blockhead(&m_globals.used, memblk);
 
 			return block;
 		}
@@ -950,27 +941,31 @@ namespace xcore
 				app_block(&m_globals.used, f, &data, memblk);
 				if (!data.found)
 				{
-					/* Failure! */
+					/// Failure!
 					m_config.m_report->print("Attempt to %s block ", action);
-					showBlock(memblk, 32, m_config.m_report);
+					show_block(memblk, 32, m_config.m_report);
 					m_config.m_report->print("%s", "\n");
 					breakpoint();
 					return 1;
 				}
-				else if (data.preCorrupt || data.postCorrupt)
+				else if (data.corrupted_headguard || data.corrupted_tailguard)
 				{
 					m_config.m_report->print("%s", "Block ");
-					showBlock(memblk, ' ', m_config.m_report);
+					show_block(memblk, ' ', m_config.m_report);
 					m_config.m_report->print(" found to be corrupted on %s!\n", action);
-					if (data.preCorrupt)
+					if (data.corrupted_headguard && data.corrupted_tailguard)
 					{
-						m_config.m_report->print("%s", "Preguard corrupted\n");
+						m_config.m_report->print("%s", "    Block head & tail-guard corrupted\n");
 					}
-					if (data.postCorrupt)
+					else if (data.corrupted_headguard)
 					{
-						m_config.m_report->print("%s", "Postguard corrupted\n");
+						m_config.m_report->print("%s", "    Block head-guard corrupted\n");
 					}
-					m_config.m_report->print("Block last checked OK at allocation %d. Now %d.\n", 2, memblk->lastOk, m_globals.sequence);
+					else if (data.corrupted_tailguard)
+					{
+						m_config.m_report->print("%s", "    Block tail-guard corrupted\n");
+					}
+					m_config.m_report->print("    Block checked OK at sequence %d. Now at sequence %d.\n", 2, memblk->lastOk, m_globals.sequence);
 					breakpoint();
 					return 1;
 				}
@@ -980,21 +975,19 @@ namespace xcore
 
 		void Instance::mfree(void *blk)
 		{
-			BlockHeader *memblk;
+			if (blk == NULL)
+				return;
 
 			if (!m_globals.inited)
 			{
 				x_memento_config config;
-				config.init(&m_stdout_null);
+				config.init(&m_null_reporter);
 				initialize(config);
 			}
 
 			event();
 
-			if (blk == NULL)
-				return;
-
-			memblk = BlockHeader::s_blocktoheader(blk);
+			BlockHeader * memblk = BlockHeader::s_blocktoheader(blk);
 			if (check_block_action(memblk, "free"))
 				return;
 
@@ -1012,11 +1005,11 @@ namespace xcore
 				{
 					memset(memblk->toblock(), m_config.m_freefillpattern, memblk->blksize);
 				}
-				add_blocktail(&m_globals.free, memblk, 1);
+				add_blocktail(&m_globals.free, memblk);
 			}
 			else
 			{
-				m_internal_mem_allocator->deallocate(memblk->toalloc());
+				m_allocator->deallocate(memblk->toalloc());
 			}
 		}
 
@@ -1048,10 +1041,10 @@ namespace xcore
 			u32 newsizemem = BlockHeader::s_allocsize(newsize, align);
 			remove_block(&m_globals.used, memblk);
 			int flags = memblk->flags;
-			BlockHeader *newmemblk = (BlockHeader*)m_internal_mem_allocator->reallocate(memblk->toalloc(), newsizemem, align);
+			BlockHeader *newmemblk = (BlockHeader*)m_allocator->reallocate(memblk->toalloc(), newsizemem, align);
 			if (newmemblk == NULL)
 			{
-				add_blockhead(&m_globals.used, memblk, 2);
+				add_blockhead(&m_globals.used, memblk);
 				return NULL;
 			}
 
@@ -1079,7 +1072,7 @@ namespace xcore
 				memset(newmemblk->headguard(), m_config.m_headguardfillpattern, newmemblk->headguard_size());
 				memset(newmemblk->tailguard(), m_config.m_tailguardfillpattern, newmemblk->tailguard_size());
 			}
-			add_blockhead(&m_globals.used, newmemblk, 2);
+			add_blockhead(&m_globals.used, newmemblk);
 			return newmemblk->toblock();
 		}
 
@@ -1098,7 +1091,7 @@ namespace xcore
 			BlkCheckData *data = (BlkCheckData *)arg;
 
 			internal_check_allocedblock(memblk, data);
-			if (data->preCorrupt || data->postCorrupt)
+			if (data->corrupted_headguard || data->corrupted_tailguard)
 			{
 				if ((data->found & 2) == 0)
 				{
@@ -1106,23 +1099,29 @@ namespace xcore
 					data->found |= 2;
 				}
 				m_config.m_report->print("%s", "  Block ");
-				showBlock(memblk, ' ', m_config.m_report);
-				if (data->preCorrupt)
+				show_block(memblk, ' ', m_config.m_report);
+				if (data->corrupted_headguard && data->corrupted_tailguard)
 				{
-					m_config.m_report->print("%s", " Preguard ");
+					m_config.m_report->print("%s", "head & tail");
 				}
-				if (data->postCorrupt)
+				else if (data->corrupted_headguard)
 				{
-					m_config.m_report->print("%s Postguard ", (data->preCorrupt ? "&" : ""));
+					m_config.m_report->print("%s", "head");
 				}
-				m_config.m_report->print("%s", "corrupted.\n");
-				m_config.m_report->print("    Block last checked OK at allocation %d. Now %d.\n", 2, memblk->lastOk, m_globals.sequence);
-				data->preCorrupt = 0;
-				data->postCorrupt = 0;
+				else if (data->corrupted_tailguard)
+				{
+					m_config.m_report->print("%s", "tail");
+				}
+				m_config.m_report->print("%s", " guard corrupted.\n");
+				m_config.m_report->print("    Block last checked OK at sequence %d. Now at sequence %d.\n", 2, memblk->lastOk, m_globals.sequence);
+				data->corrupted_headguard = 0;
+				data->corrupted_tailguard = 0;
 				data->freeCorrupt = 0;
 			}
 			else
+			{
 				memblk->lastOk = m_globals.sequence;
+			}
 			return 0;
 		}
 
@@ -1131,7 +1130,7 @@ namespace xcore
 			BlkCheckData *data = (BlkCheckData *)arg;
 
 			internal_check_freedblock(memblk, data);
-			if (data->preCorrupt || data->postCorrupt || data->freeCorrupt)
+			if (data->corrupted_headguard || data->corrupted_tailguard || data->freeCorrupt)
 			{
 				if ((data->found & 4) == 0)
 				{
@@ -1139,36 +1138,40 @@ namespace xcore
 					data->found |= 4;
 				}
 				m_config.m_report->print("%s", "  ");
-				showBlock(memblk, ' ', m_config.m_report);
+				show_block(memblk, ' ', m_config.m_report);
 
 				if (data->freeCorrupt)
 				{
 					m_config.m_report->print(" index %d", 1, data->index);
 					m_config.m_report->print(" (address 0x%p) onwards", &((char *)memblk->toblock())[data->index]);
-					if (data->preCorrupt)
+					if (data->corrupted_headguard)
 					{
-						m_config.m_report->print("%s", "+ preguard");
+						m_config.m_report->print("%s", "+ head-guard");
 					}
-					if (data->postCorrupt)
+					if (data->corrupted_tailguard)
 					{
-						m_config.m_report->print("%s", "+ postguard");
+						m_config.m_report->print("%s", "+ tail-guard");
 					}
 				}
 				else
 				{
-					if (data->preCorrupt)
+					if (data->corrupted_headguard && data->corrupted_tailguard)
 					{
-						m_config.m_report->print("%s", " preguard");
+						m_config.m_report->print("%s", " head & tail guard");
 					}
-					if (data->postCorrupt)
+					else if (data->corrupted_headguard)
 					{
-						m_config.m_report->print("%s Postguard", (data->preCorrupt ? "+" : ""));
+						m_config.m_report->print("%s", " head guard");
+					}
+					else if (data->corrupted_tailguard)
+					{
+						m_config.m_report->print("%s", " tail guard");
 					}
 				}
 				m_config.m_report->print("%s", " corrupted.\n");
-				m_config.m_report->print("    Block last checked OK at allocation %d. Now %d.\n", 2, memblk->lastOk, m_globals.sequence);
-				data->preCorrupt = 0;
-				data->postCorrupt = 0;
+				m_config.m_report->print("    Block last checked OK at sequence %d. Now at sequence %d.\n", 2, memblk->lastOk, m_globals.sequence);
+				data->corrupted_headguard = 0;
+				data->corrupted_tailguard = 0;
 				data->freeCorrupt = 0;
 			}
 			else
@@ -1209,7 +1212,8 @@ namespace xcore
 				app_blocks(&m_globals.used, checkAllAlloced, &data);
 				checkallfreed_functor checkAllFreed(this);
 				app_blocks(&m_globals.free, checkAllFreed, &data);
-				if (data.found & 6) {
+				if (data.found & 6) 
+				{
 					breakpoint();
 					return 1;
 				}
@@ -1230,17 +1234,17 @@ namespace xcore
 		{
 			int result;
 
-			m_config.m_report->print("%s", "Checking memory\n");
+			m_config.m_report->print("%s", "MEMENTO: Begin; checking memory\n");
 			result = check_all_memory();
-			m_config.m_report->print("%s", "Memory checked!\n");
+			m_config.m_report->print("%s", "MEMENTO: End; checking memory\n");
 			return result;
 		}
 
 		struct findBlkData
 		{
-			void              *addr;
-			BlockHeader *blk;
-			int                flags;
+			void*			addr;
+			BlockHeader*	blk;
+			int				flags;
 		};
 
 		static int Memento_containsAddr(BlockHeader *b, void *arg)
@@ -1291,8 +1295,8 @@ namespace xcore
 			if (data.blk != NULL)
 			{
 				m_config.m_report->print("Address 0x%p ", data.addr);
-				m_config.m_report->print("is in %s allocated block ", (data.flags == 1 ? "" : (data.flags == 2 ? "preguard of " : "postguard of ")));
-				showBlock(data.blk, ' ', m_config.m_report);
+				m_config.m_report->print("is in %s allocated block ", (data.flags == 1 ? "" : (data.flags == 2 ? "head-guard of " : "tail-guard of ")));
+				show_block(data.blk, ' ', m_config.m_report);
 				m_config.m_report->print("%s", "\n");
 				return data.blk->sequence;
 			}
@@ -1302,8 +1306,8 @@ namespace xcore
 			if (data.blk != NULL)
 			{
 				m_config.m_report->print("Address 0x%p ", data.addr);
-				m_config.m_report->print("is in %s freed block ", (data.flags == 1 ? "" : (data.flags == 2 ? "preguard of " : "postguard of ")));
-				showBlock(data.blk, ' ', m_config.m_report);
+				m_config.m_report->print("is in %s freed block ", (data.flags == 1 ? "" : (data.flags == 2 ? "head-guard of " : "tail-guard of ")));
+				show_block(data.blk, ' ', m_config.m_report);
 				m_config.m_report->print("%s", "\n");
 				return data.blk->sequence;
 			}
@@ -1322,8 +1326,8 @@ namespace xcore
 			if (data.blk != NULL)
 			{
 				m_config.m_report->print("Will stop when address 0x%p ", data.addr);
-				m_config.m_report->print("(in %sallocated block ", (data.flags == 1 ? "" : (data.flags == 2 ? "preguard of " : "postguard of ")));
-				showBlock(data.blk, ' ', m_config.m_report);
+				m_config.m_report->print("(in %sallocated block ", (data.flags == 1 ? "" : (data.flags == 2 ? "head-guard of " : "tail-guard of ")));
+				show_block(data.blk, ' ', m_config.m_report);
 				m_config.m_report->print("%s", ") is freed\n");
 				data.blk->flags |= Flag_BreakOnFree;
 				return;
@@ -1334,8 +1338,8 @@ namespace xcore
 			if (data.blk != NULL)
 			{
 				m_config.m_report->print("Can't stop on free; address 0x%p ", data.addr);
-				m_config.m_report->print("is in %sfreed block ", (data.flags == 1 ? "" : (data.flags == 2 ? "preguard of " : "postguard of ")));
-				showBlock(data.blk, ' ', m_config.m_report);
+				m_config.m_report->print("is in %sfreed block ", (data.flags == 1 ? "" : (data.flags == 2 ? "head-guard of " : "tail-guard of ")));
+				show_block(data.blk, ' ', m_config.m_report);
 				m_config.m_report->print("%s", "\n");
 				return;
 			}
@@ -1354,8 +1358,8 @@ namespace xcore
 			if (data.blk != NULL)
 			{
 				m_config.m_report->print("Will stop when address 0x%p ", data.addr);
-				m_config.m_report->print("(in %sallocated block ", (data.flags == 1 ? "" : (data.flags == 2 ? "preguard of " : "postguard of ")));
-				showBlock(data.blk, ' ', m_config.m_report);
+				m_config.m_report->print("(in %sallocated block ", (data.flags == 1 ? "" : (data.flags == 2 ? "head-guard of " : "tail-guard of ")));
+				show_block(data.blk, ' ', m_config.m_report);
 				m_config.m_report->print("%s", ") is freed (or realloced)\n");
 				data.blk->flags |= Flag_BreakOnFree | Flag_BreakOnRealloc;
 				return;
@@ -1366,9 +1370,9 @@ namespace xcore
 			app_blocks(&m_globals.free, containsAddr, &data);
 			if (data.blk != NULL)
 			{
-				m_config.m_report->print("Can't stop on free/realloc; address 0x%p ", (data.flags == 1 ? "" : (data.flags == 2 ? "preguard of " : "postguard of ")));
-				m_config.m_report->print("is in %sfreed block ", (data.flags == 1 ? "" : (data.flags == 2 ? "preguard of " : "postguard of ")));
-				showBlock(data.blk, ' ', m_config.m_report);
+				m_config.m_report->print("Can't stop on free/realloc; address 0x%p ", (data.flags == 1 ? "" : (data.flags == 2 ? "head-guard of " : "tail-guard of ")));
+				m_config.m_report->print("is in %sfreed block ", (data.flags == 1 ? "" : (data.flags == 2 ? "head-guard of " : "tail-guard of ")));
+				show_block(data.blk, ' ', m_config.m_report);
 				m_config.m_report->print("%s", "\n");
 				return;
 			}
@@ -1436,7 +1440,7 @@ namespace xcore
 		void* mem = allocator->allocate(sizeof(x_memento_allocator), sizeof(void*));
 		x_memento_allocator* memento_allocator = new (mem)x_memento_allocator();
 		memento_allocator->m_allocator = allocator;
-		memento_allocator->m_memento.m_internal_mem_allocator = allocator;
+		memento_allocator->m_memento.m_allocator = allocator;
 		memento_allocator->m_memento.initialize(config);
 		return memento_allocator;
 	}

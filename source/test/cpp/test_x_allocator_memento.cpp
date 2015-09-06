@@ -18,7 +18,7 @@ public:
 
 	virtual void print(const char* format, void* ptr) 
 	{ 
-		xconsole::write(format, x_va_list(x_va(ptr)));
+		xconsole::write(format, x_va_list(x_va((u64)ptr)));
 	}
 
 	virtual void print(const char* format, int n, int value1, int value2 = 0, int value3 = 0, int value4 = 0) 
