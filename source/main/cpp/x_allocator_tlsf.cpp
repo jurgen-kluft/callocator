@@ -331,18 +331,18 @@ namespace xcore
 	**   simplify the implementation.
 	** - The next_free / prev_free fields are only valid if the block is free.
 	*/
-	typedef struct block_header_t
+	struct block_header_t
 	{
 		/* Points to the previous physical block. */
-		struct block_header_t* prev_phys_block;
+		block_header_t* prev_phys_block;
 
 		/* The size of this block, excluding the block header. */
 		size_t size;
 
 		/* Next and previous free blocks. */
-		struct block_header_t* next_free;
-		struct block_header_t* prev_free;
-	} block_header_t;
+		block_header_t* next_free;
+		block_header_t* prev_free;
+	};
 
 	/*
 	** Since block sizes are always at least a multiple of 4, the two least
@@ -360,8 +360,7 @@ namespace xcore
 	static const size_t block_header_overhead = sizeof(size_t);
 
 	/* User data starts directly after the size field in a used block. */
-	static const size_t block_start_offset =
-		offsetof(block_header_t, size) + sizeof(size_t);
+	static const size_t block_start_offset = X_OFFSET_OF(block_header_t, size) + sizeof(size_t);
 
 	/*
 	** A free block must be large enough to store its header minus the size of
@@ -374,7 +373,7 @@ namespace xcore
 
 
 	/* The TLSF control structure. */
-	typedef struct control_t
+	struct control_t
 	{
 		/* Empty lists point at this block to indicate they are free. */
 		block_header_t block_null;
@@ -385,7 +384,7 @@ namespace xcore
 
 		/* Head of free lists. */
 		block_header_t* blocks[FL_INDEX_COUNT][SL_INDEX_COUNT];
-	} control_t;
+	};
 
 	/* A type used for casting when doing pointer arithmetic. */
 	typedef ptrdiff_t tlsfptr_t;
