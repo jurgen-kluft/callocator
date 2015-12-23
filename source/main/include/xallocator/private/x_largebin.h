@@ -44,7 +44,7 @@ namespace xcore
 		};
 
 		static inline void*		advance_ptr(void* ptr, u32 size)		{ return (void*)((xbyte*)ptr + size); }
-		static inline void*		align_ptr(void* ptr, u32 alignment)		{ return (void*)(((X_PTR_SIZED_INT)ptr + (alignment-1)) & ~(alignment-1)); }
+		static inline void*		align_ptr(void* ptr, u32 alignment)		{ return (void*)(((X_PTR_SIZED_INT)ptr + (alignment-1)) & ~((uptr)alignment-1)); }
 		static inline void*		mark_ptr_0(void* ptr, u8 bit)			{ return (void*)((X_PTR_SIZED_INT)ptr & ~((X_PTR_SIZED_INT)1<<bit)); }
 		static inline void*		mark_ptr_1(void* ptr, u8 bit)			{ return (void*)((X_PTR_SIZED_INT)ptr | ((X_PTR_SIZED_INT)1<<bit)); }
 		static inline bool		get_ptr_mark(void* ptr, u8 bit)			{ u32 const field = (1<<bit); return ((X_PTR_SIZED_INT)ptr&field) != 0; }
