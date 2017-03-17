@@ -14,7 +14,7 @@ func GetPackage() *denv.Package {
 	xentrypkg := xentry.GetPackage()
 	xbasepkg := xbase.GetPackage()
 
-	// The main (xhash) package
+	// The main (xallocator) package
 	mainpkg := denv.NewPackage("xallocator")
 	mainpkg.AddPackage(xunittestpkg)
 	mainpkg.AddPackage(xentrypkg)
@@ -25,7 +25,7 @@ func GetPackage() *denv.Package {
 	mainlib.Dependencies = append(mainlib.Dependencies, xbasepkg.GetMainLib())
 
 	// 'xallocator' unittest project
-	maintest := denv.SetupDefaultCppTestProject("xhash_test", "github.com\\jurgen-kluft\\xallocator")
+	maintest := denv.SetupDefaultCppTestProject("xallocator_test", "github.com\\jurgen-kluft\\xallocator")
 	maintest.Dependencies = append(maintest.Dependencies, xunittestpkg.GetMainLib())
 	maintest.Dependencies = append(maintest.Dependencies, xentrypkg.GetMainLib())
 	maintest.Dependencies = append(maintest.Dependencies, xbasepkg.GetMainLib())
