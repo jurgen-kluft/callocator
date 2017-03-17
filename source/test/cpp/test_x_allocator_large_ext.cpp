@@ -28,39 +28,39 @@ UNITTEST_SUITE_BEGIN(x_allocator_large_ext)
 
         UNITTEST_TEST(advance_ptr1)
         {
-			void* ptr1 = (void*)0x4000;
-			void* ptr2 = xexternal::advance_ptr(ptr1, 0x100);
-			CHECK_EQUAL((void*)0x4100, ptr2);
-			void* ptr3 = xexternal::advance_ptr(ptr1, 0x1000);
-			CHECK_EQUAL((void*)0x5000, ptr3);
+			xexternal::memptr ptr1 = (xexternal::memptr)0x4000;
+			xexternal::memptr ptr2 = xexternal::advance_ptr(ptr1, 0x100);
+			CHECK_EQUAL((xexternal::memptr)0x4100, ptr2);
+			xexternal::memptr ptr3 = xexternal::advance_ptr(ptr1, 0x1000);
+			CHECK_EQUAL((xexternal::memptr)0x5000, ptr3);
 		}
 
 		UNITTEST_TEST(align_ptr1)
         {
-			void* ptr1 = (void*)0x4010;
-			void* ptr2 = xexternal::align_ptr(ptr1, 0x100);
-			CHECK_EQUAL((void*)0x4100, ptr2);
-			void* ptr3 = xexternal::align_ptr(ptr1, 0x10);
-			CHECK_EQUAL((void*)0x4010, ptr3);
+			xexternal::memptr ptr1 = (xexternal::memptr)0x4010;
+			xexternal::memptr ptr2 = xexternal::align_ptr(ptr1, 0x100);
+			CHECK_EQUAL((xexternal::memptr)0x4100, ptr2);
+			xexternal::memptr ptr3 = xexternal::align_ptr(ptr1, 0x10);
+			CHECK_EQUAL((xexternal::memptr)0x4010, ptr3);
 		}
 
 		UNITTEST_TEST(mark_ptr_01)
         {
-			void* ptr1 = (void*)0x4010;
-			void* ptr2 = xexternal::mark_ptr_0(ptr1, 4);
-			CHECK_EQUAL((void*)0x4000, ptr2);
+			xexternal::memptr ptr1 = (xexternal::memptr)0x4010;
+			xexternal::memptr ptr2 = xexternal::mark_ptr_0(ptr1, 4);
+			CHECK_EQUAL((xexternal::memptr)0x4000, ptr2);
 		}
 
 		UNITTEST_TEST(mark_ptr_11)
         {
-			void* ptr1 = (void*)0x4000;
-			void* ptr2 = xexternal::mark_ptr_1(ptr1, 4);
-			CHECK_EQUAL((void*)0x4010, ptr2);
+			xexternal::memptr ptr1 = (xexternal::memptr)0x4000;
+			xexternal::memptr ptr2 = xexternal::mark_ptr_1(ptr1, 4);
+			CHECK_EQUAL((xexternal::memptr)0x4010, ptr2);
 		}
 
 		UNITTEST_TEST(get_ptr_mark1)
         {
-			void* ptr1 = (void*)0x4010;
+			xexternal::memptr ptr1 = (xexternal::memptr)0x4010;
 			bool mark1 = xexternal::get_ptr_mark(ptr1, 1);
 			CHECK_FALSE(mark1);
 			bool mark2 = xexternal::get_ptr_mark(ptr1, 4);
@@ -69,15 +69,15 @@ UNITTEST_SUITE_BEGIN(x_allocator_large_ext)
 
 		UNITTEST_TEST(get_ptr1)
         {
-			void* ptr1 = (void*)0x4010;
-			void* ptr2 = xexternal::get_ptr(ptr1, 5);
-			CHECK_EQUAL((void*)0x4000, ptr2);
+			xexternal::memptr ptr1 = (xexternal::memptr)0x4010;
+			xexternal::memptr ptr2 = xexternal::get_ptr(ptr1, 5);
+			CHECK_EQUAL((xexternal::memptr)0x4000, ptr2);
 		}
 
 		UNITTEST_TEST(diff_ptr1)
 		{
-			void* ptr1 = (void*)0x00000;
-			void* ptr2 = (void*)0x00010;
+			xexternal::memptr ptr1 = (xexternal::memptr)0x00000;
+			xexternal::memptr ptr2 = (xexternal::memptr)0x00010;
 			uptr d1 = xexternal::diff_ptr(ptr1, ptr2);
 			CHECK_EQUAL(0x00010, d1);
 		}

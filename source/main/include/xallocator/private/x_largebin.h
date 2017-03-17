@@ -44,19 +44,21 @@ namespace xcore
 			u32					mAddressAlignment;
 		};
 
-		static inline void*		advance_ptr(void* ptr, u32 size)		{ return (void*)((xbyte*)ptr + size); }
-		static inline void*		align_ptr(void* ptr, u32 alignment)		{ return (void*)(((X_PTR_SIZED_INT)ptr + (alignment-1)) & ~((uptr)alignment-1)); }
-		static inline void*		mark_ptr_0(void* ptr, u8 bit)			{ return (void*)((X_PTR_SIZED_INT)ptr & ~((X_PTR_SIZED_INT)1<<bit)); }
-		static inline void*		mark_ptr_1(void* ptr, u8 bit)			{ return (void*)((X_PTR_SIZED_INT)ptr | ((X_PTR_SIZED_INT)1<<bit)); }
-		static inline bool		get_ptr_mark(void* ptr, u8 bit)			{ u32 const field = (1<<bit); return ((X_PTR_SIZED_INT)ptr&field) != 0; }
-		static inline void*		get_ptr(void* ptr, u8 used_bits)		{ return (void*)((X_PTR_SIZED_INT)ptr & ~(((X_PTR_SIZED_INT)1<<used_bits)-1)); }
-		static xsize_t			diff_ptr(void* ptr, void* next_ptr)		{ return (xsize_t)((xbyte*)next_ptr - (xbyte*)ptr); }
+		typedef	u32				memptr;
+
+		static inline memptr	advance_ptr(memptr ptr, u32 size)		{ return (memptr)(ptr + size); }
+		static inline memptr	align_ptr(memptr ptr, u32 alignment)	{ return (memptr)((ptr + (alignment-1)) & ~((memptr)alignment-1)); }
+		static inline memptr	mark_ptr_0(memptr ptr, u8 bit)			{ return (memptr)(ptr & ~((memptr)1<<bit)); }
+		static inline memptr	mark_ptr_1(memptr ptr, u8 bit)			{ return (memptr)(ptr | ((memptr)1<<bit)); }
+		static inline bool		get_ptr_mark(memptr ptr, u8 bit)		{ u32 const field = (1<<bit); return ((memptr)ptr&field) != 0; }
+		static inline memptr	get_ptr(memptr ptr, u8 used_bits)		{ return (memptr)(ptr & ~(((memptr)1<<used_bits)-1)); }
+		static xsize_t			diff_ptr(memptr ptr, memptr next_ptr)	{ return (xsize_t)(next_ptr - ptr); }
 
 		struct xlnode : public xrbnode31
 		{
 			enum EState { STATE_USED=1, STATE_FREE=0, USED_BIT=0, USED_BITS=1 };
 
-			u32				offset;				// (4) pointer in external memory
+			memptr			ptr;				// (4) pointer in external memory
 			u32				next;				// (2) linear list ordered by physical address
 			u32				prev;				// (2)  
 		};
@@ -71,7 +73,7 @@ namespace xcore
 
 		static inline void		init_node(xlnode* node, u32 offset, xlnode::EState state, u32 next, u32 prev, u32 nill)
 		{
-			node->offset = (state==xlnode::STATE_USED) ? (offset | xlnode::USED_BIT) : (offset | xlnode::USED_BIT);
+			node->ptr = (state==xlnode::STATE_USED) ? (offset | xlnode::USED_BIT) : (offset | xlnode::USED_BIT);
 			node->next = next;
 			node->prev = prev;
 			node->clear(nill);
@@ -94,7 +96,7 @@ namespace xcore
 		static inline xsize_t	get_size(xlnode* nodePtr, x_iidx_allocator* a)
 		{
 			xlnode* nextNodePtr = (xlnode*)a->to_ptr(nodePtr->next);
-			xsize_t const nodeSize  = (nextNodePtr->offset & ~xlnode::USED_BITS) - (nodePtr->offset & ~xlnode::USED_BITS);
+			xsize_t const nodeSize  = (nextNodePtr->ptr & ~xlnode::USED_BITS) - (nodePtr->ptr & ~xlnode::USED_BITS);
 			return nodeSize;
 		}
 	}
