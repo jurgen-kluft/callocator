@@ -8,7 +8,7 @@
 #pragma once 
 #endif
 
-#include "xbase\private\x_rbtree15.h"
+#include "xbase\private\x_rbtree31.h"
 #include "xbase\x_idx_allocator.h"
 
 //==============================================================================
@@ -19,8 +19,9 @@ namespace xcore
 	namespace xexternal
 	{
 		// An allocator that manages 'external' memory with book keeping data outside of that memory.
-		// Every allocation and every free chunk will occupy 1 16 bytes structure.
-		// Maximum number of used/free-chunks (nodes) is 32768.
+		// Every allocation and every free chunk will occupy 1 28 bytes structure.
+		// Maximum number of used/free-chunks (nodes) is 2 * 1024 * 1024 * 1024.
+		// Maximum size of memory that can be managed is 2 GB
 		// The 'size_alignment' and 'address_alignment should be smartly initialized since:
 		//  - you may increase the amount of wasted memory (size alignment and/or address alignment to large)
 		//  - you may decrease the performance (size alignment to small)
@@ -36,9 +37,9 @@ namespace xcore
 		private:
 			x_iidx_allocator*	mNodeAllocator;				// Max. 32768 nodes (xrbnode15)
 			void*				mBaseAddress;				// Base address of the memory we are managing
-			u16					mRootSizeTree;				// First node of our internal tree, key=size
-			u16					mRootAddrTree;				// First node of our internal tree, key=address
-			u16					mNodeListHead;
+			u32					mRootSizeTree;				// First node of our internal tree, key=size
+			u32					mRootAddrTree;				// First node of our internal tree, key=address
+			u32					mNodeListHead;
 			u32					mSizeAlignment;
 			u32					mAddressAlignment;
 		};
@@ -51,16 +52,16 @@ namespace xcore
 		static inline void*		get_ptr(void* ptr, u8 used_bits)		{ return (void*)((X_PTR_SIZED_INT)ptr & ~(((X_PTR_SIZED_INT)1<<used_bits)-1)); }
 		static xsize_t			diff_ptr(void* ptr, void* next_ptr)		{ return (xsize_t)((xbyte*)next_ptr - (xbyte*)ptr); }
 
-		struct xlnode : public xrbnode15
+		struct xlnode : public xrbnode31
 		{
 			enum EState { STATE_USED=1, STATE_FREE=0, USED_BIT=0, USED_BITS=1 };
 
-			void*			ptr;				// (4) pointer to external memory
-			u16				next;				// (2) linear list ordered by physical address
-			u16				prev;				// (2)  
+			u32				offset;				// (4) pointer in external memory
+			u32				next;				// (2) linear list ordered by physical address
+			u32				prev;				// (2)  
 		};
 
-		static inline xlnode*	allocate_node(x_iidx_allocator* allocator, u16& outNodeIdx)
+		static inline xlnode*	allocate_node(x_iidx_allocator* allocator, u32& outNodeIdx)
 		{
 			void* nodePtr;
 			outNodeIdx = allocator->iallocate(nodePtr);
@@ -68,9 +69,9 @@ namespace xcore
 			return node;
 		}
 
-		static inline void		init_node(xlnode* node, void* ptr, xlnode::EState state, u16 next, u16 prev, u16 nill)
+		static inline void		init_node(xlnode* node, u32 offset, xlnode::EState state, u32 next, u32 prev, u32 nill)
 		{
-			node->ptr  = (state==xlnode::STATE_USED) ? mark_ptr_1(ptr, xlnode::USED_BIT) : mark_ptr_0(ptr, xlnode::USED_BIT);
+			node->offset = (state==xlnode::STATE_USED) ? (offset | xlnode::USED_BIT) : (offset | xlnode::USED_BIT);
 			node->next = next;
 			node->prev = prev;
 			node->clear(nill);
@@ -93,7 +94,7 @@ namespace xcore
 		static inline xsize_t	get_size(xlnode* nodePtr, x_iidx_allocator* a)
 		{
 			xlnode* nextNodePtr = (xlnode*)a->to_ptr(nodePtr->next);
-			xsize_t const nodeSize  = diff_ptr(get_ptr(nextNodePtr->ptr, xlnode::USED_BITS), get_ptr(nodePtr->ptr, xlnode::USED_BITS));
+			xsize_t const nodeSize  = (nextNodePtr->offset & ~xlnode::USED_BITS) - (nodePtr->offset & ~xlnode::USED_BITS);
 			return nodeSize;
 		}
 	}
