@@ -10,6 +10,7 @@ Some allocators in this package:
 
 * dlmalloc
 * tlsf
+* allocator with seperated bookkeeping
 * forward (like a ring buffer)
 * fixed size allocator
 * freelist
