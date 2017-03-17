@@ -911,7 +911,7 @@ namespace xcore
 	static void default_walker(void* ptr, size_t size, int used, void* user)
 	{
 		(void)user;
-		x_printf("\t%p %s size: %x (%p)\n", ptr, used ? "used" : "free", (unsigned int)size, block_from_ptr(ptr));
+		xcore::Printf("\t%p %s size: %x (%p)\n", ptr, used ? "used" : "free", (unsigned int)size, block_from_ptr(ptr));
 	}
 
 	void tlsf_walk_pool(pool_t pool, tlsf_walker walker, void* user)
@@ -1000,7 +1000,7 @@ namespace xcore
 
 		if (((ptrdiff_t)mem % ALIGN_SIZE) != 0)
 		{
-			x_printf("tlsf_add_pool: Memory must be aligned by %u bytes.\n",
+			xcore::Printf("tlsf_add_pool: Memory must be aligned by %u bytes.\n",
 				(unsigned int)ALIGN_SIZE);
 			return 0;
 		}
@@ -1008,11 +1008,11 @@ namespace xcore
 		if (pool_bytes < block_size_min || pool_bytes > block_size_max)
 		{
 	#if defined (TLSF_64BIT)
-			x_printf("tlsf_add_pool: Memory size must be between 0x%x and 0x%x00 bytes.\n", 
+			xcore::Printf("tlsf_add_pool: Memory size must be between 0x%x and 0x%x00 bytes.\n", 
 				(unsigned int)(pool_overhead + block_size_min),
 				(unsigned int)((pool_overhead + block_size_max) / 256));
 	#else
-			x_printf("tlsf_add_pool: Memory size must be between %u and %u bytes.\n", 
+			xcore::Printf("tlsf_add_pool: Memory size must be between %u and %u bytes.\n", 
 				(unsigned int)(pool_overhead + block_size_min),
 				(unsigned int)(pool_overhead + block_size_max));
 	#endif
@@ -1080,7 +1080,7 @@ namespace xcore
 
 		if (rv)
 		{
-			x_printf("tlsf_create: %x ffs/fls tests failed!\n", rv);
+			xcore::Printf("tlsf_create: %x ffs/fls tests failed!\n", rv);
 		}
 		return rv;
 	}
@@ -1097,7 +1097,7 @@ namespace xcore
 
 		if (((tlsfptr_t)mem % ALIGN_SIZE) != 0)
 		{
-			x_printf("tlsf_create: Memory must be aligned to %u bytes.\n",
+			xcore::Printf("tlsf_create: Memory must be aligned to %u bytes.\n",
 				(unsigned int)ALIGN_SIZE);
 			return 0;
 		}
