@@ -2,14 +2,15 @@
 
 A library containing many different allocators using a simple allocator interface:
 
-* virtual void*		allocate(xsize_t size, u32 align) = 0;			///< Allocate memory with alignment
-* virtual void*		reallocate(void* p, xsize_t size, u32 align) = 0;///< Reallocate memory
-* virtual void		deallocate(void* p) = 0;						///< Deallocate/Free memory
+* ```virtual void*		allocate(xsize_t size, u32 align) = 0;			///< Allocate memory with alignment```
+* ```virtual void*		reallocate(void* p, xsize_t size, u32 align) = 0;///< Reallocate memory```
+* ```virtual void		deallocate(void* p) = 0;						///< Deallocate/Free memory```
 
 Some allocators in this package:
 
 * dlmalloc
 * tlsf
+* allocator with seperated bookkeeping
 * forward (like a ring buffer)
 * fixed size allocator
 * freelist
