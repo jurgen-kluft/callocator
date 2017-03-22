@@ -17,7 +17,10 @@ UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_idx_allocator_array);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_idx_allocator_pool);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_small_ext);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_large_ext);
+UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_large16_ext);
+UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_large32_ext);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_memento);
+
 
 namespace xcore
 {

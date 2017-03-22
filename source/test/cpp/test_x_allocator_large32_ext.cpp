@@ -1,7 +1,7 @@
 #include "xbase\x_allocator.h"
 #include "xbase\x_idx_allocator.h"
 #include "xallocator\x_allocator_freelist.h"
-#include "xallocator\private\x_largebin.h"
+#include "xallocator\private\x_largebin32.h"
 
 #include "xunittest\xunittest.h"
 
@@ -10,7 +10,7 @@ using namespace xcore;
 extern x_iallocator* gSystemAllocator;
 
 
-UNITTEST_SUITE_BEGIN(x_allocator_large_ext)
+UNITTEST_SUITE_BEGIN(x_allocator_large32_ext)
 {
     UNITTEST_FIXTURE(main)
     {
@@ -18,7 +18,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_large_ext)
 
         UNITTEST_FIXTURE_SETUP()
 		{
-			gIdxAllocator = gCreateFreeListIdxAllocator(gSystemAllocator, sizeof(xexternal::xlnode), 8, 65536);
+			gIdxAllocator = gCreateFreeListIdxAllocator(gSystemAllocator, sizeof(xexternal32::xlnode), 8, 65536);
 		}
 
         UNITTEST_FIXTURE_TEARDOWN()
@@ -28,33 +28,33 @@ UNITTEST_SUITE_BEGIN(x_allocator_large_ext)
 
         UNITTEST_TEST(advance_ptr1)
         {
-			xexternal::memptr ptr1 = (xexternal::memptr)0x4000;
-			xexternal::memptr ptr2 = xexternal::advance_ptr(ptr1, 0x100);
-			CHECK_EQUAL((xexternal::memptr)0x4100, ptr2);
-			xexternal::memptr ptr3 = xexternal::advance_ptr(ptr1, 0x1000);
-			CHECK_EQUAL((xexternal::memptr)0x5000, ptr3);
+			xexternal32::memptr ptr1 = (xexternal32::memptr)0x4000;
+			xexternal32::memptr ptr2 = xexternal32::advance_ptr(ptr1, 0x100);
+			CHECK_EQUAL((xexternal32::memptr)0x4100, ptr2);
+			xexternal32::memptr ptr3 = xexternal32::advance_ptr(ptr1, 0x1000);
+			CHECK_EQUAL((xexternal32::memptr)0x5000, ptr3);
 		}
 
 		UNITTEST_TEST(align_ptr1)
         {
-			xexternal::memptr ptr1 = (xexternal::memptr)0x4010;
-			xexternal::memptr ptr2 = xexternal::align_ptr(ptr1, 0x100);
-			CHECK_EQUAL((xexternal::memptr)0x4100, ptr2);
-			xexternal::memptr ptr3 = xexternal::align_ptr(ptr1, 0x10);
-			CHECK_EQUAL((xexternal::memptr)0x4010, ptr3);
+			xexternal32::memptr ptr1 = (xexternal32::memptr)0x4010;
+			xexternal32::memptr ptr2 = xexternal32::align_ptr(ptr1, 0x100);
+			CHECK_EQUAL((xexternal32::memptr)0x4100, ptr2);
+			xexternal32::memptr ptr3 = xexternal32::align_ptr(ptr1, 0x10);
+			CHECK_EQUAL((xexternal32::memptr)0x4010, ptr3);
 		}
 
 		UNITTEST_TEST(diff_ptr1)
 		{
-			xexternal::memptr ptr1 = (xexternal::memptr)0x00000;
-			xexternal::memptr ptr2 = (xexternal::memptr)0x00010;
-			uptr d1 = xexternal::diff_ptr(ptr1, ptr2);
+			xexternal32::memptr ptr1 = (xexternal32::memptr)0x00000;
+			xexternal32::memptr ptr2 = (xexternal32::memptr)0x00010;
+			uptr d1 = xexternal32::diff_ptr(ptr1, ptr2);
 			CHECK_EQUAL(0x00010, d1);
 		}
 
 		UNITTEST_TEST(init1)
         {
-			xexternal::xlargebin sb;
+			xexternal32::xlargebin sb;
 			CHECK_EQUAL(0, gIdxAllocator->size());
 			sb.init((void*)0x80000000, 65536, 64, 4, gIdxAllocator);
 			CHECK_EQUAL(5, gIdxAllocator->size());
@@ -64,7 +64,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_large_ext)
 
 		UNITTEST_TEST(allocate1)
 		{
-			xexternal::xlargebin sb;
+			xexternal32::xlargebin sb;
 			CHECK_EQUAL(0, gIdxAllocator->size());
 			sb.init((void*)0x80000000, 65536, 64, 4, gIdxAllocator);
 			CHECK_EQUAL(5, gIdxAllocator->size());
@@ -78,7 +78,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_large_ext)
 	
 		UNITTEST_TEST(allocate2)
 		{
-			xexternal::xlargebin sb;
+			xexternal32::xlargebin sb;
 			void* base = (void*)0x80000000;
 			CHECK_EQUAL(0, gIdxAllocator->size());
 			sb.init(base, 65536, 2048, 32, gIdxAllocator);
@@ -105,7 +105,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_large_ext)
 
 		UNITTEST_TEST(allocate3)
 		{
-			xexternal::xlargebin sb;
+			xexternal32::xlargebin sb;
 			void* base = (void*)0x80000000;
 			CHECK_EQUAL(0, gIdxAllocator->size());
 			sb.init(base, 1 * 1024 * 1024 * 1024, 256, 256, gIdxAllocator);

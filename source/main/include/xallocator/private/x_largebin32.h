@@ -1,25 +1,23 @@
 //==============================================================================
 //  x_largebin.h
 //==============================================================================
-#ifndef __X_ALLOCATOR_LARGE_BIN_H__
-#define __X_ALLOCATOR_LARGE_BIN_H__
+#ifndef __X_ALLOCATOR_LARGE_BIN32_H__
+#define __X_ALLOCATOR_LARGE_BIN32_H__
 #include "xbase\x_target.h"
 #ifdef USE_PRAGMA_ONCE 
 #pragma once 
 #endif
 
-#include "xbase\private\x_rbtree.h"
-#include "xbase\x_allocator.h"
+#include "xbase\private\x_rbtree31.h"
+#include "xbase\x_idx_allocator.h"
 
 //==============================================================================
 // xCore namespace
 //==============================================================================
 namespace xcore
 {
-	namespace xexternal
+	namespace xexternal32
 	{
-		struct xlnode;
-
 		// An allocator that manages 'external' memory with book keeping data outside of that memory.
 		// Every allocation and every free chunk will occupy 1 28 bytes structure.
 		// Maximum number of used/free-chunks (nodes) is 2 * 1024 * 1024 * 1024.
@@ -31,7 +29,7 @@ namespace xcore
 		struct xlargebin
 		{
 			//@note: 'node_allocator' is used to allocate fixed size (16/32 bytes) structures
-			void				init		(void* mem_begin, u32 mem_size, u32 size_alignment, u32 address_alignment, x_iallocator* node_allocator);
+			void				init		(void* mem_begin, u32 mem_size, u32 size_alignment, u32 address_alignment, x_iidx_allocator* node_allocator);
 			void				release		();
 		
 			void*				allocate	(u32 size, u32 alignment);
@@ -39,11 +37,11 @@ namespace xcore
 
 		private:
 
-			x_iallocator*		mNodeAllocator;				// 
+			x_iidx_allocator*	mNodeAllocator;				// 
 			void*				mBaseAddress;				// Base address of the memory we are managing
-			xlnode*				mRootSizeTree;				// First node of our internal tree, key=size
-			xlnode*				mRootAddrTree;				// First node of our internal tree, key=address
-			xlnode*				mNodeListHead;
+			u32					mRootSizeTree;				// First node of our internal tree, key=size
+			u32					mRootAddrTree;				// First node of our internal tree, key=address
+			u32					mNodeListHead;
 			u32					mSizeAlignment;
 			u32					mAddressAlignment;
 		};
@@ -54,7 +52,7 @@ namespace xcore
 		static inline memptr	align_ptr(memptr ptr, u32 alignment)	{ return (memptr)((ptr + (alignment-1)) & ~((memptr)alignment-1)); }
 		static xsize_t			diff_ptr(memptr ptr, memptr next_ptr)	{ return (xsize_t)(next_ptr - ptr); }
 
-		struct xlnode : public xrbnode
+		struct xlnode : public xrbnode31
 		{
 			enum EState { STATE_USED=4, STATE_FREE=0 };
 
@@ -66,40 +64,41 @@ namespace xcore
 			bool			is_free() const				{ return (flags & STATE_USED) == STATE_FREE; }
 			bool			is_used() const				{ return (flags & STATE_USED) == STATE_USED; }
 
+			u32				next;						// (4) linear list ordered by physical address
+			u32				prev;						// (4)  
 			memptr			ptr;						// (4) pointer/offset in external memory
-			xlnode*			next;						// (4) linear list ordered by physical address
-			xlnode*			prev;						// (4)  
 		};
 
-		static inline xlnode*	allocate_node(x_iallocator* allocator)
+		static inline xlnode*	allocate_node(x_iidx_allocator* allocator, u32& outNodeIdx)
 		{
-			void* nodePtr = allocator->allocate(sizeof(xlnode), sizeof(void*));
+			void* nodePtr;
+			outNodeIdx = allocator->iallocate(nodePtr);
 			xlnode* node = (xlnode*)nodePtr;
 			return node;
 		}
 
-		static inline void		init_node(xlnode* node, u32 offset, xlnode::EState state, xlnode* next, xlnode* prev)
+		static inline void		init_node(xlnode* node, memptr offset, xlnode::EState state, u32 next, u32 prev, u32 nill)
 		{
-			node->clear(node);
+			node->clear(nill);
 			node->set_state(state);
-			node->ptr = offset;
 			node->next = next;
 			node->prev = prev;
+			node->ptr = offset;
 		}
 
-		static inline void		deallocate_node(xlnode* nodePtr, x_iallocator* allocator)
+		static inline void		deallocate_node(xlnode* nodePtr, x_iidx_allocator* allocator)
 		{
 			allocator->deallocate(nodePtr);
 		}
 
-		static inline xsize_t	get_size(xlnode* nodePtr)
+		static inline xsize_t	get_size(xlnode* nodePtr, x_iidx_allocator* a)
 		{
-			xlnode* nextNodePtr = nodePtr->next;
+			xlnode* nextNodePtr = (xlnode*)a->to_ptr(nodePtr->next);
 			xsize_t const nodeSize  = (nextNodePtr->ptr) - (nodePtr->ptr);
 			return nodeSize;
 		}
 	}
 };
 
-#endif	/// __X_ALLOCATOR_LARGE_BIN_H__
+#endif	/// __X_ALLOCATOR_LARGE_BIN32_H__
 

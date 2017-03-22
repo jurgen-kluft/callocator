@@ -20,32 +20,32 @@ namespace xcore
 
 		*/
 
-		static void			insert_size(u32 root, u32 node, x_iidx_allocator* node_allocator);
-		static bool			find_bestfit(u32 root, u32 size, u32 alignment, x_iidx_allocator* a, u32& outNode, u32& outNodeSize);
+		static void			insert_size(xlnode* root, xlnode* node);
+		static bool			find_bestfit(xlnode* root, u32 size, u32 alignment, xlnode*& outNode, u32& outNodeSize);
 
-		static void			insert_addr(u32 root, u32 node, x_iidx_allocator* node_allocator);
-		static bool			find_addr(u32 root, void* ptr, x_iidx_allocator* a, u32& outNode);
+		static void			insert_addr(xlnode* root, xlnode* node);
+		static bool			find_addr(xlnode* root, memptr ptr, xlnode*& outNode);
 
-		static xlnode*		insert_in_list(xlnode* nodep, u32 size, x_iidx_allocator* a, u32& newNode);
-		static void			remove_from_list(u32 node, x_iidx_allocator* a);
-		static void			remove_from_tree(u32 root, u32 node, x_iidx_allocator* a);
+		static xlnode*		insert_in_list(xlnode* nodep, u32 size, x_iallocator* a);
+		static void			remove_from_list(xlnode* node);
 
-		void				xlargebin::init(void* mem_begin, u32 mem_size, u32 size_alignment, u32 address_alignment, x_iidx_allocator* node_allocator)
+		static void			remove_from_tree(xlnode* root, xlnode* node);
+
+		void				xlargebin::init(void* mem_begin, u32 mem_size, u32 size_alignment, u32 address_alignment, x_iallocator* node_allocator)
 		{
-			x_iidx_allocator* a = node_allocator;
+			x_iallocator* a = node_allocator;
 
 			// Allocate the root nodes for the @size and @address tree
 			mNodeAllocator		= a;
-			allocate_node(a, mRootSizeTree);
-			allocate_node(a, mRootAddrTree);
+			mRootSizeTree		= allocate_node(a);
+			mRootAddrTree		= allocate_node(a);
+			init_node(mRootSizeTree, 0, xlnode::STATE_USED, mRootSizeTree, mRootSizeTree);
+			init_node(mRootAddrTree, 0, xlnode::STATE_USED, mRootAddrTree, mRootAddrTree);
 
 			mBaseAddress		= mem_begin;
-			mNodeListHead		= 0xffff;
+			mNodeListHead		= NULL;
 			mSizeAlignment		= size_alignment;
 			mAddressAlignment	= address_alignment;
-
-			u32 const size_nill = mRootSizeTree;
-			u32 const addr_nill = mRootAddrTree;
 
 			// The initial tree will contain 3 nodes, 2 nodes that define
 			// the span of the managed memory (begin - end). These 2 nodes
@@ -54,53 +54,43 @@ namespace xcore
 			// the tree is empty only these 2 nodes are left and the logic
 			// will figure out that there is no free memory.
 
-			u32 beginNodeIdx;
-			xlnode* beginNode = allocate_node(a, beginNodeIdx);
-			u32 endNodeIdx;
-			xlnode* endNode   = allocate_node(a, endNodeIdx);
-			u32 sizeNodeIdx;
-			xlnode* sizeNode  = allocate_node(a, sizeNodeIdx);
-
-			mNodeListHead = beginNodeIdx;
-			u32 mem_end = advance_ptr(0, mem_size);
+			xlnode* beginNode = allocate_node(a);
+			xlnode* sizeNode  = allocate_node(a);
+			xlnode* endNode   = allocate_node(a);
 
 			// Link these 3 nodes into a double linked list. This list will always be ordered by the
 			// address of the managed memory that is identified with the node.
 			// So after n allocations this list will contain n+3 nodes where every node will be
 			// pointing in managed memory increasingly higher.
-			init_node(sizeNode ,        0, xlnode::STATE_FREE, endNodeIdx  , beginNodeIdx, size_nill);
-			init_node(beginNode,        0, xlnode::STATE_USED, sizeNodeIdx , endNodeIdx  , size_nill);
-			init_node(endNode  , mem_size, xlnode::STATE_USED, beginNodeIdx, sizeNodeIdx , size_nill);
+			init_node(beginNode,        0, xlnode::STATE_USED, sizeNode , endNode  );
+			init_node(sizeNode ,        0, xlnode::STATE_FREE, endNode  , beginNode);
+			init_node(endNode  , mem_size, xlnode::STATE_USED, beginNode, sizeNode );
 
-			xlnode* sizeRoot = (xlnode*)a->to_ptr(mRootSizeTree);
-			init_node(sizeRoot, NULL, xlnode::STATE_USED, size_nill, size_nill, size_nill);
-			
+			mNodeListHead = beginNode;
+
 			// Add the 'initial' size node to the size tree
-			sizeRoot->set_left(sizeNodeIdx);
-
-			xlnode* addrRoot = (xlnode*)a->to_ptr(mRootAddrTree);
-			init_node(addrRoot, NULL, xlnode::STATE_USED, addr_nill, addr_nill, addr_nill);
+			insert_size(mRootSizeTree, sizeNode);
 		}
 
 		void				xlargebin::release	()
 		{
-			x_iidx_allocator* a = mNodeAllocator;
+			x_iallocator* a = mNodeAllocator;
 
 			// There are always at least 3 nodes so we can safely
 			// start the loop assuming mNodeListHead is not nill
-			u32 i = mNodeListHead;
+			xlnode* i = mNodeListHead;
 			do {
-				xlnode* n = (xlnode*)a->to_ptr(i);
+				xlnode* n = i;
 				i = n->next;
 				a->deallocate(n);
 			} while (i != mNodeListHead);
 
-			a->ideallocate(mRootSizeTree);
-			a->ideallocate(mRootAddrTree);
+			a->deallocate(mRootSizeTree);
+			a->deallocate(mRootAddrTree);
 
-			mRootSizeTree = 0xffff;
-			mRootAddrTree = 0xffff;
-			mNodeListHead = 0xffff;
+			mRootSizeTree = NULL;
+			mRootAddrTree = NULL;
+			mNodeListHead = NULL;
 
 			mSizeAlignment    = 0xffffffff;
 			mAddressAlignment = 0xffffffff;
@@ -108,26 +98,22 @@ namespace xcore
 		
 		void*				xlargebin::allocate	(u32 size, u32 alignment)
 		{
-			x_iidx_allocator* a = mNodeAllocator;
-
 			// Align the size up with 'mSizeAlignment'
 			// Align the alignment up with 'mAddressAlignment'
-			size      = x_intu::alignUp(size     , mSizeAlignment   );
-			alignment = x_intu::alignUp(alignment, mAddressAlignment);
+			size      = x_intu::alignUp(size, mSizeAlignment);
+			alignment = x_intu::max(alignment, mAddressAlignment);
 
 			// Find the first node in the size tree that has the same or larger size
 			// Start to iterate through the tree until we find a node that can hold
 			// our size+alignment.
-			u32 node;
+			xlnode* node;
 			u32 nodeSize;
-			if (find_bestfit(mRootSizeTree, size, alignment, a, node, nodeSize) == false)
+			if (find_bestfit(mRootSizeTree, size, alignment, node, nodeSize) == false)
 				return NULL;
-
-			xlnode* nodep = (xlnode*)xlnode::to_ptr(a, node);
 
 			// @TODO: We still need to check that if the alignment is very big to
 			//        have a new node take that wasted-space.
-			nodep->ptr    = align_ptr(nodep->ptr, alignment);
+			node->ptr    = align_ptr(node->ptr, alignment);
 
 			// Check if we have to split this node, if so do it, create a new node
 			// to hold the left-over size, insert it into the double linked list and
@@ -135,145 +121,140 @@ namespace xcore
 			if ((nodeSize - size) >= mSizeAlignment)
 			{
 				// Add to the linear list after 'node'
-				u32 newNode;
-				xlnode* newNodep = insert_in_list(nodep, size, a, newNode);
+				xlnode* newNodep = insert_in_list(node, size, mNodeAllocator);
 				if (newNodep == NULL)
 					return NULL;
 
-				// Insert this new node into the size tree
-				insert_size(mRootSizeTree, newNode, a);
+				// Insert this 'free' new node into the size tree
+				newNodep->set_free();
+				insert_size(mRootSizeTree, newNodep);
 			}
+
+			// Mark our node as used
+			node->set_used();
 
 			// Remove 'node' from the size tree since it is not available/free
 			// anymore
-			remove_from_tree(mRootSizeTree, node, a);
-
-			// Mark our node as used
-			nodep->ptr = mark_ptr_1(nodep->ptr, xlnode::USED_BIT);
+			remove_from_tree(mRootSizeTree, node);
 
 			// Insert our alloc node into the address tree so that we can find it when
 			// deallocate is called.
-			insert_addr(mRootAddrTree, node, a);
+			insert_addr(mRootAddrTree, node);
 
 			// Done...
 
-			return (void*)((uptr)mBaseAddress + get_ptr(nodep->ptr, xlnode::USED_BITS));
+			return (void*)((uptr)mBaseAddress + node->ptr);
 		}
 
 
 		void				xlargebin::deallocate	(void* ptr)
 		{
-			x_iidx_allocator* a = mNodeAllocator;
+			x_iallocator* a = mNodeAllocator;
+
+			memptr p = (xbyte*)ptr - (xbyte*)mBaseAddress;
 
 			// Find this address in the address-tree and remove it from there.
-			u32 node;
-			if (find_addr(mRootAddrTree, ptr, a, node)==false)
+			xlnode* node;
+			if (find_addr(mRootAddrTree, p, node)==false)
 				return;
 
 			// Remove the node from the tree, it is deallocated so it has no
 			// reason to be in this tree anymore.
-			remove_from_tree(mRootAddrTree, node, a);
+			remove_from_tree(mRootAddrTree, node);
 
-			xlnode* nodep = (xlnode*)xrbnode31::to_ptr(a, node);
-
-			u32 const next = nodep->next;
-			u32 const prev = nodep->prev;
-
-			xlnode* nextp = (xlnode*)xrbnode31::to_ptr(a, next);
-			xlnode* prevp = (xlnode*)xrbnode31::to_ptr(a, prev);
+			xlnode* next = node->next;
+			xlnode* prev = node->prev;
 
 			// Check if we can merge with our previous and next nodes, handle
 			// any merge and remove any obsolete node from the size-tree.
-			bool prev_used = get_ptr_mark(prevp->ptr, xlnode::USED_BIT);
-			bool next_used = get_ptr_mark(nextp->ptr, xlnode::USED_BIT);
+			bool prev_used = prev->is_used();
+			bool next_used = next->is_used();
 
 			// mark our node to indicate it is free now
-			nodep->ptr = mark_ptr_0(nodep->ptr, xlnode::USED_BIT);
+			node->set_free();
 
 			if (!prev_used)
-				remove_from_list(node, a);
+				remove_from_list(node);
 
 			if (!next_used)
 			{
-				remove_from_list(next, a);
-				remove_from_tree(mRootSizeTree, next, a);
+				remove_from_list(next);
+				remove_from_tree(mRootSizeTree, next);
 
 				// next has been merged so we can deallocate it
-				a->ideallocate(next);
+				a->deallocate(next);
 			}
 
 			// The size of 'prev' has changed if we have merged, so we need to pull
 			// out the 'prev' node from the size tree and re-insert it.
 			if (!prev_used)
 			{
-				remove_from_tree(mRootSizeTree, prev, a);
-				insert_size(mRootSizeTree, prev, a);
+				remove_from_tree(mRootSizeTree, prev);
+				insert_size(mRootSizeTree, prev);
 
 				// node has been merged with prev so it is not needed anymore
-				a->ideallocate(node);
+				a->deallocate(node);
 			}
 			else
 			{
 				// Insert node into the size tree
-				insert_size(mRootSizeTree, node, a);
+				insert_size(mRootSizeTree, node);
 			}
 
 			// Done...
 		}
 
 		// Size tree function implementations
-		static void			insert_size(u32 root, u32 node, x_iidx_allocator* a)
+		static void			insert_size(xlnode* root, xlnode* node)
 		{
-			xlnode* rootPtr = (xlnode*)a->to_ptr(root);
-			xlnode* nodePtr = (xlnode*)a->to_ptr(node);
+			ASSERT(node->is_free());
 		
-			xlnode* nextNodePtr = (xlnode*)a->to_ptr(nodePtr->next);
-			xsize_t const nodeSize  = diff_ptr(get_ptr(nextNodePtr->ptr, xlnode::USED_BITS), get_ptr(nodePtr->ptr, xlnode::USED_BITS));
+			xlnode* nill     = root;
+			xlnode* nextNode = node->next;
+			xsize_t const nodeSize  = diff_ptr(node->ptr, nextNode->ptr);
 
-			u32     lastNode  = root;
-			xlnode* lastNodep = rootPtr;
-			u32     curNode   = rootPtr->get_child(xlnode::LEFT);
-			xlnode* curNodep  = (xlnode*)(xrbnode31::to_ptr(a, curNode));
+			xlnode* lastNode  = root;
+			xlnode* curNode   = (xlnode*)root->get_child(xlnode::LEFT);
+
 			s32 s = xlnode::LEFT;
-			while (curNode != root)
+			while (curNode != nill)
 			{
 				lastNode  = curNode;
-				lastNodep = curNodep;
 
-				xlnode* nextNodep  = (xlnode*)xrbnode31::to_ptr(a, curNodep->next);
-				xsize_t const curSize = diff_ptr(get_ptr(curNodep->ptr, xlnode::USED_BITS), get_ptr(nextNodep->ptr, xlnode::USED_BITS));
+				xlnode* nextNode  = curNode->next;
+				xsize_t const curSize = diff_ptr(curNode->ptr, nextNode->ptr);
 
 				if (nodeSize < curSize)
 				{ s = xlnode::LEFT; }
 				else if (nodeSize > curSize)
 				{ s = xlnode::RIGHT; }
 				else
-				{	// Duplicate, insert it as a sibling
-					curNodep->insert_sibling(curNode, node, root, a);
-					return;	
+				{	// Identical size, sort them by address
+					if (node->ptr < curNode->ptr)
+					{ s = xlnode::LEFT; }
+					else
+					{ s = xlnode::RIGHT; }
 				}
-				curNode  = curNodep->get_child(s);
-				curNodep = (xlnode*)xrbnode31::to_ptr(a, curNode);
+				curNode  = (xlnode*)curNode->get_child(s);
 			}
 
-			rb31_attach_to(node, lastNode, s, a);
-			rb31_insert_fixup(root, node, a);
+			rb_attach_to(node, lastNode, s);
+			rb_insert_fixup(*root, node);
 
-	#ifdef DEBUG_RB15TREE
-			rb15_check(root, a);
+	#ifdef DEBUG_RBTREE
+			rb_check(root);
 	#endif
 		}
 
-		static bool	can_handle_size(u32 node, u32 size, u32 alignment, x_iidx_allocator* a, u32& outSize)
+		static bool	can_handle_size(xlnode* node, u32 size, u32 alignment, u32& outSize)
 		{
 			// Convert index to node ptr
-			xlnode* nodep    = (xlnode*)xrbnode31::to_ptr(a, node);
-			xlnode* nextp    = (xlnode*)xrbnode31::to_ptr(a, nodep->next);
+			xlnode* next = node->next;
 			
 			// Compute the 'size' that 'node' can allocate. This is done by taking
 			// the 'external mem ptr' of the current node and the 'external mem ptr'
 			// of the next node and substracting them.
-			xsize_t const node_size = diff_ptr(get_ptr(nodep->ptr, xlnode::USED_BITS), get_ptr(nextp->ptr, xlnode::USED_BITS));
+			xsize_t const node_size = diff_ptr(node->ptr, next->ptr);
 
 			ASSERT(x_intu::isPowerOf2(alignment));
 			u32 align_mask = alignment - 1;
@@ -282,7 +263,7 @@ namespace xcore
 			if (size <= node_size)
 			{
 				// Verify the alignment
-				u32 align_shift = (u32)((uptr)nodep->ptr & align_mask);
+				u32 align_shift = (u32)((uptr)node->ptr & align_mask);
 				if (align_shift!=0)
 				{
 					// How many bytes do we have to add to the pointer to reach
@@ -312,21 +293,19 @@ namespace xcore
 			return false;
 		}
 
-		static bool			find_bestfit(u32 root, u32 size, u32 alignment, x_iidx_allocator* a, u32& outNode, u32& outNodeSize)
+		static bool			find_bestfit(xlnode* root, u32 size, u32 alignment, xlnode*& outNode, u32& outNodeSize)
 		{
-			u32 const    nill      = root;
-			u32          lastNode  = root;
-			xlnode*      lastNodep = (xlnode*)xrbnode31::to_ptr(a, root);
-			u32          curNode   = lastNodep->get_child(xlnode::LEFT);
-			xlnode*      curNodep  = (xlnode*)xrbnode31::to_ptr(a, curNode);
+			xlnode*		nill      = root;
+			xlnode*		lastNode  = root;
+			xlnode*		curNode   = (xlnode*)lastNode->get_child(xlnode::LEFT);
+
 			s32 s = xlnode::LEFT;
 			while (curNode != nill)
 			{
 				lastNode  = curNode;
-				lastNodep = curNodep;
 
-				xlnode* nextNodep = (xlnode*)xrbnode31::to_ptr(a, curNodep->next);
-				xsize_t const curSize = diff_ptr(get_ptr(curNodep->ptr, xlnode::USED_BITS), get_ptr(nextNodep->ptr, xlnode::USED_BITS));
+				xlnode* nextNode = curNode->next;
+				xsize_t const curSize = diff_ptr(curNode->ptr, nextNode->ptr);
 
 				if (size < curSize)
 				{ s = xlnode::LEFT; }
@@ -338,233 +317,156 @@ namespace xcore
 					// traverse the tree from here searching for the best-fit.
 					break;
 				}
-				curNode  = curNodep->get_child(s);
-				curNodep = (xlnode*)xrbnode31::to_ptr(a, curNode);
+				curNode  = (xlnode*)curNode->get_child(s);
 			}
 
 			curNode  = lastNode;
-			curNodep = lastNodep;
 			if (s == xlnode::RIGHT)
 			{
 				// Get the successor since our size is bigger than the size
 				// that the lastNode is holding
-				curNode  = rb31_inorder(1, curNode, root, a);
-				curNodep = (xlnode*)xrbnode31::to_ptr(a, curNode);
+				curNode  = (xlnode*)rb_inorder(1, curNode);
 			}
-
 
 			// Now traverse to the right until we find a block that satisfies our
 			// size and alignment.
 			while (curNode != nill)
 			{
 				u32 curNodeSize;
-				if (can_handle_size(curNode, size, alignment, a, curNodeSize))
+				if (can_handle_size(curNode, size, alignment, curNodeSize))
 				{
 					outNode     = curNode;
 					outNodeSize = curNodeSize;
 					return true;
 				}
-
-				// Iterate over all the blocks, we have to do this since every block
-				// might have a different alignment to start with and there is a 
-				// possibility that we find a best-fit.
-				u32 curNodeSibling = curNodep->get_sibling();
-				while (curNodeSibling != nill)
-				{
-					xlnode* curNodeSiblingp = (xlnode*)xrbnode31::to_ptr(a, curNodeSibling);
-					if (can_handle_size(curNodeSibling, size, alignment, a, curNodeSize))
-					{
-						outNode     = curNodeSibling;
-						outNodeSize = curNodeSize;
-						return true;
-					}
-					curNodeSibling = curNodeSiblingp->get_right();
-				}
-
-				curNode  = rb31_inorder(0, curNode, root, a);
-				curNodep = (curNode!=nill) ? ((xlnode*)xrbnode31::to_ptr(a, curNode)) : NULL;
+				curNode  = (xlnode*)rb_inorder(0, curNode);
 			}
 			return false;
 		}
 
-		void			insert_addr(u32 root, u32 node, x_iidx_allocator* a)
+		void			insert_addr(xlnode* root, xlnode* node)
 		{
-			xlnode* rootPtr = (xlnode*)a->to_ptr(root);
-			xlnode* nodePtr = (xlnode*)a->to_ptr(node);
-
 			// @TODO
 			// Since we can get the prev node from our linear list
 			// we could shortcut the search here since we are on the right
 			// of our prev node.
+			ASSERT(node->is_used());
 
-			u32     lastNode  = root;
-			xlnode* lastNodep = rootPtr;
-
-			u32     curNode   = rootPtr->get_child(xlnode::LEFT);
-			xlnode* curNodep  = (xlnode*)(xrbnode31::to_ptr(a, curNode));
+			xlnode* nill = root;
+			xlnode*	lastNode  = root;
+			xlnode*	curNode   = (xlnode*)root->get_child(xlnode::LEFT);
 			s32 s = xlnode::LEFT;
-			while (curNodep != rootPtr)
+			while (curNode != nill)
 			{
 				lastNode  = curNode;
-				lastNodep = curNodep;
 
-				if ((xbyte*)nodePtr->ptr < (xbyte*)curNodep->ptr)
+				if (node->ptr < curNode->ptr)
 				{ s = xlnode::LEFT; }
-				else if ((xbyte*)nodePtr->ptr > (xbyte*)curNodep->ptr)
+				else if (node->ptr > curNode->ptr)
 				{ s = xlnode::RIGHT; }
 
-				curNode  = curNodep->get_child(s);
-				curNodep = (xlnode*)xrbnode31::to_ptr(a, curNode);
+				curNode  = (xlnode*)curNode->get_child(s);
 			}
 
-			rb31_attach_to(node, lastNode, s, a);
-			rb31_insert_fixup(root, node, a);
+			rb_attach_to(node, lastNode, s);
+			rb_insert_fixup(*root, node);
 
-#ifdef DEBUG_RB15TREE
-			rb15_check(root, a);
+#ifdef DEBUG_RBTREE
+			rb_check(root, a);
 #endif
 		}
 
-		bool			find_addr(u32 root, void* ptr, x_iidx_allocator* a, u32& outNode)
+		bool			find_addr(xlnode* root, memptr ptr, xlnode*& outNode)
 		{
-			xlnode* rootPtr = (xlnode*)a->to_ptr(root);
-
-			u32     curNode   = rootPtr->get_child(xlnode::LEFT);
-			xlnode* curNodep  = (xlnode*)(xrbnode31::to_ptr(a, curNode));
+			xlnode*	nill = root;
+			xlnode*	curNode = (xlnode*)root->get_child(xlnode::LEFT);
 			s32 s = xlnode::LEFT;
-			while (curNodep != rootPtr)
+			while (curNode != nill)
 			{
-				xbyte const* const cptr = (xbyte*)get_ptr(curNodep->ptr, xlnode::USED_BITS);
+				memptr cptr = curNode->ptr;
 
-				if ((xbyte*)ptr < cptr)
+				if (ptr < cptr)
 				{ s = xlnode::LEFT; }
-				else if ((xbyte*)ptr > cptr)
+				else if (ptr > cptr)
 				{ s = xlnode::RIGHT; }
 				else
 				{
 					outNode = curNode;
 					return true;
 				}
-				curNode  = curNodep->get_child(s);
-				curNodep = (xlnode*)xrbnode31::to_ptr(a, curNode);
+				curNode  = (xlnode*)curNode->get_child(s);
 			}
 			return false;
 		}
 
-		inline u32			to_idx(x_iidx_allocator* a, xlnode* node)	{ return a->to_idx(node); }
-
-		xlnode*		insert_in_list(xlnode* nodep, u32 size, x_iidx_allocator* a, u32& newNode)
+		xlnode*		insert_in_list(xlnode* node, u32 size, x_iallocator* a)
 		{
-			newNode = 0xffff;
+			xlnode* newNode = NULL;
 			{
-				void* p;
-				newNode = a->iallocate(p);
-				if (p == NULL)
+				newNode = (xlnode*)a->allocate(sizeof(xlnode), sizeof(void*));
+				if (newNode == NULL)
 					return NULL;
 			}
 
-			xlnode* newNodep = (xlnode*)xlnode::to_ptr(a, newNode);
-			newNodep->next = nodep->next;
-			newNodep->prev = to_idx(a, nodep);
-			newNodep->ptr  = advance_ptr(nodep->ptr, size);
+			newNode->clear(newNode);
+			newNode->next = node->next;
+			newNode->prev = node;
+			newNode->ptr  = advance_ptr(node->ptr, size);
 
-			xlnode* nextp = (xlnode*)xlnode::to_ptr(a, nodep->next);
-			nextp->prev = newNode;
-			nodep->next = newNode;
+			xlnode* next = node->next;
+			next->prev = newNode;
+			node->next = newNode;
 
-			return newNodep;
+			return newNode;
 		}
 
-		void			remove_from_list(u32 node, x_iidx_allocator* a)
+		void			remove_from_list(xlnode* node)
 		{
 			// The node to remove from the linear list
-			xlnode* nodep = (xlnode*)xrbnode31::to_ptr(a, node);
-
-			xlnode* nextp = (xlnode*)xrbnode31::to_ptr(a, nodep->next);
-			xlnode* prevp = (xlnode*)xrbnode31::to_ptr(a, nodep->prev);
-
-			prevp->next = nodep->next;
-			nextp->prev = nodep->prev;
+			xlnode* next = node->next;
+			xlnode* prev = node->prev;
+			prev->next = node->next;
+			next->prev = node->prev;
 		}
 
-
-		static void			remove_from_tree(u32 root, u32 node, x_iidx_allocator* a)
+		static void			remove_from_tree(xlnode* root, xlnode* node)
 		{
-			u32 const nill = root;
-			xlnode* rootp  = (xlnode*)xrbnode31::to_ptr(a, root);
-
 			// The node to remove
-			xlnode* nodep = (xlnode*)xrbnode31::to_ptr(a, node);
 			ASSERT(node != root);
-
-			// It's possible the node is a sibling, in that case we have to search
-			// the tree for the 'parent'/'head' node and remove this node from there
-			// as a sibling.
-			if (nodep->is_sibling(nill))
+			xlnode* nill = root;
 			{
-				// First determine the 'size' that this node represents
-				u32 const nodeSize = (u32)get_size(nodep, a);
-
-				u32     curNode   = rootp->get_child(xlnode::LEFT);
-				xlnode* curNodep  = (xlnode*)(xlnode::to_ptr(a, curNode));
-				s32 s = xlnode::LEFT;
-				while (curNodep != rootp)
-				{
-					u32 const curNodeSize = (u32)get_size(curNodep, a);
-
-					if (nodeSize < curNodeSize)
-					{ s = xlnode::LEFT; }
-					else if (nodeSize > curNodeSize)
-					{ s = xlnode::RIGHT; }
-					else
-					{
-						// Remove the node as a sibling from this tree node
-						ASSERT(curNodep->has_sibling(nill));
-						curNodep->remove_sibling(node, nill, a);
-						break;
-					}
-					curNode  = curNodep->get_child(s);
-					curNodep = (xlnode*)xlnode::to_ptr(a, curNode);
-				}
-			}
-			else
-			{
-				u32     repl  = node;
-				xlnode* replp = nodep;
+				xlnode* repl = node;
 
 				s32 s = xlnode::LEFT;
-				if (nodep->get_right() != root)
+				if (node->get_right() != nill)
 				{
-					if (nodep->get_left() != root)
+					if (node->get_left() != nill)
 					{
-						repl = nodep->get_right();
-						replp = (xlnode*)xrbnode31::to_ptr(a, repl);
-						while (replp->get_left() != root)
+						repl = (xlnode*)node->get_right();
+						while (repl->get_left() != nill)
 						{
-							repl = replp->get_left();
-							replp = (xlnode*)xrbnode31::to_ptr(a, repl);
+							repl = (xlnode*)repl->get_left();
 						}
 					}
 					s = xlnode::RIGHT;
 				}
-				ASSERT(replp->get_child(1-s) == root);
-				bool const red = replp->is_red();
-				u32 replChild  = replp->get_child(s);
-				xlnode* replChildp = (xlnode*)xrbnode31::to_ptr(a, replChild);
+				ASSERT(repl->get_child(1-s) == nill);
+				bool const red = repl->is_red();
+				xlnode* replChild  = (xlnode*)repl->get_child(s);
 
-				rb31_substitute_with(repl, replChild, a);
-				ASSERT(rootp->is_black());
+				rb_substitute_with(repl, replChild);
+				ASSERT(root->is_black());
 
 				if (repl != node)
-					rb31_switch_with(repl, node, a);
+					rb_switch_with(repl, node);
 
-				ASSERT(rootp->is_black());
+				ASSERT(root->is_black());
 
 				if (!red) 
-					rb31_erase_fixup(root, replChild, a);
+					rb_erase_fixup(root, replChild);
 
-#ifdef DEBUG_RB15TREE
-				rb15_check(root, a);
+#ifdef DEBUG_RBTREE
+				rb_check(root, a);
 #endif
 			}
 		}

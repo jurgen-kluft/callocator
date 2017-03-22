@@ -364,7 +364,7 @@ namespace xcore
 				else if (s == 0)
 					return mSmallBins[mNumSmallBins-1];
 
-				s32 bounds[2] = {0, mNumSmallBins};
+				s32 bounds[2] = {0, (s32)mNumSmallBins};
 				s32 mid = bounds[1] / 2;
 				while (true)
 				{
@@ -606,7 +606,7 @@ namespace xcore
 			// Allocate a new node, add 'block' into the linked list of that
 			// node and insert it into the red-black tree.
 			rbnode_size* node = (rbnode_size*)node_allocator->allocate(sizeof(rbnode_size), 4);
-			node->clear();
+			node->clear(root);
 			node->mBlocks = block;
 			outNode = node;
 
@@ -801,7 +801,7 @@ namespace xcore
 			// Allocate a new node, add 'block' into the linked list of that
 			// node and insert it into the red-black tree.
 			rbnode_alloc* node = (rbnode_alloc*)node_allocator->allocate(sizeof(rbnode_alloc), 4);
-			node->clear();
+			node->clear(root);
 			node->mBlock = block;
 			outNode = node;
 
@@ -883,7 +883,7 @@ namespace xcore
 			}
 
 			rbnode_address* node = (rbnode_address*)node_allocator->allocate(sizeof(rbnode_address), 4);
-			node->clear();
+			node->clear(root);
 			node->mBlock = block;
 			outNode = node;
 

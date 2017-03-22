@@ -52,7 +52,7 @@ namespace xcore
 		class xblock : public xrbnode
 		{
 		public:
-								xblock() : mElementArrayBegin (0), mElementArrayEnd (0), mFreeList (0), mNumManagedElements(0), mNumFreeElements(0) { clear(); }
+								xblock() : mElementArrayBegin (0), mElementArrayEnd (0), mFreeList (0), mNumManagedElements(0), mNumFreeElements(0) { clear(this); }
 
 			static xblock*		create(x_iallocator* allocator, u32 inElemSize, u32 inNumElements, s32 inAlignment);
 
@@ -162,7 +162,7 @@ namespace xcore
 		**/
 		struct xblocktree
 		{
-			inline				xblocktree() : mNumBlocks(0)		{ mRoot.clear(); }
+			inline				xblocktree() : mNumBlocks(0)		{ mRoot.clear(&mRoot); }
 
 			u32					size() const						{ return mNumBlocks; }
 			bool				empty() const						{ return mNumBlocks == 0; }
@@ -213,7 +213,7 @@ namespace xcore
 				rb_check(root);
 #endif		
 				--mNumBlocks;
-				node->clear();
+				node->clear(node);
 				return node;
 			}
 
@@ -299,7 +299,7 @@ namespace xcore
 #ifdef DEBUG_RBTREE
 				rb_check(root);
 #endif
-				block->clear();
+				block->clear(block);
 			}
 
 			void				reset(u32 inNumElements, u32 inElemSize)
