@@ -99,21 +99,21 @@ UNITTEST_SUITE_BEGIN(x_allocator_large_ext)
 			xexternal::xlargebin sb;
 			void* base = (void*)0x80000000;
 			CHECK_EQUAL(0, gIdxAllocator->size());
-			sb.init(base, 1 * 1024 * 1024 * 1024, 256, 256, gIdxAllocator);
+			sb.init(base, 3 * 512 * 1024 * 1024, 256, 256, gIdxAllocator);
 			CHECK_EQUAL(4, gIdxAllocator->size());
 
-			const int max_tracked_allocs = 1000;
+			const int max_tracked_allocs = 16384;
 			void*	allocations[max_tracked_allocs];
 			for (s32 i = 0; i < max_tracked_allocs; ++i)
 			{
 				allocations[i] = NULL;
 			}
 
-			for (s32 i = 0; i < 10000; ++i)
+			for (s32 i = 0; i < 100000; ++i)
 			{
 				for (s32 a = 1; a <= 32; ++a)
 				{
-					void* p1 = sb.allocate(a * 1024, 4);
+					void* p1 = sb.allocate(a * 4096, 4);
 					CHECK_NOT_NULL(p1);
 					int alloc_idx = rand() % max_tracked_allocs;
 					if (allocations[alloc_idx] != NULL)
