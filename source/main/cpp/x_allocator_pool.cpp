@@ -52,7 +52,7 @@ namespace xcore
 		class xblock : public xrbnode
 		{
 		public:
-								xblock() : mElementArrayBegin (0), mElementArrayEnd (0), mFreeList (0), mNumManagedElements(0), mNumFreeElements(0) { clear(this); }
+								xblock() : mElementArrayBegin (0), mElementArrayEnd (0), mFreeList (0), mNumManagedElements(0), mNumFreeElements(0) { clear(); }
 
 			static xblock*		create(x_iallocator* allocator, u32 inElemSize, u32 inNumElements, s32 inAlignment);
 
@@ -111,6 +111,17 @@ namespace xcore
 			u32					mNumFreeElements;
 		};
 
+		s32			compare_blocks(xrbnode* a, xrbnode* b)
+		{
+			xblock* ab = (xblock*)a;
+			xblock* bb = (xblock*)b;
+			return ab->compare(bb);
+		}
+		void		swap_blocks(xrbnode* a, xrbnode* b)
+		{
+			// TODO
+		}
+
 		xblock*		xblock::create(x_iallocator* allocator, u32 inElemSize, u32 inNumElements, s32 inAlignment)
 		{
 			ASSERT(inElemSize != 0);			// Check input parameters
@@ -162,7 +173,7 @@ namespace xcore
 		**/
 		struct xblocktree
 		{
-			inline				xblocktree() : mNumBlocks(0)		{ mRoot.clear(&mRoot); }
+			inline				xblocktree() : mNumBlocks(0)		{ mRoot = NULL; }
 
 			u32					size() const						{ return mNumBlocks; }
 			bool				empty() const						{ return mNumBlocks == 0; }
@@ -173,81 +184,37 @@ namespace xcore
 					return NULL;
 
 				// The node to remove
-				xblock* root = &mRoot;
-				xblock* node = root;
-				while (node->get_child(xblock::LEFT)!=root)
-					node = (xblock*)node->get_child(xblock::LEFT);
-
-				if (node == &mRoot)
-					return NULL;
-
-				xblock* endNode = root;
-				xblock* repl = node;
-				s32 s = xblock::LEFT;
-				if (node->get_child(xblock::RIGHT) != endNode)
+				rb_iterator iterator;
+				xblock* node = (xblock*)iterator.init(mRoot, rb_iterator::MINIMUM);
+				if (node == mRoot)
 				{
-					if (node->get_child(xblock::LEFT) != endNode)
-					{
-						repl = (xblock*)node->get_child(xblock::RIGHT);
-						while (repl->get_child(xblock::LEFT) != endNode)
-							repl = (xblock*)repl->get_child(xblock::LEFT);
-					}
-					s = xblock::RIGHT;
+					mRoot = NULL;
+					return node;
 				}
-				ASSERT(repl->get_child(1-s) == endNode);
-				bool red = repl->is_red();
-				xblock* replChild = (xblock*)repl->get_child(s);
 
-				rb_substitute_with(repl, replChild);
-				ASSERT(endNode->is_black());
+				xrbnode* root = mRoot;
+				xrbnode* removed = NULL;
+				rb_remove_node(root, node, compare_blocks, swap_blocks, removed);
+				ASSERT(node == removed);
+				mRoot = (xblock*)root;
 
-				if (repl != node)
-					rb_switch_with(repl, node);
-
-				ASSERT(endNode->is_black());
-
-				if (!red) 
-					rb_erase_fixup(root, replChild);
-
-#ifdef DEBUG_RBTREE
-				rb_check(root);
-#endif		
 				--mNumBlocks;
-				node->clear(node);
+
+				removed->clear();
 				return node;
 			}
 
 			void				push(xblock* block)
 			{
-				xblock* root     = &mRoot;
-				xblock* endNode  = root;
-				xblock* lastNode = root;
-				xblock* curNode  = (xblock*)root->get_child(xblock::LEFT);;
-				s32 s = xblock::LEFT;
-
-				while (curNode != endNode)
-				{
-					lastNode = curNode;
-					s32 c = curNode->compare(block);
-					s = (c < 0) ? xblock::LEFT : xblock::RIGHT;
-					curNode = (xblock*)curNode->get_child(s);
-				}
-
-				rb_attach_to(block, lastNode, s);
-				rb_insert_fixup(*root, block);
+				xrbnode* root = mRoot;
+				xtree_insert(root, block, compare_blocks);
 				++mNumBlocks;
-
-#ifdef DEBUG_RBTREE
-				rb_check(root);
-#endif			
 			}
 
 			xblock*				find(void* ptr)
 			{
-				xblock* root = &mRoot;
-				xblock* nill = root;
-				xblock* it = (xblock*)root->get_child(xblock::LEFT);
-				while ( it != nill )
+				xblock* it = (xblock*)mRoot;
+				while ( it != NULL )
 				{
 					s32 cmp = it->compare_ptr(ptr);
 					if ( cmp == 0 )
@@ -256,94 +223,52 @@ namespace xcore
 				}
 
 				// 'it' is the block that contains this pointer (element)
-				return it!=root ? it : NULL;
+				return it;
 			}
 
 			void				remove(xblock* block)
 			{
-				xblock* root    = &mRoot;
-				xblock* endNode = root;
-				ASSERT(block != root);
-
-				xblock* repl = block;
-				s32 s = xblock::LEFT;
-				if (block->get_child(xblock::RIGHT) != endNode)
-				{
-					if (block->get_child(xblock::LEFT) != endNode)
-					{
-						repl = (xblock*)block->get_child(xblock::RIGHT);
-						while (repl->get_child(xblock::LEFT) != endNode)
-							repl = (xblock*)repl->get_child(xblock::LEFT);
-					}
-					s = xblock::RIGHT;
-				}
-				
-				ASSERT(repl->get_child(1-s) == endNode);
-
-				bool red = repl->is_red();
-				xblock* replChild = (xblock*)repl->get_child(s);
-
-				rb_substitute_with(repl, replChild);
-				ASSERT(endNode->is_black());
-
-				if (repl != block)
-					rb_switch_with(repl, block);
-
-				ASSERT(endNode->is_black());
-
-				if (!red) 
-					rb_erase_fixup(root, replChild);
+				xrbnode* root = mRoot;
+				xrbnode* removed = NULL;
+				rb_remove_node(root, block, compare_blocks, swap_blocks, removed);
+				ASSERT(block == removed);
+				mRoot = (xblock*)root;
 
 				--mNumBlocks;
-
-#ifdef DEBUG_RBTREE
-				rb_check(root);
-#endif
-				block->clear(block);
+				removed->clear();
 			}
 
 			void				reset(u32 inNumElements, u32 inElemSize)
 			{
-				xblock* root = &mRoot;
-				xblock* node = (xblock*)mRoot.get_child(xblock::LEFT);
-				while (node->get_child(xblock::LEFT)!=root)
-					node = (xblock*)node->get_child(xblock::LEFT);
-				while (node != root)
+				xrbnode* root = mRoot;
+
+				rb_iterator iterator;
+				iterator.init(root, rb_iterator::MINIMUM);
+
+				xrbnode* node = iterator.move(rb_iterator::FORWARDS);
+				while (node != NULL)
 				{
-					node->reset(inElemSize);
-					node = (xblock*)rb_inorder(0, node);
+					xblock* block = (xblock*)node;
+					block->reset(inElemSize);
+					node = iterator.move(rb_iterator::FORWARDS);
 				}
 			}
 
 			void				release(x_iallocator* allocator)
 			{
-				xblock* root = &mRoot;
-				xblock* it   = (xblock*)mRoot.get_child(xblock::LEFT);
-				while ( it != root ) 
+				xrbnode* root = mRoot;
+				xrbnode* it = NULL;
+				while (it != NULL)
 				{
-					xblock* save;
-					if ( it->get_child(xblock::LEFT) == root ) 
+					xrbnode* remove = xtree_clear(root);
+					if (remove != NULL)
 					{
-						/* No left links, just kill the node and move on */
-						save = (xblock*)it->get_child(xblock::RIGHT);
-						if (it != root)
-						{
-							it->release(allocator);
-							--mNumBlocks;
-						}
+						allocator->deallocate(remove);
 					}
-					else
-					{
-						/* Rotate away the left link and check again */
-						save = (xblock*)it->get_child(xblock::LEFT);
-						it->set_child(save->get_child(xblock::RIGHT), xblock::LEFT);
-						save->set_child(it, xblock::RIGHT);
-					}
-					it = save;
 				}
 			}
 		private:
-			xblock				mRoot;
+			xblock*				mRoot;
 			u32					mNumBlocks;
 		};
 

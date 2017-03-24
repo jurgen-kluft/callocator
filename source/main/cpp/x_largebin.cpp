@@ -1,7 +1,9 @@
 #include "xbase\x_target.h"
+#include "xbase\x_allocator.h"
 #include "xbase\x_debug.h"
 #include "xbase\x_integer.h"
 #include "xbase\x_tree.h"
+
 #include "xallocator\private\x_largebin.h"
 
 namespace xcore
@@ -19,17 +21,96 @@ namespace xcore
 		into the red-black tree of free blocks.
 
 		*/
+		typedef	u32				memptr;
 
-		static void			insert_size(xlnode* root, xlnode* node);
-		static bool			find_bestfit(xlnode* root, u32 size, u32 alignment, xlnode*& outNode, u32& outNodeSize);
+		static inline memptr	advance_ptr(memptr ptr, u32 size)		{ return (memptr)(ptr + size); }
+		static inline memptr	align_ptr(memptr ptr, u32 alignment)	{ return (memptr)((ptr + (alignment - 1)) & ~((memptr)alignment - 1)); }
+		static xsize_t			diff_ptr(memptr ptr, memptr next_ptr)	{ return (xsize_t)(next_ptr - ptr); }
 
-		static void			insert_addr(xlnode* root, xlnode* node);
-		static bool			find_addr(xlnode* root, memptr ptr, xlnode*& outNode);
+		struct xrbnodep : public xrbnode
+		{
+			xlnode*		node;
+		};
 
-		static xlnode*		insert_in_list(xlnode* nodep, u32 size, x_iallocator* a);
+		struct xlnode
+		{
+			enum EState { STATE_USED = 4, STATE_FREE = 0 };
+
+			void			set_state(EState state)		{ flags = (flags & ~STATE_USED) | state; }
+			EState			get_state() const			{ return EState(flags & STATE_USED); }
+
+			void			set_free()					{ flags = (flags & ~STATE_USED); }
+			void			set_used()					{ flags = (flags & ~STATE_USED) | STATE_USED; }
+
+			bool			is_free() const				{ return (flags & STATE_USED) == STATE_FREE; }
+			bool			is_used() const				{ return (flags & STATE_USED) == STATE_USED; }
+
+			u32				flags;						// Used/Not-Used
+			memptr			ptr;						// (4) pointer/offset in external memory
+			xlnode*			next;						// (4/8) doubly linked list sorted by physical address
+			xlnode*			prev;						// (4/8)  
+		};
+
+		static inline xlnode*	allocate_list_node(x_iallocator* allocator)
+		{
+			void* nodePtr = allocator->allocate(sizeof(xlnode), sizeof(void*));
+			xlnode* node = (xlnode*)nodePtr;
+			return node;
+		}
+
+		static inline xrbnodep*	allocate_tree_node(x_iallocator* allocator)
+		{
+			void* nodePtr = allocator->allocate(sizeof(xlnode), sizeof(void*));
+			xrbnodep* node = (xrbnodep*)nodePtr;
+			node->clear();
+			node->node = NULL;
+			return node;
+		}
+
+		static inline void		init_list_node(xlnode* node, u32 offset, xlnode::EState state, xlnode* next, xlnode* prev)
+		{
+			node->flags = 0;
+			node->set_state(state);
+			node->ptr = offset;
+			node->next = next;
+			node->prev = prev;
+		}
+
+		static inline void		deallocate_node(xlnode* nodePtr, x_iallocator* allocator)
+		{
+			allocator->deallocate(nodePtr);
+		}
+		static inline void		deallocate_node(xrbnode* nodePtr, x_iallocator* allocator)
+		{
+			allocator->deallocate(nodePtr);
+		}
+
+		static inline xsize_t	get_size(xlnode* nodePtr)
+		{
+			xlnode* nextNodePtr = nodePtr->next;
+			xsize_t const nodeSize = (nextNodePtr->ptr) - (nodePtr->ptr);
+			return nodeSize;
+		}
+
+
+		static void			insert_size(xrbnodep*& root, xrbnodep* node);
+		static void			insert_addr(xrbnodep*& root, xrbnodep* node);
+
+		static bool			find_bestfit(xrbnodep* root, u32 size, u32 alignment, xrbnodep*& outNode, u32& outNodeSize);
+		static bool			find_size(xrbnodep* root, xlnode* node, xrbnodep*& outNode);
+		static bool			find_addr(xrbnodep* root, memptr ptr, xrbnodep*& outNode);
+
+		static xlnode*		insert_new_node_in_list(xlnode* nodep, u32 size, x_iallocator* a);
 		static void			remove_from_list(xlnode* node);
 
-		static void			remove_from_tree(xlnode* root, xlnode* node);
+		static xrbnodep*	remove_from_size_tree(xrbnodep*& root, xrbnodep* node);
+		static xrbnodep*	remove_from_addr_tree(xrbnodep*& root, xrbnodep* node);
+
+
+		u32					xlargebin::sizeof_node()
+		{
+			return sizeof(xrbnodep) > sizeof(xlnode) ? sizeof(xrbnodep) : sizeof(xlnode);
+		}
 
 		void				xlargebin::init(void* mem_begin, u32 mem_size, u32 size_alignment, u32 address_alignment, x_iallocator* node_allocator)
 		{
@@ -37,10 +118,8 @@ namespace xcore
 
 			// Allocate the root nodes for the @size and @address tree
 			mNodeAllocator		= a;
-			mRootSizeTree		= allocate_node(a);
-			mRootAddrTree		= allocate_node(a);
-			init_node(mRootSizeTree, 0, xlnode::STATE_USED, mRootSizeTree, mRootSizeTree);
-			init_node(mRootAddrTree, 0, xlnode::STATE_USED, mRootAddrTree, mRootAddrTree);
+			mRootSizeTree		= NULL;
+			mRootAddrTree		= NULL;
 
 			mBaseAddress		= mem_begin;
 			mNodeListHead		= NULL;
@@ -54,22 +133,24 @@ namespace xcore
 			// the tree is empty only these 2 nodes are left and the logic
 			// will figure out that there is no free memory.
 
-			xlnode* beginNode = allocate_node(a);
-			xlnode* sizeNode  = allocate_node(a);
-			xlnode* endNode   = allocate_node(a);
+			xlnode* beginNode = allocate_list_node(a);
+			xlnode* sizeNode  = allocate_list_node(a);
+			xlnode* endNode   = allocate_list_node(a);
 
 			// Link these 3 nodes into a double linked list. This list will always be ordered by the
 			// address of the managed memory that is identified with the node.
 			// So after n allocations this list will contain n+3 nodes where every node will be
 			// pointing in managed memory increasingly higher.
-			init_node(beginNode,        0, xlnode::STATE_USED, sizeNode , endNode  );
-			init_node(sizeNode ,        0, xlnode::STATE_FREE, endNode  , beginNode);
-			init_node(endNode  , mem_size, xlnode::STATE_USED, beginNode, sizeNode );
+			init_list_node(beginNode,        0, xlnode::STATE_USED, sizeNode , endNode  );
+			init_list_node(sizeNode ,        0, xlnode::STATE_FREE, endNode  , beginNode);
+			init_list_node(endNode  , mem_size, xlnode::STATE_USED, beginNode, sizeNode );
 
 			mNodeListHead = beginNode;
 
 			// Add the 'initial' size node to the size tree
-			insert_size(mRootSizeTree, sizeNode);
+			xrbnodep* sizeTreeNode = allocate_tree_node(a);
+			sizeTreeNode->node = sizeNode;
+			insert_size(mRootSizeTree, sizeTreeNode);
 		}
 
 		void				xlargebin::release	()
@@ -84,13 +165,30 @@ namespace xcore
 				i = n->next;
 				a->deallocate(n);
 			} while (i != mNodeListHead);
-
-			a->deallocate(mRootSizeTree);
-			a->deallocate(mRootAddrTree);
-
-			mRootSizeTree = NULL;
-			mRootAddrTree = NULL;
 			mNodeListHead = NULL;
+
+			if (mRootSizeTree != NULL)
+			{
+				xrbnode* root = mRootSizeTree;
+				xrbnode* node_to_destroy = xtree_clear(root);
+				while (node_to_destroy != NULL)
+				{
+					a->deallocate(node_to_destroy);
+					node_to_destroy = xtree_clear(root);
+				};
+				mRootSizeTree = NULL;
+			}
+			if (mRootAddrTree != NULL)
+			{
+				xrbnode* root = mRootAddrTree;
+				xrbnode* node_to_destroy = xtree_clear(root);
+				while (node_to_destroy != NULL)
+				{
+					a->deallocate(node_to_destroy);
+					node_to_destroy = xtree_clear(root);
+				};
+				mRootAddrTree = NULL;
+			}
 
 			mSizeAlignment    = 0xffffffff;
 			mAddressAlignment = 0xffffffff;
@@ -106,155 +204,183 @@ namespace xcore
 			// Find the first node in the size tree that has the same or larger size
 			// Start to iterate through the tree until we find a node that can hold
 			// our size+alignment.
-			xlnode* node;
+			xrbnodep* thisTreeNode;
 			u32 nodeSize;
-			if (find_bestfit(mRootSizeTree, size, alignment, node, nodeSize) == false)
+			if (find_bestfit(mRootSizeTree, size, alignment, thisTreeNode, nodeSize) == false)
 				return NULL;
+
+			xlnode* thisListNode = thisTreeNode->node;
 
 			// @TODO: We still need to check that if the alignment is very big to
 			//        have a new node take that wasted-space.
-			node->ptr    = align_ptr(node->ptr, alignment);
+			thisListNode->ptr = align_ptr(thisListNode->ptr, alignment);
+
+			// Remove 'node' from the size tree since it is not available/free anymore
+			thisTreeNode = remove_from_size_tree(mRootSizeTree, thisTreeNode);
+			ASSERT(thisTreeNode->node == thisListNode);
 
 			// Check if we have to split this node, if so do it, create a new node
 			// to hold the left-over size, insert it into the double linked list and
 			// insert it into the size tree.
 			if ((nodeSize - size) >= mSizeAlignment)
 			{
-				// Add to the linear list after 'node'
-				xlnode* newNodep = insert_in_list(node, size, mNodeAllocator);
-				if (newNodep == NULL)
+				// Add to the linear list after 'thisListNode'
+				xlnode* newListNode = insert_new_node_in_list(thisListNode, size, mNodeAllocator);
+				if (newListNode == NULL)
 					return NULL;
 
 				// Insert this 'free' new node into the size tree
-				newNodep->set_free();
-				insert_size(mRootSizeTree, newNodep);
+				newListNode->set_free();
+				xrbnodep* newTreeNode = allocate_tree_node(mNodeAllocator);
+				newTreeNode->node = newListNode;
+				insert_size(mRootSizeTree, newTreeNode);
 			}
 
 			// Mark our node as used
-			node->set_used();
-
-			// Remove 'node' from the size tree since it is not available/free
-			// anymore
-			remove_from_tree(mRootSizeTree, node);
+			thisListNode->set_used();
 
 			// Insert our alloc node into the address tree so that we can find it when
 			// deallocate is called.
-			insert_addr(mRootAddrTree, node);
+			thisTreeNode->clear();
+			insert_addr(mRootAddrTree, thisTreeNode);
 
 			// Done...
 
-			return (void*)((uptr)mBaseAddress + node->ptr);
+			return (void*)((uptr)mBaseAddress + thisListNode->ptr);
 		}
 
 
-		void				xlargebin::deallocate	(void* ptr)
+		bool			xlargebin::deallocate	(void* ptr)
 		{
 			x_iallocator* a = mNodeAllocator;
 
 			memptr p = (xbyte*)ptr - (xbyte*)mBaseAddress;
 
 			// Find this address in the address-tree and remove it from there.
-			xlnode* node;
-			if (find_addr(mRootAddrTree, p, node)==false)
-				return;
+			xrbnodep* thisTreeNode;
+			if (find_addr(mRootAddrTree, p, thisTreeNode)==false)
+				return false;
 
 			// Remove the node from the tree, it is deallocated so it has no
 			// reason to be in this tree anymore.
-			remove_from_tree(mRootAddrTree, node);
+			thisTreeNode = remove_from_addr_tree(mRootAddrTree, thisTreeNode);
 
-			xlnode* next = node->next;
-			xlnode* prev = node->prev;
+			xlnode* thisListNode = thisTreeNode->node;
+			xlnode* prevListNode = thisListNode->prev;
+			xlnode* nextListNode = thisListNode->next;
+			
+			mNodeAllocator->deallocate(thisTreeNode);
+			thisTreeNode = NULL;
 
 			// Check if we can merge with our previous and next nodes, handle
 			// any merge and remove any obsolete node from the size-tree.
-			bool prev_used = prev->is_used();
-			bool next_used = next->is_used();
 
-			// mark our node to indicate it is free now
-			node->set_free();
+			// Mark our node to indicate it is free now
+			thisListNode->set_free();
 
-			if (!prev_used)
-				remove_from_list(node);
+			if (!nextListNode->is_used())
+			{	// remove 'next' and deallocate it
+				xrbnodep* nextTreeNode = NULL;
+				find_size(mRootSizeTree, nextListNode, nextTreeNode);
+				nextTreeNode = remove_from_size_tree(mRootSizeTree, nextTreeNode);
+				a->deallocate(nextTreeNode);
 
-			if (!next_used)
-			{
-				remove_from_list(next);
-				remove_from_tree(mRootSizeTree, next);
-
-				// next has been merged so we can deallocate it
-				a->deallocate(next);
+				remove_from_list(nextListNode);
+				a->deallocate(nextListNode);
+				nextListNode = NULL;
 			}
 
-			// The size of 'prev' has changed if we have merged, so we need to pull
-			// out the 'prev' node from the size tree and re-insert it.
-			if (!prev_used)
+			// 'prev' is not used as well, so we can merge it with 'node'
+			if (!prevListNode->is_used())
 			{
-				remove_from_tree(mRootSizeTree, prev);
-				insert_size(mRootSizeTree, prev);
+				xrbnodep* prevTreeNode = NULL;
+				find_size(mRootSizeTree, prevListNode, prevTreeNode);
+				prevTreeNode = remove_from_size_tree(mRootSizeTree, prevTreeNode);
 
-				// node has been merged with prev so it is not needed anymore
-				a->deallocate(node);
+				// Remove node from the list, after that the size of prev has increased
+				remove_from_list(thisListNode);
+				mNodeAllocator->deallocate(thisListNode);
+
+				// Now insert 'prev' as a tree node back into the size tree
+				prevTreeNode->clear();
+				ASSERT(prevTreeNode->node == prevListNode);
+				insert_size(mRootSizeTree, prevTreeNode);
 			}
 			else
-			{
-				// Insert node into the size tree
-				insert_size(mRootSizeTree, node);
+			{	// 'prev' is still used so we cannot merge, so here we have to insert node back into the size tree
+				thisTreeNode = allocate_tree_node(mNodeAllocator);
+				thisTreeNode->node = thisListNode;
+				insert_size(mRootSizeTree, thisTreeNode);
 			}
 
 			// Done...
+			return true;
+		}
+
+		s32		rbtree_compare_addr(xrbnode* _a, xrbnode* _b)
+		{
+			xlnode* a = ((xrbnodep*)_a)->node;
+			xlnode* b = ((xrbnodep*)_b)->node;
+			if (a->ptr < b->ptr)
+				return -1;
+			if (a->ptr > b->ptr)
+				return 1;
+			return 0;
+		}
+
+		s32		rbtree_compare_size(xrbnode* _a, xrbnode* _b)
+		{
+			xlnode* a = ((xrbnodep*)_a)->node;
+			xlnode* b = ((xrbnodep*)_b)->node;
+			if (a == b)
+				return 0;
+
+			xsize_t const aSize = get_size(a);
+			xsize_t const bSize = get_size(b);
+			if (aSize == bSize)
+			{
+				if (a->ptr < b->ptr)
+					return -1;
+			}
+			else
+			{
+				if (aSize < bSize)
+					return -1;
+			}
+			return 1;
+		}
+
+		void	rbtree_swap(xrbnode* to_replace, xrbnode* to_remove)
+		{
+			xrbnodep* p = (xrbnodep*)to_replace;
+			xrbnodep* r = (xrbnodep*)to_remove;
+			xlnode* tmp = p->node;
+			p->node = r->node;
+			r->node = tmp;
 		}
 
 		// Size tree function implementations
-		static void			insert_size(xlnode* root, xlnode* node)
+		static void			insert_size(xrbnodep*& root, xrbnodep* node)
 		{
-			ASSERT(node->is_free());
+			ASSERT(node->node->is_free());
 		
-			xlnode* nill     = root;
-			xlnode* nextNode = node->next;
-			xsize_t const nodeSize  = diff_ptr(node->ptr, nextNode->ptr);
-
-			xlnode* lastNode  = root;
-			xlnode* curNode   = (xlnode*)root->get_child(xlnode::LEFT);
-
-			s32 s = xlnode::LEFT;
-			while (curNode != nill)
+			xrbnode* r = root;
+			rb_insert_node(r, node, rbtree_compare_size);
+			const char* result = NULL;
+			rb_tree_test(r, rbtree_compare_size, result);
+			if (result != NULL)
 			{
-				lastNode  = curNode;
-
-				xlnode* nextNode  = curNode->next;
-				xsize_t const curSize = diff_ptr(curNode->ptr, nextNode->ptr);
-
-				if (nodeSize < curSize)
-				{ s = xlnode::LEFT; }
-				else if (nodeSize > curSize)
-				{ s = xlnode::RIGHT; }
-				else
-				{	// Identical size, sort them by address
-					if (node->ptr < curNode->ptr)
-					{ s = xlnode::LEFT; }
-					else
-					{ s = xlnode::RIGHT; }
-				}
-				curNode  = (xlnode*)curNode->get_child(s);
+				return;
 			}
-
-			rb_attach_to(node, lastNode, s);
-			rb_insert_fixup(*root, node);
-
-	#ifdef DEBUG_RBTREE
-			rb_check(root);
-	#endif
+			root = (xrbnodep*)r;
 		}
 
-		static bool	can_handle_size(xlnode* node, u32 size, u32 alignment, u32& outSize)
+		static bool			can_handle_size(xrbnodep* node, u32 size, u32 alignment, u32& outSize)
 		{
-			// Convert index to node ptr
-			xlnode* next = node->next;
-			
 			// Compute the 'size' that 'node' can allocate. This is done by taking
 			// the 'external mem ptr' of the current node and the 'external mem ptr'
 			// of the next node and substracting them.
-			xsize_t const node_size = diff_ptr(node->ptr, next->ptr);
+			xsize_t const node_size = get_size(node->node);
 
 			ASSERT(x_intu::isPowerOf2(alignment));
 			u32 align_mask = alignment - 1;
@@ -263,7 +389,7 @@ namespace xcore
 			if (size <= node_size)
 			{
 				// Verify the alignment
-				u32 align_shift = (u32)((uptr)node->ptr & align_mask);
+				u32 align_shift = (u32)((uptr)node->node->ptr & align_mask);
 				if (align_shift!=0)
 				{
 					// How many bytes do we have to add to the pointer to reach
@@ -293,44 +419,42 @@ namespace xcore
 			return false;
 		}
 
-		static bool			find_bestfit(xlnode* root, u32 size, u32 alignment, xlnode*& outNode, u32& outNodeSize)
+		static bool			find_bestfit(xrbnodep* root, u32 size, u32 alignment, xrbnodep*& outNode, u32& outNodeSize)
 		{
-			xlnode*		nill      = root;
-			xlnode*		lastNode  = root;
-			xlnode*		curNode   = (xlnode*)lastNode->get_child(xlnode::LEFT);
+			if (root == NULL)
+				return false;
 
-			s32 s = xlnode::LEFT;
-			while (curNode != nill)
+			rb_iterator iterator;
+			xrbnodep* curNode = root;
+			s32 s = xrbnode::LEFT;
+			while (curNode != NULL)
 			{
-				lastNode  = curNode;
-
-				xlnode* nextNode = curNode->next;
-				xsize_t const curSize = diff_ptr(curNode->ptr, nextNode->ptr);
+				xsize_t const curSize = get_size(curNode->node);
 
 				if (size < curSize)
-				{ s = xlnode::LEFT; }
+				{ s = xrbnode::LEFT; }
 				else if (size > curSize)
-				{ s = xlnode::RIGHT; }
+				{ s = xrbnode::RIGHT; }
 				else
 				{
 					// We have found a node that holds the same size, we will
 					// traverse the tree from here searching for the best-fit.
 					break;
 				}
-				curNode  = (xlnode*)curNode->get_child(s);
+				xrbnodep* child = (xrbnodep*)curNode->get_child(s);
+				iterator.push(curNode);
+				curNode = child;
 			}
 
-			curNode  = lastNode;
-			if (s == xlnode::RIGHT)
+			if (curNode == NULL)
 			{
-				// Get the successor since our size is bigger than the size
-				// that the lastNode is holding
-				curNode  = (xlnode*)rb_inorder(1, curNode);
+				if (iterator.top > 0)
+					curNode = (xrbnodep*)iterator.pop();
 			}
+			iterator.node = curNode;
 
-			// Now traverse to the right until we find a block that satisfies our
-			// size and alignment.
-			while (curNode != nill)
+			// Now traverse to the right until we find a block that satisfies our size and alignment.
+			while (curNode != NULL)
 			{
 				u32 curNodeSize;
 				if (can_handle_size(curNode, size, alignment, curNodeSize))
@@ -339,79 +463,88 @@ namespace xcore
 					outNodeSize = curNodeSize;
 					return true;
 				}
-				curNode  = (xlnode*)rb_inorder(0, curNode);
+				curNode = (xrbnodep*)iterator.move(rb_iterator::FORWARDS);
 			}
 			return false;
 		}
 
-		void			insert_addr(xlnode* root, xlnode* node)
+		bool			find_size(xrbnodep* root, xlnode* node, xrbnodep*& outNode)
 		{
-			// @TODO
-			// Since we can get the prev node from our linear list
-			// we could shortcut the search here since we are on the right
-			// of our prev node.
-			ASSERT(node->is_used());
+			xsize_t const nodeSize = get_size(node);
 
-			xlnode* nill = root;
-			xlnode*	lastNode  = root;
-			xlnode*	curNode   = (xlnode*)root->get_child(xlnode::LEFT);
-			s32 s = xlnode::LEFT;
-			while (curNode != nill)
+			xrbnodep* curNode = root;
+			s32 s = xrbnode::LEFT;
+			while (curNode != NULL)
 			{
-				lastNode  = curNode;
+				xlnode* cur = curNode->node;
+				if (cur == node)
+				{
+					outNode = curNode;
+					return true;
+				}
 
-				if (node->ptr < curNode->ptr)
-				{ s = xlnode::LEFT; }
-				else if (node->ptr > curNode->ptr)
-				{ s = xlnode::RIGHT; }
+				s32 s = xrbnode::RIGHT;
+				xsize_t const curSize = get_size(cur);
+				if (curSize == nodeSize)
+				{
+					if (node->ptr < cur->ptr)
+						s = xrbnode::LEFT;
+				}
+				else
+				{
+					if (nodeSize < curSize)
+						s = xrbnode::LEFT;
+				}
 
-				curNode  = (xlnode*)curNode->get_child(s);
+				curNode = (xrbnodep*)curNode->get_child(s);
 			}
-
-			rb_attach_to(node, lastNode, s);
-			rb_insert_fixup(*root, node);
-
-#ifdef DEBUG_RBTREE
-			rb_check(root, a);
-#endif
+			return false;
 		}
 
-		bool			find_addr(xlnode* root, memptr ptr, xlnode*& outNode)
+		void			insert_addr(xrbnodep*& root, xrbnodep* node)
 		{
-			xlnode*	nill = root;
-			xlnode*	curNode = (xlnode*)root->get_child(xlnode::LEFT);
-			s32 s = xlnode::LEFT;
-			while (curNode != nill)
+			ASSERT(node->node->is_used());
+
+			xrbnode* r = root;
+			rb_insert_node(r, node, rbtree_compare_addr);
+			const char* result = NULL;
+			rb_tree_test(r, rbtree_compare_addr, result);
+			if (result != NULL)
 			{
-				memptr cptr = curNode->ptr;
+				return;
+			}
+			root = (xrbnodep*)r;
+		}
+
+		bool			find_addr(xrbnodep* root, memptr ptr, xrbnodep*& outNode)
+		{
+			xrbnodep*	curNode = root;
+			s32 s = xrbnode::LEFT;
+			while (curNode != NULL)
+			{
+				memptr cptr = curNode->node->ptr;
 
 				if (ptr < cptr)
-				{ s = xlnode::LEFT; }
+				{ s = xrbnode::LEFT; }
 				else if (ptr > cptr)
-				{ s = xlnode::RIGHT; }
+				{ s = xrbnode::RIGHT; }
 				else
 				{
 					outNode = curNode;
 					return true;
 				}
-				curNode  = (xlnode*)curNode->get_child(s);
+				curNode  = (xrbnodep*)curNode->get_child(s);
 			}
 			return false;
 		}
 
-		xlnode*		insert_in_list(xlnode* node, u32 size, x_iallocator* a)
+		xlnode*		insert_new_node_in_list(xlnode* node, u32 size, x_iallocator* a)
 		{
-			xlnode* newNode = NULL;
-			{
-				newNode = (xlnode*)a->allocate(sizeof(xlnode), sizeof(void*));
-				if (newNode == NULL)
-					return NULL;
-			}
+			xlnode* newNode = allocate_list_node(a);
+			if (newNode == NULL)
+				return NULL;
 
-			newNode->clear(newNode);
-			newNode->next = node->next;
-			newNode->prev = node;
-			newNode->ptr  = advance_ptr(node->ptr, size);
+			init_list_node(newNode, advance_ptr(node->ptr, size), xlnode::STATE_USED, node->next, node);
 
 			xlnode* next = node->next;
 			next->prev = newNode;
@@ -429,46 +562,34 @@ namespace xcore
 			next->prev = node->prev;
 		}
 
-		static void			remove_from_tree(xlnode* root, xlnode* node)
+		static xrbnodep*	remove_from_size_tree(xrbnodep*& root, xrbnodep* node)
 		{
-			// The node to remove
-			ASSERT(node != root);
-			xlnode* nill = root;
+			xrbnode* r = root;
+			xrbnode* o = NULL;
+			rb_remove_node(r, node, rbtree_compare_size, rbtree_swap, o);
+			const char* result = NULL;
+			rb_tree_test(r, rbtree_compare_size, result);
+			if (result != NULL)
 			{
-				xlnode* repl = node;
-
-				s32 s = xlnode::LEFT;
-				if (node->get_right() != nill)
-				{
-					if (node->get_left() != nill)
-					{
-						repl = (xlnode*)node->get_right();
-						while (repl->get_left() != nill)
-						{
-							repl = (xlnode*)repl->get_left();
-						}
-					}
-					s = xlnode::RIGHT;
-				}
-				ASSERT(repl->get_child(1-s) == nill);
-				bool const red = repl->is_red();
-				xlnode* replChild  = (xlnode*)repl->get_child(s);
-
-				rb_substitute_with(repl, replChild);
-				ASSERT(root->is_black());
-
-				if (repl != node)
-					rb_switch_with(repl, node);
-
-				ASSERT(root->is_black());
-
-				if (!red) 
-					rb_erase_fixup(root, replChild);
-
-#ifdef DEBUG_RBTREE
-				rb_check(root, a);
-#endif
+				return NULL;
 			}
+			root = (xrbnodep*)r;
+			return (xrbnodep*)o;
+		}
+
+		static xrbnodep*	remove_from_addr_tree(xrbnodep*& root, xrbnodep* node)
+		{
+			xrbnode* r = root;
+			xrbnode* o = NULL;
+			rb_remove_node(r, node, rbtree_compare_addr, rbtree_swap, o);
+			const char* result = NULL;
+			rb_tree_test(r, rbtree_compare_addr, result);
+			if (result != NULL)
+			{
+				return NULL;
+			}
+			root = (xrbnodep*)r;
+			return (xrbnodep*)o;
 		}
 	}
 }

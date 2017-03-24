@@ -135,9 +135,9 @@ namespace xcore
 			size_t			numReallocs;
 
 			size_t			freelistsize;
-			int				freemaxsizekeep;		/// The maximum size of memory to keep in the free list
-			int				freeskipsizemin;		/// Do not add allocations that are smaller than this size in the free list
-			int				freeskipsizemax;		/// Do not add allocations that are larger than this size in the free list
+			size_t			freemaxsizekeep;		/// The maximum size of memory to keep in the free list
+			size_t			freeskipsizemin;		/// Do not add allocations that are smaller than this size in the free list
+			size_t			freeskipsizemax;		/// Do not add allocations that are larger than this size in the free list
 
 			size_t			maxmemory;
 			unsigned int	ptrsearch;

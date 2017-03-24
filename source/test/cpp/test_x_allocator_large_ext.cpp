@@ -18,7 +18,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_large_ext)
 
         UNITTEST_FIXTURE_SETUP()
 		{
-			gIdxAllocator = gCreateFreeListIdxAllocator(gSystemAllocator, sizeof(xexternal::xlnode), 8, 65536);
+			gIdxAllocator = gCreateFreeListIdxAllocator(gSystemAllocator, xexternal::xlargebin::sizeof_node(), 8, 65536);
 		}
 
         UNITTEST_FIXTURE_TEARDOWN()
@@ -26,38 +26,13 @@ UNITTEST_SUITE_BEGIN(x_allocator_large_ext)
 			gIdxAllocator->release();
 		}
 
-        UNITTEST_TEST(advance_ptr1)
-        {
-			xexternal::memptr ptr1 = (xexternal::memptr)0x4000;
-			xexternal::memptr ptr2 = xexternal::advance_ptr(ptr1, 0x100);
-			CHECK_EQUAL((xexternal::memptr)0x4100, ptr2);
-			xexternal::memptr ptr3 = xexternal::advance_ptr(ptr1, 0x1000);
-			CHECK_EQUAL((xexternal::memptr)0x5000, ptr3);
-		}
-
-		UNITTEST_TEST(align_ptr1)
-        {
-			xexternal::memptr ptr1 = (xexternal::memptr)0x4010;
-			xexternal::memptr ptr2 = xexternal::align_ptr(ptr1, 0x100);
-			CHECK_EQUAL((xexternal::memptr)0x4100, ptr2);
-			xexternal::memptr ptr3 = xexternal::align_ptr(ptr1, 0x10);
-			CHECK_EQUAL((xexternal::memptr)0x4010, ptr3);
-		}
-
-		UNITTEST_TEST(diff_ptr1)
-		{
-			xexternal::memptr ptr1 = (xexternal::memptr)0x00000;
-			xexternal::memptr ptr2 = (xexternal::memptr)0x00010;
-			uptr d1 = xexternal::diff_ptr(ptr1, ptr2);
-			CHECK_EQUAL(0x00010, d1);
-		}
 
 		UNITTEST_TEST(init1)
         {
 			xexternal::xlargebin sb;
 			CHECK_EQUAL(0, gIdxAllocator->size());
 			sb.init((void*)0x80000000, 65536, 64, 4, gIdxAllocator);
-			CHECK_EQUAL(5, gIdxAllocator->size());
+			CHECK_EQUAL(4, gIdxAllocator->size());
 			sb.release();
 			CHECK_EQUAL(0, gIdxAllocator->size());
         }
@@ -67,7 +42,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_large_ext)
 			xexternal::xlargebin sb;
 			CHECK_EQUAL(0, gIdxAllocator->size());
 			sb.init((void*)0x80000000, 65536, 64, 4, gIdxAllocator);
-			CHECK_EQUAL(5, gIdxAllocator->size());
+			CHECK_EQUAL(4, gIdxAllocator->size());
 
 			void* p1 = sb.allocate(60, 4);
 			sb.deallocate(p1);
@@ -82,18 +57,34 @@ UNITTEST_SUITE_BEGIN(x_allocator_large_ext)
 			void* base = (void*)0x80000000;
 			CHECK_EQUAL(0, gIdxAllocator->size());
 			sb.init(base, 65536, 2048, 32, gIdxAllocator);
-			CHECK_EQUAL(5, gIdxAllocator->size());
+			CHECK_EQUAL(4, gIdxAllocator->size());
 
-			for (s32 i=0; i<32; ++i)
+			for (s32 j = 0; j < 10; j++)
+			{
+				for (s32 i = 0; i < 32; ++i)
+				{
+					void* p1 = sb.allocate(60, 4);
+					CHECK_NOT_NULL(p1);
+					void* pp = (void*)((char*)base + i * 2048);
+					CHECK_EQUAL(pp, p1);
+				}
+				for (s32 i = 0; i < 32; ++i)
+				{
+					bool deallocated = sb.deallocate((char*)base + i * 2048);
+					CHECK_TRUE(deallocated);
+				}
+			}
+			for (s32 i = 0; i < 32; ++i)
 			{
 				void* p1 = sb.allocate(60, 4);
 				CHECK_NOT_NULL(p1);
-				void* pp = (void*)((char*)base + i*2048);
+				void* pp = (void*)((char*)base + i * 2048);
 				CHECK_EQUAL(pp, p1);
 			}
+
 			// Last allocation caused the allocator to deplete the memory so it
 			// did not have to allocate a 'split' node.
-			CHECK_EQUAL(32-1+5, gIdxAllocator->size());
+			CHECK_EQUAL(32*2-2+4, gIdxAllocator->size());
 
 			// Allocator has no memory left so this should fail
 			void* p2 = sb.allocate(60, 4);
@@ -109,7 +100,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_large_ext)
 			void* base = (void*)0x80000000;
 			CHECK_EQUAL(0, gIdxAllocator->size());
 			sb.init(base, 1 * 1024 * 1024 * 1024, 256, 256, gIdxAllocator);
-			CHECK_EQUAL(5, gIdxAllocator->size());
+			CHECK_EQUAL(4, gIdxAllocator->size());
 
 			const int max_tracked_allocs = 1000;
 			void*	allocations[max_tracked_allocs];
@@ -120,14 +111,18 @@ UNITTEST_SUITE_BEGIN(x_allocator_large_ext)
 
 			for (s32 i = 0; i < 10000; ++i)
 			{
-				for (s32 a = 0; a < 32; ++a)
+				for (s32 a = 1; a <= 32; ++a)
 				{
-					void* p1 = sb.allocate(60, 4);
+					void* p1 = sb.allocate(a * 1024, 4);
 					CHECK_NOT_NULL(p1);
 					int alloc_idx = rand() % max_tracked_allocs;
 					if (allocations[alloc_idx] != NULL)
 					{
-						sb.deallocate(allocations[alloc_idx]);
+						bool deallocated = sb.deallocate(allocations[alloc_idx]);
+						if (!deallocated)
+						{
+							CHECK_TRUE(deallocated);
+						}
 					}
 					allocations[alloc_idx] = p1;
 				}
@@ -137,10 +132,10 @@ UNITTEST_SUITE_BEGIN(x_allocator_large_ext)
 			{
 				if (allocations[i] != NULL)
 				{
-					sb.deallocate(allocations[i]);
+					bool deallocated = sb.deallocate(allocations[i]);
+					CHECK_TRUE(deallocated);
 				}
 			}
-
 
 			sb.release();
 			CHECK_EQUAL(0, gIdxAllocator->size());

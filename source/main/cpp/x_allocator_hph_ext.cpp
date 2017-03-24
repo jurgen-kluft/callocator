@@ -10,6 +10,7 @@
 #include "xallocator\x_allocator_hph_ext.h"
 #include "xallocator\x_allocator_pool.h"
 
+#if 0
 namespace xcore
 {
 	namespace xhpeha
@@ -576,12 +577,12 @@ namespace xcore
 			#define CHECK_RBTREE(root)	
 		#endif
 
-		void		insert_size(rbnode_size* root, block_free* block, x_iallocator* node_allocator, rbnode_size*& outNode)
+		void		insert_size(rbnode_size*& root, block_free* block, x_iallocator* node_allocator, rbnode_size*& outNode)
 		{
 			rbnode_size* lastNode = root;
-			rbnode_size* curNode  = (rbnode_size*)root->get_child(rbnode_size::LEFT);;
+			rbnode_size* curNode  = root;
 			s32 s = rbnode_size::LEFT;
-			while (curNode != root)
+			while (curNode != NULL)
 			{
 				lastNode = curNode;
 				if (block->mSize < curNode->mBlocks->mSize)
@@ -606,7 +607,7 @@ namespace xcore
 			// Allocate a new node, add 'block' into the linked list of that
 			// node and insert it into the red-black tree.
 			rbnode_size* node = (rbnode_size*)node_allocator->allocate(sizeof(rbnode_size), 4);
-			node->clear(root);
+			node->clear();
 			node->mBlocks = block;
 			outNode = node;
 
@@ -801,7 +802,7 @@ namespace xcore
 			// Allocate a new node, add 'block' into the linked list of that
 			// node and insert it into the red-black tree.
 			rbnode_alloc* node = (rbnode_alloc*)node_allocator->allocate(sizeof(rbnode_alloc), 4);
-			node->clear(root);
+			node->clear();
 			node->mBlock = block;
 			outNode = node;
 
@@ -883,7 +884,7 @@ namespace xcore
 			}
 
 			rbnode_address* node = (rbnode_address*)node_allocator->allocate(sizeof(rbnode_address), 4);
-			node->clear(root);
+			node->clear();
 			node->mBlock = block;
 			outNode = node;
 
@@ -1174,4 +1175,5 @@ namespace xcore
 		return allocator_hph_ext;
 	}
 };
+#endif
 
