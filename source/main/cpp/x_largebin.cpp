@@ -18,7 +18,7 @@ namespace xcore
 
 		A red-black tree is used to quickly identify a suitable (best-fit) block for allocation, while the deallocation
 		code path is using an additional red-black tree for quickly finding the allocated block so as to release it back
-		into the red-black tree of free blocks.
+		into the 'size' red-black tree.
 
 		*/
 		typedef	u32				memptr;
@@ -321,11 +321,9 @@ namespace xcore
 		{
 			xlnode* a = ((xrbnodep*)_a)->node;
 			xlnode* b = ((xrbnodep*)_b)->node;
-			if (a->ptr < b->ptr)
-				return -1;
-			if (a->ptr > b->ptr)
-				return 1;
-			return 0;
+			s32 s = (a->ptr != b->ptr);
+			s = s * (((a->ptr > b->ptr) * 2) - 1);
+			return s;
 		}
 
 		s32		rbtree_compare_size(xrbnode* _a, xrbnode* _b)
@@ -335,19 +333,18 @@ namespace xcore
 			if (a == b)
 				return 0;
 
+			s32 s = 1;
 			xsize_t const aSize = get_size(a);
 			xsize_t const bSize = get_size(b);
 			if (aSize == bSize)
 			{
-				if (a->ptr < b->ptr)
-					return -1;
+				s = ((a->ptr > b->ptr) * 2) - 1;
 			}
 			else
 			{
-				if (aSize < bSize)
-					return -1;
+				s = ((aSize > bSize) * 2) - 1;
 			}
-			return 1;
+			return s;
 		}
 
 		void	rbtree_swap(xrbnode* to_replace, xrbnode* to_remove)
@@ -431,16 +428,13 @@ namespace xcore
 			{
 				xsize_t const curSize = get_size(curNode->node);
 
-				if (size < curSize)
-				{ s = xrbnode::LEFT; }
-				else if (size > curSize)
-				{ s = xrbnode::RIGHT; }
-				else
+				if (size == curSize)
 				{
 					// We have found a node that holds the same size, we will
 					// traverse the tree from here searching for the best-fit.
 					break;
 				}
+				s32 const s = size > curSize;
 				xrbnodep* child = (xrbnodep*)curNode->get_child(s);
 				iterator.push(curNode);
 				curNode = child;
@@ -483,17 +477,16 @@ namespace xcore
 					return true;
 				}
 
-				s32 s = xrbnode::RIGHT;
 				xsize_t const curSize = get_size(cur);
+
+				s32 s;
 				if (curSize == nodeSize)
 				{
-					if (node->ptr < cur->ptr)
-						s = xrbnode::LEFT;
+					s = ((node->ptr > b->ptr) * 2) - 1;
 				}
 				else
 				{
-					if (nodeSize < curSize)
-						s = xrbnode::LEFT;
+					s = ((nodeSize > curSize) * 2) - 1;
 				}
 
 				curNode = (xrbnodep*)curNode->get_child(s);
@@ -523,16 +516,12 @@ namespace xcore
 			while (curNode != NULL)
 			{
 				memptr cptr = curNode->node->ptr;
-
-				if (ptr < cptr)
-				{ s = xrbnode::LEFT; }
-				else if (ptr > cptr)
-				{ s = xrbnode::RIGHT; }
-				else
+				if (ptr == cptr)
 				{
 					outNode = curNode;
 					return true;
 				}
+				s32 const s = ptr > cptr;
 				curNode  = (xrbnodep*)curNode->get_child(s);
 			}
 			return false;
