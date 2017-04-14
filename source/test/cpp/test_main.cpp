@@ -11,7 +11,7 @@ UNITTEST_SUITE_LIST(xAllocatorUnitTest);
 //UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_dlmalloc);	// Doesn't work on 64-bit systems
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_tlfs);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_freelist);
-//UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_pool);
+UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_pool);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_allocator_forward);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_idx_allocator_array);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_idx_allocator_pool);

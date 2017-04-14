@@ -44,8 +44,8 @@ namespace xcore
 		private:
 			x_iallocator*		mNodeAllocator;				// 
 			void*				mBaseAddress;				// Base address of the memory we are managing
-			xrbnodep*			mRootSizeTree;				// First node of our internal tree, key=size
-			xrbnodep*			mRootAddrTree;				// 
+			xrbtree				mRootSizeTree;				// First node of our internal tree, key=size
+			xrbtree				mRootAddrTree;				// 
 			xlnode*				mNodeListHead;
 			u32					mSizeAlignment;
 			u32					mAddressAlignment;

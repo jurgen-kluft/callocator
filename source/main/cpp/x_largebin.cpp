@@ -92,19 +92,60 @@ namespace xcore
 			return nodeSize;
 		}
 
+		s32		rbtree_compare_addr(void* _a, xrbnode* _b)
+		{
+			xlnode* a = ((xlnode*)_a);
+			xlnode* b = ((xrbnodep*)_b)->node;
+			if (a->ptr < b->ptr)
+				return -1;
+			if (a->ptr > b->ptr)
+				return 1;
+			return 0;
+		}
 
-		static void			insert_size(xrbnodep*& root, xrbnodep* node);
-		static void			insert_addr(xrbnodep*& root, xrbnodep* node);
+		s32		rbtree_compare_size(void* _a, xrbnode* _b)
+		{
+			xlnode* a = ((xlnode*)_a);
+			xlnode* b = ((xrbnodep*)_b)->node;
+			if (a == b)
+				return 0;
 
-		static bool			find_bestfit(xrbnodep* root, u32 size, u32 alignment, xrbnodep*& outNode, u32& outNodeSize);
-		static bool			find_size(xrbnodep* root, xlnode* node, xrbnodep*& outNode);
-		static bool			find_addr(xrbnodep* root, memptr ptr, xrbnodep*& outNode);
+			xsize_t const aSize = get_size(a);
+			xsize_t const bSize = get_size(b);
+			if (aSize == bSize)
+			{
+				if (a->ptr < b->ptr)
+					return -1;
+			}
+			else
+			{
+				if (aSize < bSize)
+					return -1;
+			}
+			return 1;
+		}
+
+		void	rbtree_swap(xrbnode* to_replace, xrbnode* to_remove)
+		{
+			xrbnodep* p = (xrbnodep*)to_replace;
+			xrbnodep* r = (xrbnodep*)to_remove;
+			xlnode* tmp = p->node;
+			p->node = r->node;
+			r->node = tmp;
+		}
+
+		static void			insert_size(xrbtree& tree, xrbnodep* node);
+		static void			insert_addr(xrbtree& tree, xrbnodep* node);
+
+		static bool			find_bestfit(xrbtree& tree, u32 size, u32 alignment, xrbnodep*& outNode, u32& outNodeSize);
+		static bool			find_size(xrbtree& tree, xlnode* node, xrbnodep*& outNode);
+		static bool			find_addr(xrbtree& tree, memptr ptr, xrbnodep*& outNode);
 
 		static xlnode*		insert_new_node_in_list(xlnode* nodep, u32 size, x_iallocator* a);
 		static void			remove_from_list(xlnode* node);
 
-		static xrbnodep*	remove_from_size_tree(xrbnodep*& root, xrbnodep* node);
-		static xrbnodep*	remove_from_addr_tree(xrbnodep*& root, xrbnodep* node);
+		static xrbnodep*	remove_from_size_tree(xrbtree& tree, xrbnodep* node);
+		static xrbnodep*	remove_from_addr_tree(xrbtree& tree, xrbnodep* node);
 
 
 		u32					xlargebin::sizeof_node()
@@ -118,8 +159,7 @@ namespace xcore
 
 			// Allocate the root nodes for the @size and @address tree
 			mNodeAllocator		= a;
-			mRootSizeTree		= NULL;
-			mRootAddrTree		= NULL;
+			mRootSizeTree.init(rbtree_compare_size, rbtree_swap);
 
 			mBaseAddress		= mem_begin;
 			mNodeListHead		= NULL;
@@ -167,27 +207,23 @@ namespace xcore
 			} while (i != mNodeListHead);
 			mNodeListHead = NULL;
 
-			if (mRootSizeTree != NULL)
 			{
-				xrbnode* root = mRootSizeTree;
-				xrbnode* node_to_destroy = xtree_clear(root);
+				xrbnode* iterator = NULL;
+				xrbnode* node_to_destroy = mRootSizeTree.clear(iterator);
 				while (node_to_destroy != NULL)
 				{
 					a->deallocate(node_to_destroy);
-					node_to_destroy = xtree_clear(root);
+					node_to_destroy = mRootSizeTree.clear(iterator);
 				};
-				mRootSizeTree = NULL;
 			}
-			if (mRootAddrTree != NULL)
 			{
-				xrbnode* root = mRootAddrTree;
-				xrbnode* node_to_destroy = xtree_clear(root);
+				xrbnode* iterator = NULL;
+				xrbnode* node_to_destroy = mRootAddrTree.clear(iterator);
 				while (node_to_destroy != NULL)
 				{
 					a->deallocate(node_to_destroy);
-					node_to_destroy = xtree_clear(root);
+					node_to_destroy = mRootAddrTree.clear(iterator);
 				};
-				mRootAddrTree = NULL;
 			}
 
 			mSizeAlignment    = 0xffffffff;
@@ -357,19 +393,12 @@ namespace xcore
 		}
 
 		// Size tree function implementations
-		static void			insert_size(xrbnodep*& root, xrbnodep* node)
+		static void			insert_size(xrbtree& tree, xrbnodep* node)
 		{
 			ASSERT(node->node->is_free());
-		
-			xrbnode* r = root;
-			rb_insert_node(r, node, rbtree_compare_size);
+			tree.insert(node->node, node);
 			const char* result = NULL;
-			rb_tree_test(r, rbtree_compare_size, result);
-			if (result != NULL)
-			{
-				return;
-			}
-			root = (xrbnodep*)r;
+			tree.test(rbtree_compare_size2, result);
 		}
 
 		static bool			can_handle_size(xrbnodep* node, u32 size, u32 alignment, u32& outSize)
@@ -416,13 +445,13 @@ namespace xcore
 			return false;
 		}
 
-		static bool			find_bestfit(xrbnodep* root, u32 size, u32 alignment, xrbnodep*& outNode, u32& outNodeSize)
+		static bool			find_bestfit(xrbtree& tree, u32 size, u32 alignment, xrbnodep*& outNode, u32& outNodeSize)
 		{
-			if (root == NULL)
+			if (tree.is_empty())
 				return false;
 
 			rb_iterator iterator;
-			xrbnodep* curNode = root;
+			xrbnodep* curNode = (xrbnodep*)tree.get_root();
 			s32 s = xrbnode::LEFT;
 			while (curNode != NULL)
 			{
@@ -462,11 +491,11 @@ namespace xcore
 			return false;
 		}
 
-		bool			find_size(xrbnodep* root, xlnode* node, xrbnodep*& outNode)
+		bool			find_size(xrbtree& tree, xlnode* node, xrbnodep*& outNode)
 		{
 			xsize_t const nodeSize = get_size(node);
 
-			xrbnodep* curNode = root;
+			xrbnodep* curNode = (xrbnodep*)tree.get_root();
 			s32 s = xrbnode::LEFT;
 			while (curNode != NULL)
 			{
@@ -494,24 +523,27 @@ namespace xcore
 			return false;
 		}
 
-		void			insert_addr(xrbnodep*& root, xrbnodep* node)
+		s32		rbtree_compare_addr2(xrbnode* _a, xrbnode* _b)
+		{
+			return rbtree_compare_addr(((xrbnodep*)_a)->node, _b);
+		}
+
+		void			insert_addr(xrbtree& tree, xrbnodep* node)
 		{
 			ASSERT(node->node->is_used());
 
-			xrbnode* r = root;
-			rb_insert_node(r, node, rbtree_compare_addr);
+			tree.insert(node->node, node);
 			const char* result = NULL;
-			rb_tree_test(r, rbtree_compare_addr, result);
+			tree.test(rbtree_compare_addr2, result);
 			if (result != NULL)
 			{
 				return;
 			}
-			root = (xrbnodep*)r;
 		}
 
-		bool			find_addr(xrbnodep* root, memptr ptr, xrbnodep*& outNode)
+		bool			find_addr(xrbtree& tree, memptr ptr, xrbnodep*& outNode)
 		{
-			xrbnodep*	curNode = root;
+			xrbnodep* curNode = (xrbnodep*)tree.get_root();
 			s32 s = xrbnode::LEFT;
 			while (curNode != NULL)
 			{
@@ -551,33 +583,29 @@ namespace xcore
 			next->prev = node->prev;
 		}
 
-		static xrbnodep*	remove_from_size_tree(xrbnodep*& root, xrbnodep* node)
+		static xrbnodep*	remove_from_size_tree(xrbtree& tree, xrbnodep* node)
 		{
-			xrbnode* r = root;
 			xrbnode* o = NULL;
-			rb_remove_node(r, node, rbtree_compare_size, rbtree_swap, o);
+			tree.remove(node->node, o);
 			const char* result = NULL;
-			rb_tree_test(r, rbtree_compare_size, result);
+			tree.test(rbtree_compare_size2, result);
 			if (result != NULL)
 			{
 				return NULL;
 			}
-			root = (xrbnodep*)r;
 			return (xrbnodep*)o;
 		}
 
-		static xrbnodep*	remove_from_addr_tree(xrbnodep*& root, xrbnodep* node)
+		static xrbnodep*	remove_from_addr_tree(xrbtree& tree, xrbnodep* node)
 		{
-			xrbnode* r = root;
 			xrbnode* o = NULL;
-			rb_remove_node(r, node, rbtree_compare_addr, rbtree_swap, o);
+			tree.remove(node->node, o);
 			const char* result = NULL;
-			rb_tree_test(r, rbtree_compare_addr, result);
+			tree.test(rbtree_compare_addr2, result);
 			if (result != NULL)
 			{
 				return NULL;
 			}
-			root = (xrbnodep*)r;
 			return (xrbnodep*)o;
 		}
 	}

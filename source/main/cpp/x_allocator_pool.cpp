@@ -4,6 +4,7 @@
 #include "xbase\x_integer.h"
 #include "xbase\x_allocator.h"
 #include "xbase\x_tree.h"
+#include "xbase\private\x_rbtree_sentinel.h"
 
 #include "xallocator\x_allocator_pool.h"
 
@@ -49,7 +50,7 @@ namespace xcore
 
 				xblock has a 32 bytes overhead caused by the bookkeeping data.
 		**/
-		class xblock : public xrbnode
+		class xblock : public xrbsnode
 		{
 		public:
 								xblock() : mElementArrayBegin (0), mElementArrayEnd (0), mFreeList (0), mNumManagedElements(0), mNumFreeElements(0) { clear(); }
@@ -111,15 +112,17 @@ namespace xcore
 			u32					mNumFreeElements;
 		};
 
-		s32			compare_blocks(xrbnode* a, xrbnode* b)
+		s32			compare_blocks_f(void* a, xrbsnode* b)
 		{
 			xblock* ab = (xblock*)a;
 			xblock* bb = (xblock*)b;
 			return ab->compare(bb);
 		}
-		void		swap_blocks(xrbnode* a, xrbnode* b)
+
+		s32			compare_ptr_block_f(void* a, xrbsnode* b)
 		{
-			// TODO
+			xblock* bb = (xblock*)b;
+			return bb->compare_ptr(a);
 		}
 
 		xblock*		xblock::create(x_iallocator* allocator, u32 inElemSize, u32 inNumElements, s32 inAlignment)
@@ -173,7 +176,7 @@ namespace xcore
 		**/
 		struct xblocktree
 		{
-			inline				xblocktree() : mNumBlocks(0)		{ mRoot = NULL; }
+			inline				xblocktree() : mNumBlocks(0)		{ mTree.init(compare_blocks_f); }
 
 			u32					size() const						{ return mNumBlocks; }
 			bool				empty() const						{ return mNumBlocks == 0; }
@@ -184,91 +187,65 @@ namespace xcore
 					return NULL;
 
 				// The node to remove
-				rb_iterator iterator;
-				xblock* node = (xblock*)iterator.init(mRoot, rb_iterator::MINIMUM);
-				if (node == mRoot)
-				{
-					mRoot = NULL;
-					return node;
-				}
-
-				xrbnode* root = mRoot;
-				xrbnode* removed = NULL;
-				rb_remove_node(root, node, compare_blocks, swap_blocks, removed);
-				ASSERT(node == removed);
-				mRoot = (xblock*)root;
+				xblock* node = (xblock*)mTree.min().current();
+				mTree.remove(node);
 
 				--mNumBlocks;
 
-				removed->clear();
+				node->clear();
 				return node;
 			}
 
 			void				push(xblock* block)
 			{
-				xrbnode* root = mRoot;
-				xtree_insert(root, block, compare_blocks);
+				mTree.insert(block, block);
 				++mNumBlocks;
 			}
 
 			xblock*				find(void* ptr)
 			{
-				xblock* it = (xblock*)mRoot;
-				while ( it != NULL )
+				rbs_iterator it = mTree.root();
+				
+				xrbsnode* node = it.move(ptr, compare_ptr_block_f);
+				while (node == NULL)
 				{
-					s32 cmp = it->compare_ptr(ptr);
-					if ( cmp == 0 )
-						break;
-					it = (xblock*)it->get_child((++cmp)>>1);
+					node = it.move(ptr, compare_ptr_block_f);
 				}
-
-				// 'it' is the block that contains this pointer (element)
-				return it;
+				return NULL;
 			}
 
 			void				remove(xblock* block)
 			{
-				xrbnode* root = mRoot;
-				xrbnode* removed = NULL;
-				rb_remove_node(root, block, compare_blocks, swap_blocks, removed);
-				ASSERT(block == removed);
-				mRoot = (xblock*)root;
-
+				xrbsnode* r = block;
+				mTree.remove(r);
 				--mNumBlocks;
-				removed->clear();
+				r->clear();
 			}
 
 			void				reset(u32 inNumElements, u32 inElemSize)
 			{
-				xrbnode* root = mRoot;
-
-				rb_iterator iterator;
-				iterator.init(root, rb_iterator::MINIMUM);
-
-				xrbnode* node = iterator.move(rb_iterator::FORWARDS);
+				rbs_iterator it = mTree.min();
+				xrbsnode* node = it.current();
 				while (node != NULL)
 				{
 					xblock* block = (xblock*)node;
 					block->reset(inElemSize);
-					node = iterator.move(rb_iterator::FORWARDS);
+					node = it.move();
 				}
 			}
 
 			void				release(x_iallocator* allocator)
 			{
-				xrbnode* root = mRoot;
-				xrbnode* it = NULL;
+				xrbsnode* it = NULL;
 				while (it != NULL)
 				{
-					xrbnode* remove = xtree_clear(root);
+					xrbsnode* remove = mTree.clear(it);
 					if (remove != NULL)
-					{
 						allocator->deallocate(remove);
-					}
 				}
 			}
 		private:
-			xblock*				mRoot;
+			xrbstree			mTree;
 			u32					mNumBlocks;
 		};
 
