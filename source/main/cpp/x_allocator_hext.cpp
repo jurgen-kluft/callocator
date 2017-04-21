@@ -1,35 +1,39 @@
-
 #include <cstdlib>
 #include <stdio.h>
 #include <atomic>
 #include <assert.h>
 
-namespace HEXT_Allocator
+class IAllocator
 {
-	/*
-		1 GB / 1024 = 1024 * 1024 = 1
+public:
+	virtual void*			Allocate(uint32_t size) = 0;
+	virtual void			Deallocate(void* p) = 0;
+};
 
-		262144
-		4096 x 64
-		64 x 64 x 64
 
-		8 x 64 x 64 x 64 x 1024 = 2 GB
-		3 x  6 x  6 x  6 x   10 = 31 bits
+namespace HEXT_Allocator2
+{
+	/*	4 GB
+	Address Table
+	- Address space = 4 GB
+	- Address space granularity = 1 KB
+	- Num Entries = 4 MB
+	- 4 nodes per address location
+	- Num Entries, 4 MB / 4 = 1 MB
+	- 1 entry is a NodeIdx(4)
+	- Total memory is 4 MB
 
-		8 x 8 x 8 x 8 x 8->Linked - List(max 64 (8 x 8) items)
-
-		Size is broken down in the same way as the address
-		Max - size = 32 MB
-		Min - size = 1 KB
-		Granularity = 1 KB
-		(Max - size - Min - size) / Granularity = 32 K num entries
-		8 x 8 x 8 x 8 x 8
+	Size Table
+	- MinSize = 1 KB
+	- MaxSize = 32 MB
+	- Granularity = 1 KB
+	- Num Entries = 32 K
+	- 1 entry is NodeIdx
+	- Bit tree = 8/64/512/4096/32768 = 5 KB
+	- Total Memory = 128 + 5 KB
 	*/
 
-	const static uint32_t	cNullNode      = 0x7FFFFFFF;
-	const static uint16_t	cNodeTypeMask  = 0x80000000;
-	const static uint16_t	cNodeTypeHNode = 0x00000000;
-	const static uint16_t	cNodeTypeTNode = 0x80000000;
+	const static uint32_t	cNullNode = 0xFFFFFFFF;
 
 	struct NodeIdx
 	{
@@ -37,22 +41,46 @@ namespace HEXT_Allocator
 		inline			NodeIdx(uint32_t index) : mIndex(index) {}
 		inline			NodeIdx(const NodeIdx& c) : mIndex(c.mIndex) {}
 
-		void			Reset()										{ mIndex = cNullNode; }
-		bool			IsNull() const								{ return mIndex == cNullNode; }
+		void			Init() { mIndex = cNullNode; }
+		bool			IsNull() const { return mIndex == cNullNode; }
 
-		inline void		SetIndex(uint32_t index)					{ mIndex = (mIndex & cNodeTypeMask) | index; }
-		inline uint32_t	GetIndex() const							{ return mIndex & ~cNodeTypeMask; }
+		inline void		SetIndex(uint32_t index) { mIndex = index; }
+		inline uint32_t	GetIndex() const { return mIndex; }
 
-		inline void		SetType(uint32_t type)						{ mIndex = (mIndex & ~cNodeTypeMask) | type; }
-		inline uint32_t	GetType() const								{ return mIndex & cNodeTypeMask; }
-		inline bool		IsType(uint32_t type) const					{ return (mIndex & cNodeTypeMask) == type; }
-
-		inline bool		operator == (const NodeIdx& other) const	{ return mIndex == other.mIndex; }
-		inline bool		operator != (const NodeIdx& other) const	{ return mIndex != other.mIndex; }
+		inline bool		operator == (const NodeIdx& other) const { return mIndex == other.mIndex; }
+		inline bool		operator != (const NodeIdx& other) const { return mIndex != other.mIndex; }
 
 	private:
 		uint32_t		mIndex;
 	};
+
+	static inline void*		ToVoidPtr(void* base, uint32_t offset)
+	{
+		return (uint8_t*)base + offset;
+	}
+
+	static inline void*		AllocateAndClear(uint32_t size)
+	{
+		void* ptr = malloc(size);
+		memset(ptr, 0, size);
+		return ptr;
+	}
+
+	template<typename T>
+	static inline T*		AllocateAndClear(int32_t count)
+	{
+		T* ptr = (T*)malloc(count * sizeof(T));
+		while (--count >= 0)
+			ptr[count].Init();
+		return ptr;
+	}
+
+	static inline uint32_t	Clamp(uint32_t value, uint32_t cmin, uint32_t cmax)
+	{
+		if (value < cmin) return cmin;
+		if (value > cmax) return cmax;
+		return value;
+	}
 
 	struct Range
 	{
@@ -68,61 +96,198 @@ namespace HEXT_Allocator
 		value:34 => index:4 => from:32 - to:40
 		*/
 
-		void		Set(uint32_t from, uint32_t to, uint32_t divisor, uint32_t min_range)
+		// E.g: 
+		//      Range r;
+		//      r.Set(32 * _MB, 1 * _KB, 8);
+		//
+		void		Set(uint32_t min_range, uint32_t max_range, uint32_t divisor, uint32_t root_level)
 		{
-			mRange[0] = from;
-			mRange[1] = to;
-			mDivisor = divisor;
-			mMaxRange = Distance();
+			mMaxRange = max_range;
 			mMinRange = min_range;
+			mLevel = root_level;
+			mBaseLevel = 0;
+			mRootLevel = root_level;
+
+			uint32_t range = max_range;
+			do {
+				mBaseLevel += 1;
+				range = range / divisor;
+			} while (range > min_range);
+
+			mRange[0] = 0;
+			mRange[1] = max_range;
+			mDivisor = divisor;
 		}
 
-		uint32_t	Distance() const		{ return mRange[1] - mRange[0]; }
-		bool		IsRootLevel() const		{ return Distance() == mMaxRange; }
-		bool		IsBaseLevel() const		{ return Distance() == mMinRange; }
+		void		Set(uint32_t min_range, uint32_t max_range, uint32_t divisor)
+		{
+			Set(min_range, max_range, divisor, 0);
+		}
+
+		uint32_t	AlignValue(uint32_t value) const
+		{
+			value = (value + (mMinRange - 1)) & ~(mMinRange - 1);
+			return value;
+		}
+
+		bool		IsRootLevel() const { return mLevel == mRootLevel; }
+		bool		IsBaseLevel() const { return mLevel == mBaseLevel; }
+		uint32_t	GetLevel() const { return mLevel; }
+		uint32_t	GetRootLevel() const { return mRootLevel; }
+		uint32_t	GetBaseLevel() const { return mBaseLevel; }
+		uint32_t	GetNumLevels() const { return mBaseLevel + 1 - mRootLevel; }
+
+		void		SetChildIndex(uint32_t child_index)
+		{
+			uint32_t const divisor = 1 << (mLevel * 3);
+			uint32_t const subrange = mMaxRange / divisor;
+			uint32_t const from = child_index * subrange;
+			uint32_t const to = from + subrange;
+			mRange[0] = from;
+			mRange[1] = to;
+		}
+
+		uint32_t	GetChildIndexFromValue(uint32_t value) const
+		{
+			value = Clamp(value, 0, mMaxRange - mMinRange);
+			uint32_t const divisor = 1 << (mLevel * 3);
+			uint32_t const subrange = mMaxRange / divisor;
+			uint32_t const index = (value / subrange) & (mDivisor - 1);
+			return index;
+		}
+
+		uint32_t	GetIndexFromValue(uint32_t value) const
+		{
+			value = Clamp(value, 0, mMaxRange - mMinRange);
+			uint32_t const divisor = 1 << (mLevel * 3);
+			uint32_t const subrange = mMaxRange / divisor;
+			uint32_t const index = value / subrange;
+			return index;
+		}
+
+		uint32_t	GetIndex() const
+		{
+			uint32_t const value = mRange[0];
+			uint32_t const divisor = 1 << (mLevel * 3);
+			uint32_t const subrange = mMaxRange / divisor;
+			uint32_t const index = value / subrange;
+			return index;
+		}
+
+		uint32_t	GetIndexFromValueAtBaseLevel(uint32_t value) const
+		{
+			value = Clamp(value, 0, mMaxRange - mMinRange);
+			uint32_t const divisor = 1 << (mBaseLevel * 3);
+			uint32_t const subrange = mMaxRange / divisor;
+			uint32_t const index = value / subrange;
+			return index;
+		}
+
+		uint32_t	GetIndexFromChildIndex(uint32_t index) const
+		{
+			assert(index >= 0 && index < mDivisor);
+			uint32_t const divisor = 1 << (mLevel * 3);
+			uint32_t const subrange = mMaxRange / divisor;
+			uint32_t const value = mRange[0] + index * subrange;
+			return GetIndexFromValue(value);
+		}
 
 		bool		Contains(uint32_t value) const
 		{
+			value = Clamp(value, 0, mMaxRange - mMinRange);
 			return value >= mRange[0] && value < mRange[1];
+		}
+
+		Range		ToBaseLevel(uint32_t value) const
+		{
+			value = Clamp(value, 0, mMaxRange - mMinRange);
+
+			// Align value to minimum range
+			value = value & ~(mMinRange - 1);
+			// Set Range[from,to]
+			Range r(*this);
+			r.mRange[0] = value;
+			r.mRange[1] = value + mMinRange;
+			// This is base-level
+			r.mLevel = mBaseLevel;
+			return r;
+		}
+
+		uint32_t	GetLevelSize(uint32_t level) const
+		{
+			assert(level >= 0 && level <= mBaseLevel);
+			uint32_t const size = 1 << (level * 3);
+			return size;
+		}
+
+		uint32_t	GetBaseLevelSize() const
+		{
+			return GetLevelSize(mBaseLevel);
+		}
+
+		uint32_t	GetTotalSize() const
+		{
+			uint32_t size = 0;
+			for (uint32_t l = mRootLevel; l <= mBaseLevel; ++l)
+				size += GetLevelSize(l);
+			return size;
 		}
 
 		uint32_t	TraverseUp(uint32_t value)
 		{
-			assert(value >= mRange[0] && value < mRange[1]);
+			value = Clamp(value, 0, mMaxRange - mMinRange);
 			if (IsRootLevel() == false)
 			{
-				uint32_t s = Distance() * mDivisor;
-				mRange[0] = mRange[0] & ~(s - 1);
-				mRange[1] = mRange[0] + s;
+				mLevel--;
+
+				uint32_t const divisor = 1 << (mLevel * 3);
+				uint32_t const subrange = mMaxRange / divisor;
+
+				// Align value to sub range
+				value = value & ~(subrange - 1);
+
+				mRange[0] = value;
+				mRange[1] = value + subrange;
 			}
-			uint32_t const subr = Distance() / mDivisor;
-			uint32_t const index = (value - mRange[0]) / subr;
-			return index;
+			return GetChildIndexFromValue(value);
 		}
 
 		uint32_t	TraverseDown(uint32_t value)
 		{
-			assert(value >= mRange[0] && value < mRange[1]);
-			uint32_t const subr = (mRange[1] - mRange[0]) / mDivisor;
-			uint32_t const index = (value - mRange[0]) / subr;
+			value = Clamp(value, 0, mMaxRange - mMinRange);
 			if (IsBaseLevel() == false)
 			{
-				uint32_t const from = index * subr;
-				uint32_t const to = from + subr;
-				mRange[0] = from;
-				mRange[1] = to;
+				mLevel++;
+
+				uint32_t const divisor = 1 << (mLevel * 3);
+				uint32_t const subrange = mMaxRange / divisor;
+
+				// Align value to sub range
+				value = value & ~(subrange - 1);
+
+				mRange[0] = value;
+				mRange[1] = value + subrange;
 			}
-			return index;
+			return GetChildIndexFromValue(value);
+		}
+
+		uint32_t	TraverseDownChild(uint32_t child_index)
+		{
+			uint32_t const subr = (mRange[1] - mRange[0]) / mDivisor;
+			uint32_t const value = mRange[0] + child_index * subr;
+			return TraverseDown(value);
 		}
 
 		uint32_t	mMaxRange;
 		uint32_t	mMinRange;
+		uint32_t	mLevel;
+		uint32_t	mRootLevel;
+		uint32_t	mBaseLevel;
 		uint32_t	mDivisor;
 		uint32_t	mRange[2];
 	};
 
 
-	struct HNode;
 	struct MNode;
 	struct TNode;
 	struct LNode;
@@ -137,11 +302,12 @@ namespace HEXT_Allocator
 			NodeIdx			mNext;
 		};
 
-		// HNode[]
-		NodeIdx			mHNode_FreeList;
-		uint32_t		mNumAllocatedHNodeBlocks;
-		HNode*			mAllocatedHNodes[cMaximumBlocks];
-		MNode*			mAllocatedMNodes[cMaximumBlocks];
+		Range			mAddrRange;
+		NodeIdx*		mAddrNodes;
+
+		NodeIdx*		mSizeNodes;
+		Range			mSizeRange;
+		MNode**			mSizeTree;
 
 		// TNode[]
 		NodeIdx			mTNode_FreeList;
@@ -151,545 +317,648 @@ namespace HEXT_Allocator
 		LNode*			mAllocatedLNodes_Addr[cMaximumBlocks];
 
 		Nodes::Nodes()
-			: mNumAllocatedHNodeBlocks(0)
-			, mNumAllocatedTNodeBlocks(0)
+			: mNumAllocatedTNodeBlocks(0)
 		{
-			for (uint32_t i = 0; i < cMaximumBlocks; ++i)
-			{
-				mAllocatedHNodes[i] = NULL;
-				mAllocatedTNodes[i] = NULL;
-			}
 		}
-		enum EListType
-		{
-			SIZE = 0,
-			ADDR = 1
-		};
 
-		HNode*			IndexToHNode(NodeIdx i) const;
+		void			Initialize(uint32_t min_range, uint32_t max_range, uint32_t min_alloc_size, uint32_t max_alloc_size);
+
+		void			SetSizeUsed(Range range, uint32_t value);
+		void			SetSizeEmpty(Range range, uint32_t value);
+
+		void			Alloc(TNode*& p, NodeIdx& i);
+		void			Dealloc(TNode* tnode, NodeIdx i);
+
 		TNode*			IndexToTNode(NodeIdx i) const;
-		LNode*			IndexToLNode(EListType t, NodeIdx i) const;
 		LNode*			IndexToLNode_Size(NodeIdx i) const;
 		LNode*			IndexToLNode_Addr(NodeIdx i) const;
-		MNode*			IndexToMNode(NodeIdx i) const;
-		FNode*			IndexToFNodeForHNode(NodeIdx i) const;
-		FNode*			IndexToFNodeForTNode(NodeIdx i) const;
-
-		void			Alloc(HNode*& p, NodeIdx& i);
-		void			Alloc(TNode*& p, NodeIdx& i);
-		void			Dealloc(HNode* hnode, NodeIdx i);
-		void			Dealloc(TNode* tnode, NodeIdx i);
+		FNode*			IndexToFNode(NodeIdx i) const;
 	};
 
 
 	// 2 * 4 = 8 bytes
 	struct LNode
 	{
-		void		InsertBefore(Nodes* nodes, NodeIdx self, NodeIdx& head)
+		void			Init()
 		{
-			LNode* headn = nodes->IndexToLNode_Size(head);
-			LNode* prevn = nodes->IndexToLNode_Size(headn->mPrev);
-			LNode* nextn = nodes->IndexToLNode_Size(headn->mNext);
-			mNext = head;
-			mPrev = headn->mPrev;
-			prevn->mNext = self;
-			nextn->mPrev = self;
+			mNext = cNullNode;
+			mPrev = cNullNode;
 		}
 
-		void		RemoveFrom(Nodes* nodes, NodeIdx self, NodeIdx& head)
+		void			InsertBefore(Nodes* nodes, NodeIdx self, NodeIdx node)
+		{
+			LNode* prevn = nodes->IndexToLNode_Size(mPrev);
+			LNode* noden = nodes->IndexToLNode_Size(node);
+			noden->mNext = self;
+			noden->mPrev = mPrev;
+			mPrev = node;
+			if (prevn != NULL) prevn->mNext = node;
+		}
+
+		void			InsertAfter(Nodes* nodes, NodeIdx self, NodeIdx node)
+		{
+			LNode* nextn = nodes->IndexToLNode_Size(mNext);
+			LNode* noden = nodes->IndexToLNode_Size(node);
+			noden->mNext = mNext;
+			noden->mPrev = self;
+			mNext = node;
+			if (nextn != NULL) nextn->mPrev = node;
+		}
+
+		void			RemoveFrom(Nodes* nodes, NodeIdx self, NodeIdx& head)
 		{
 			LNode* prevn = nodes->IndexToLNode_Size(mPrev);
 			LNode* nextn = nodes->IndexToLNode_Size(mNext);
-			prevn->mNext = mNext;
-			nextn->mPrev = mPrev;
+			if (prevn != NULL) prevn->mNext = mNext;
+			if (nextn != NULL) nextn->mPrev = mPrev;
 			if (head == self)
 				head = mNext;
 		}
 
-		NodeIdx		Next() const				{ return mNext; }
-		NodeIdx		Prev() const				{ return mPrev; }
+		NodeIdx			Next() const { return mNext; }
+		NodeIdx			Prev() const { return mPrev; }
 
 	private:
-		NodeIdx		mNext, mPrev;
+		NodeIdx			mNext, mPrev;
 	};
 
-	// 8 bytes
+
+	// TNode is a leaf entity of the SizeNodes and AddrNodes
 	struct TNode
 	{
-		void			SetFree()				{ mSize = mSize & ~USED; }
-		void			SetUsed()				{ mSize = mSize |  USED; }
-		bool			IsFree() const			{ return (mSize & USED) == USED; }
+		void			Init()
+		{
+			mAddr = 0;
+			mSize = 0;
+		}
 
-		uint32_t		GetAddr() const			{ return (mAddr); }
-		void			SetAddr(uint32_t addr)	{ mAddr = addr; }
+		void			SetFree() { mSize = (mSize & ~USED); }
+		void			SetUsed() { mSize = mSize | USED; }
+		bool			IsFree() const { return (mSize & USED) == USED; }
 
-		void			SetSize(uint32_t size)	{ mSize = (mSize & ~FMASK) | (size & ~FMASK); }
-		uint32_t		GetSize() const			{ return (mSize & ~FMASK); }
+		uint32_t		GetAddr() const { return (mAddr); }
+		void			SetAddr(uint32_t addr) { mAddr = addr; }
+		void*			GetPtr(void* ptr) const { return (uint8_t*)ptr + mAddr; }
+
+		void			SetSize(uint32_t size) { mSize = (mSize & FMASK) | ((size >> 4) & ~FMASK); }
+		uint32_t		GetSize() const { return (mSize & ~FMASK) << 4; }
+
+		bool			HasSizeLeft(uint32_t size) const
+		{
+			return size < GetSize();
+		}
+
+		void			Split(Nodes* nodes, NodeIdx self, uint32_t size, TNode*& next_node, NodeIdx& next_nodeidx)
+		{
+			nodes->Alloc(next_node, next_nodeidx);
+			next_node->mAddr = mAddr + size;
+			next_node->mSize = mSize;
+			next_node->SetSize(GetSize() - size);
+
+			LNode* lnode_self = nodes->IndexToLNode_Addr(self);
+			lnode_self->InsertAfter(nodes, self, next_nodeidx);
+
+			SetSize(size);
+		}
 
 	private:
 		enum EFlags
 		{
 			USED = 0x80000000,
-			FMASK = 0x80000000,
-
+			FMASK = 0xF0000000,
 		};
 		uint32_t		mAddr;					// ADDRESS
 		uint32_t		mSize;					// SIZE (*cMinimumSize)
 	};
 
+	// MNode is an entity of the bit based Size-Tree
 	struct MNode
 	{
-		inline			MNode() : mInfo(0) {}
+		inline			MNode() : mBits(0) {}
 
-		uint8_t			GetUsed() const								{ return mInfo; }
-		void			SetUsed(uint8_t used)						{ mInfo = used; }
+		void			Init()
+		{
+			mBits = 0;
+		}
 
-		void			SetChildUsed(uint32_t index)				{ uint8_t const bit = (uint8_t)(1 << index); mInfo = mInfo | bit; }
-		void			SetChildNull(uint32_t index)				{ uint8_t const bit = (uint8_t)(1 << index); mInfo = mInfo & ~bit; }
-		bool			GetChildUsed(uint32_t index) const			{ uint8_t const bit = (uint8_t)(1 << index); return (mInfo & bit) == bit; }
+		uint8_t			GetBits() const { return mBits; }
+		void			SetBits(uint8_t bits) { mBits = bits; }
+
+		bool			GetChildLower(uint32_t child_index, uint32_t& next_index) const
+		{
+			// In the child occupancy find an existing child at a lower position then @child_index.
+			// Return the existing child-index in @existing_index and return 0 or 1. 
+			// Return 0 if @child_index == @existing_index meaning that there is a child at @child_index.
+			// Return 1 if at the current @child_index does not have a valid child but we did find an existing child
+			//          at a lower index.
+			// Return -1 if the child occupancy is empty.
+			if (mBits == 0 || child_index == 0)
+				return false;
+
+			uint32_t occupance = mBits & ((1 << child_index) - 1);
+			if (occupance == 0)
+				return false;
+			uint32_t existing = (occupance ^ (occupance & (occupance - 1)));
+
+			next_index = 0;
+			if ((existing & 0x0F) == 0) { next_index += 4;  existing = existing >> 4; }
+			if ((existing & 0x03) == 0) { next_index += 2;  existing = existing >> 2; }
+			if ((existing & 0x01) == 0) { next_index += 1; }
+			return true;
+		}
+
+		bool			GetChildLowest(uint32_t& next_index) const
+		{
+			return GetChildLower(8, next_index);
+		}
+
+		bool			GetChildHigher(uint32_t child_index, uint32_t& next_index) const
+		{
+			// In the child occupancy find an existing child at the current or higher position then @child_index.
+			// Return the existing child-index in @existing_index and return 0 or 1. 
+			// Return 0 if @child_index == @existing_index meaning that there is a child at @child_index.
+			// Return 1 if at the current @child_index does not have a valid child but we did find an existing child
+			//          at a higher index.
+			// Return -1 if the child occupancy is empty.
+			if (mBits == 0 || child_index == 7)
+				return false;
+
+			uint32_t occupance = mBits & (0xFE << child_index);
+			if (occupance == 0)
+				return false;
+			uint32_t existing = (occupance ^ (occupance & (occupance - 1)));
+
+			next_index = 0;
+			if ((existing & 0x0F) == 0) { next_index += 4;  existing = existing >> 4; }
+			if ((existing & 0x03) == 0) { next_index += 2;  existing = existing >> 2; }
+			if ((existing & 0x01) == 0) { next_index += 1; }
+			return true;
+		}
+
+		void			SetChildUsed(uint32_t index) { uint8_t const bit = (uint8_t)(1 << index); mBits = mBits | bit; }
+		void			SetChildEmpty(uint32_t index) { uint8_t const bit = (uint8_t)(1 << index); mBits = mBits & ~bit; }
+		bool			GetChildUsed(uint32_t index) const { uint8_t const bit = (uint8_t)(1 << index); return (mBits & bit) == bit; }
 
 	private:
-		uint8_t			mInfo;
+		uint8_t			mBits;
 	};
 
-	// 32 bytes
-	struct HNode
+	template<>
+	static inline MNode**	AllocateAndClear<MNode*>(int32_t count)
 	{
-		const static uint32_t	cNumChildren = 8;
+		MNode** ptr = (MNode**)malloc(count * sizeof(MNode*));
+		while (--count >= 0)
+			ptr[count] = NULL;
+		return ptr;
+	}
 
-		void			Reset()
+
+	void			Nodes::Initialize(uint32_t min_range, uint32_t max_range, uint32_t min_alloc_size, uint32_t max_alloc_size)
+	{
+		mAddrRange.Set(min_range, max_range, 8);
+		mAddrNodes = AllocateAndClear<NodeIdx>(mAddrRange.GetBaseLevelSize());
+
+		mSizeRange.Set(min_alloc_size, max_alloc_size, 8, 1);
+		mSizeNodes = AllocateAndClear<NodeIdx>(mSizeRange.GetBaseLevelSize());
+
+		mSizeTree = AllocateAndClear<MNode*>(mSizeRange.GetBaseLevel() + 1);
+		mSizeTree[0] = AllocateAndClear<MNode>(mSizeRange.GetTotalSize() >> 3);
+		for (uint32_t i = mSizeRange.GetRootLevel(); i <= mSizeRange.GetBaseLevel(); ++i)
 		{
-			for (uint32_t i = 0; i < cNumChildren; ++i)
-				mChildren[i].Reset();
-		}
-		void			SetChild(uint32_t idx, NodeIdx child)
-		{
-			mChildren[idx] = child;
-		}
-		NodeIdx			GetChild(uint32_t idx) const
-		{
-			return mChildren[idx];
+			uint32_t numbytes = mSizeRange.GetLevelSize(i - 1) >> 3;
+			mSizeTree[i] = mSizeTree[i - 1] + numbytes;
 		}
 
-	private:
-		NodeIdx			mChildren[cNumChildren];
-	};
+		mTNode_FreeList = NodeIdx();
+		mNumAllocatedTNodeBlocks = 0;
+		for (uint32_t i = 0; i < cMaximumBlocks; ++i)
+		{
+			mAllocatedTNodes[i] = NULL;
+			mAllocatedLNodes_Size[i] = NULL;
+			mAllocatedLNodes_Addr[i] = NULL;
+		}
+	}
 
-	struct Allocator
+	void			Nodes::SetSizeUsed(Range range, uint32_t value)
+	{
+		assert(range.IsBaseLevel());
+
+		uint8_t bits;
+		do
+		{
+			uint32_t li = range.GetLevel();
+			uint32_t ii = range.GetIndexFromValue(value);
+			uint32_t ei = ii >> 3;
+			MNode* mnode = &mSizeTree[li][ei];
+			uint32_t bi = ii & 0x7;
+			bits = mnode->GetBits();
+			mnode->SetChildUsed(bi);
+			if (range.IsRootLevel())
+				break;
+			range.TraverseUp(value);
+		} while (bits == 0);
+	}
+
+	void			Nodes::SetSizeEmpty(Range range, uint32_t value)
+	{
+		assert(range.IsBaseLevel());
+
+		uint8_t bits;
+		do
+		{
+			uint32_t li = range.GetLevel();
+			uint32_t ii = range.GetIndexFromValue(value);
+			uint32_t ei = ii >> 3;
+			MNode* mnode = &mSizeTree[li][ei];
+			uint32_t bi = ii & 0x7;
+			mnode->SetChildEmpty(bi);
+			if (range.IsRootLevel())
+				break;
+
+			bits = mnode->GetBits();
+			range.TraverseUp(value);
+		} while (bits == 0);
+	}
+
+	class Allocator : public IAllocator
 	{
 	public:
 		const uint32_t	cMinimumAllocSize = 1024;
 		const uint32_t	cMaximumAllocSize = 32 * 1024 * 1024;
 		const uint32_t	cGranulaAllocSize = 1024;
 
-		void		Initialize(void* base, uint32_t size);
+		void			Initialize(void* mem_base, uint32_t mem_size, uint32_t min_alloc_size, uint32_t max_alloc_size);
+		void			Destroy();
 
-		void*		Alloc(uint32_t size);
-		void		Deallocate(void*);
+		void*			Allocate(uint32_t size);
+		void			Deallocate(void*);
 
 	private:
-		bool		FindSize(uint32_t size);
-		bool		FindAddr(uint32_t addr);
-		void		Coallesce(TNode*& curr);
+		NodeIdx			FindSize(uint32_t size) const;
+		NodeIdx			FindAddr(uint32_t addr) const;
 
-		NodeIdx		FindAddress(Nodes* nodes, NodeIdx current, uint32_t address, Range range);
+		void			AddToAddr(NodeIdx node, uint32_t address);
+		void			AddToSize(NodeIdx node, uint32_t size);
 
-		NodeIdx		AddToAddrHierarchy(Nodes* nodes, NodeIdx& current, NodeIdx node, uint32_t address, Range range);
-		NodeIdx		AddToSizeHierarchy(Nodes* nodes, NodeIdx current, NodeIdx node, uint32_t size, Range range);
+		void			RemoveFromAddr(NodeIdx node, uint32_t addr);
+		void			RemoveFromSize(NodeIdx node, uint32_t size);
 
-		NodeIdx		RemoveFromAddrHierarchy(Nodes* nodes, NodeIdx current, NodeIdx node, uint32_t addr, Range range);
-		NodeIdx		RemoveFromSizeHierarchy(Nodes* nodes, NodeIdx current, NodeIdx node, uint32_t size, Range range);
+		int32_t			Coallesce(NodeIdx& n, TNode*& curr_tnode);
 
-		NodeIdx		FindBestFitInSizeHierarchy(Nodes* nodes, NodeIdx current, uint32_t size, Range range);
-
-		Nodes		mNodes;
-
-		NodeIdx		mAddrHierarchy;
-		NodeIdx		mSizeHierarchy;
+		void*			mMemBase;
+		Nodes			mNodes;
 	};
 
-	// The current HNode has N children where every child represents a part of 
-	// the range that this HNode covers. When we ask for an existing child this
-	// function will return a child that is at the current index or higher in
-	// the range. Of course when this HNode has no children then it will return
-	// an invalid
-	static inline int32_t	CountLeadingZeros(uint8_t i8)
+	NodeIdx		Allocator::FindSize(uint32_t size) const
 	{
-		int32_t count = 0;
-		if ((i8 & 0x0F) == 0) { count += 4;  i8 = i8 >> 4; }
-		if ((i8 & 0x03) == 0) { count += 2;  i8 = i8 >> 2; }
-		if ((i8 & 0x01) == 0) { count += 1; }
-		return count;
+		assert(mNodes.mSizeRange.Contains(size));
+
+		size = mNodes.mSizeRange.AlignValue(size);
+		uint32_t const index = mNodes.mSizeRange.GetIndexFromValueAtBaseLevel(size);
+		NodeIdx current = mNodes.mSizeNodes[index];
+
+		// So can this TNode fullfill the size request ?
+		if (current.IsNull() == false)
+		{
+			LNode* lnode = mNodes.IndexToLNode_Size(current);
+			TNode* tnode = mNodes.IndexToTNode(current);
+			while (true)
+			{
+				if (size >= tnode->GetSize())
+					return current;
+				if (lnode->Next().IsNull())
+					break;
+				current = lnode->Next();
+				tnode = mNodes.IndexToTNode(current);
+				lnode = mNodes.IndexToLNode_Addr(current);
+			}
+		}
+
+		// Ok, so here we did not find an exact fit, go and find a best fit
+		// Move up the tree to find a branch that holds a larger size.
+		Range r = mNodes.mSizeRange.ToBaseLevel(size);
+
+		uint32_t child_index = r.GetIndexFromValue(size) & 0x7;
+		uint32_t mlevel_index = r.GetLevel();
+		uint32_t mnode_index = r.GetIndexFromValue(size) >> 3;
+		MNode* mnode = &mNodes.mSizeTree[mlevel_index][mnode_index];
+
+		enum ETraverseDir { UP = -1, DOWN = 1 };
+		ETraverseDir traverse_dir = UP;
+		uint32_t next_index;
+		while (true)
+		{
+			if (traverse_dir == UP)
+			{
+				if (mnode->GetChildHigher(child_index, next_index))
+				{
+					// We found a next size and now we should traverse down to
+					// the base-level.
+					child_index = next_index;
+					r.SetChildIndex(child_index);
+					traverse_dir = DOWN;
+				}
+				else
+				{
+					if (r.IsRootLevel())
+						break;
+					r.TraverseUp(size);
+
+					child_index = r.GetIndexFromValue(size) & 0x7;
+					mlevel_index = r.GetLevel();
+					mnode_index = r.GetIndexFromValue(size) >> 3;
+					mnode = &mNodes.mSizeTree[mlevel_index][mnode_index];
+				}
+			}
+			else if (traverse_dir == DOWN)
+			{
+				if (r.IsBaseLevel())
+				{
+					// So do we have an existing TNode here ?
+					mnode_index = r.GetIndex();
+					current = mNodes.mSizeNodes[mnode_index];
+					break;
+				}
+
+				r.TraverseDownChild(child_index);
+				mlevel_index = r.GetLevel();
+				mnode_index = r.GetIndex() >> 3;
+				mnode = &mNodes.mSizeTree[mlevel_index][mnode_index];
+
+				// When traversing down we need to traverse to the most minimum existing leaf.
+				// So on every level pick the minimum existing child index and traverse down
+				// into that child.
+				if (mnode->GetChildLowest(child_index) == false)
+					break;
+			}
+		}
+		return current;
 	}
 
-	// In the child occupancy find an existing child at the current or higher position then @child_index.
-	// Return the existing child-index in @existing_index and return 0 or 1. 
-	// Return 0 if @child_index == @existing_index meaning that there is a child at @child_index.
-	// Return 1 if at the current @child_index does not have a valid child but we did find an existing child
-	//          at a higher index.
-	// Return -1 if the child occupancy is empty.
-	inline int32_t FindExistingChild_GE(uint8_t child_occupance, uint32_t child_index, uint32_t& existing_index)
+	NodeIdx		Allocator::FindAddr(uint32_t address) const
 	{
-		if (child_occupance == 0)
-			return -1;
-
-		uint32_t occupance = child_occupance & (0xFF << child_index);
-		uint32_t existing = (occupance ^ (occupance & (occupance - 1)));
-		existing_index = (1 << child_index) == existing ? 0 : child_index;
-		child_index = CountLeadingZeros(existing);
-		return existing_index==child_index ? 0 : 1;
-	}
-
-	struct HIterator
-	{
-		inline		HIterator() : mPathLength(0) {}
-
-		bool		NotEmpty() const { return mPathLength > 0; }
-
-		void		Push(NodeIdx node, uint32_t index)
-		{
-			mNode[mPathLength] = node;
-			mIndex[mPathLength] = index;
-			++mPathLength;
-		}
-
-		NodeIdx		Pop(uint32_t& index)
-		{
-			--mPathLength;
-			index = mIndex[mPathLength];
-			return mNode[mPathLength];
-		}
-
-		Nodes*		mNodes;
-		uint32_t	mPathLength;
-
-		struct PathNode
-		{
-			NodeIdx		mParent;
-			uint32_t	mChildIndex;	// Index of child in parent
-			NodeIdx		mChildNode;		// The child
-		};
-
-		uint32_t	mIndex[7];
-		NodeIdx		mNode[7];
-	};
-
-	NodeIdx		Allocator::FindAddress(Nodes* nodes, NodeIdx current, uint32_t address, Range range)
-	{
-		while (range.IsBaseLevel() == false)
-		{
-			MNode* mcurrent = nodes->IndexToMNode(current);
-			uint8_t child_occupance = mcurrent->GetUsed();
-			HNode* hnode = nodes->IndexToHNode(current);
-			uint32_t child_index = range.TraverseDown(address);
-
-			// Is this child a TNode or a HNode ? If it is a TNode
-			// or Null we cannot iterate further down the hierarchy.
-			if (current.IsNull() || current.GetType() == cNodeTypeTNode)
-				break;
-
-			current = hnode->GetChild(child_index);
-		}
+		assert(mNodes.mAddrRange.Contains(address));
+		uint32_t const index = mNodes.mAddrRange.GetIndexFromValueAtBaseLevel(address);
+		NodeIdx current = mNodes.mAddrNodes[index];
 
 		// So does this TNode actually matches the address?
 		if (current.IsNull() == false)
 		{
-			TNode* tnode = nodes->IndexToTNode(current);
-
 			// This TNode is the start of a list that we need to iterate 
 			// over to find the TNode that holds this address. We should
 			// stop once we have a node that falls out of 'range'.
-			LNode* lnode = nodes->IndexToLNode_Addr(current);
-			while (range.Contains(tnode->GetAddr()))
+			LNode* lnode = mNodes.IndexToLNode_Addr(current);
+			TNode* tnode = mNodes.IndexToTNode(current);
+			Range baser = mNodes.mAddrRange.ToBaseLevel(address);
+			while (baser.Contains(tnode->GetAddr()))
 			{
 				if (tnode->GetAddr() == address)
 					return current;
+				if (lnode->Next().IsNull())
+					break;
 				current = lnode->Next();
-				tnode = nodes->IndexToTNode(current);
-				lnode = nodes->IndexToLNode_Addr(current);
+				tnode = mNodes.IndexToTNode(current);
+				lnode = mNodes.IndexToLNode_Addr(current);
 			}
 		}
 		return NodeIdx();
 	}
 
-
-	NodeIdx		Allocator::AddToAddrHierarchy(Nodes* nodes, NodeIdx& current, NodeIdx node, uint32_t address, Range range)
+	void		Allocator::AddToAddr(NodeIdx node, uint32_t address)
 	{
-		assert(current.IsType(cNodeTypeHNode));
-		assert(node.IsType(cNodeTypeTNode));
+		assert(mNodes.mAddrRange.Contains(address));
 
 		// The TNode is already linked into the address-list, so we do not have to search an existing child.
-		// We really need to add it to the exact place in the hierarchy.
+		uint32_t const index = mNodes.mAddrRange.GetIndexFromValueAtBaseLevel(address);
+		NodeIdx head = mNodes.mAddrNodes[index];
 
-		HIterator it;
-		while (range.IsBaseLevel() == false)
-		{
-			MNode* mcurrent = nodes->IndexToMNode(current);
-			uint8_t child_occupance = mcurrent->GetUsed();
-			HNode* hnode = nodes->IndexToHNode(current);
-			uint32_t child_index = range.TraverseDown(address);
-
-			it.Push(current, child_index);
-			current = hnode->GetChild(child_index);
-
-			// Does this child have a node and is it a TNode or a HNode ? 
-			// If it is TNode we cannot iterate further down the hierarchy.
-			if (current.IsNull() == true || current.GetType() == cNodeTypeTNode)
-				break;
-		}
-
-		if (current.IsNull())
+		if (head.IsNull())
 		{
 			// So the location where we should put this entry is not used yet
-			// Get the parent
-			uint32_t child_index;
-			NodeIdx parent = it.Pop(child_index);
-			HNode* hnode = nodes->IndexToHNode(parent);
-			hnode->SetChild(child_index, node);
-		}
-		else if (current.IsType(cNodeTypeTNode))
-		{
-			// Are we add the base-level? If not we need to push down both
-			// @current and @node until their child-index is different or
-			// when reaching base-level.
-
-			// @TODO
-
-		}
-		else if (current.IsType(cNodeTypeHNode))
-		{
-			// We reached base-level
-
-			// @TODO
-
-		}
-		return NodeIdx();
-	}
-
-	NodeIdx		Allocator::AddToSizeHierarchy(Nodes* nodes, NodeIdx current, NodeIdx node, uint32_t size, Range range)
-	{
-		assert(current.IsType(cNodeTypeHNode));
-		assert(node.IsType(cNodeTypeTNode));
-
-		HIterator it;
-		while (range.IsBaseLevel() == false)
-		{
-			MNode* mcurrent = nodes->IndexToMNode(current);
-			uint8_t child_occupance = mcurrent->GetUsed();
-			HNode* hnode = nodes->IndexToHNode(current);
-			uint32_t child_index = range.TraverseDown(size);
-			NodeIdx parent = current;
-
-			it.Push(current, child_index);
-			current = hnode->GetChild(child_index);
-			if (current.IsNull())
-			{
-				// No node here, we could set this TNode here at this child.
-				mcurrent->SetChildUsed(child_index);
-				hnode->SetChild(child_index, node);
-				return parent;
-			}
-
-			// Is this child a TNode or a HNode ? If it is a TNode
-			// we cannot iterate further down the hierarchy.
-			if (current.IsType(cNodeTypeTNode))
-				break;
-		}
-
-		// So we found either a TNode as a child or we reached base-level in the hierarchy
-		if (current.IsType(cNodeTypeTNode))
-		{
-			// Here we found a TNode and we need to push both nodes down the hierarchy
-			// Traverse down creating HNodes until the child-index of @current and @node
-			// are different or when reaching base-level. Also make sure to mark the
-			// occupancy when traversing down.
+			mNodes.mAddrNodes[index] = node;
 		}
 		else
-		{	// We reached base-level and we have a HNode so we just have to insert @node 
-			// at the child location.
-			// Also mark this child as used in the occupancy.
-
-		}
-
-		return NodeIdx();
-	}
-
-	NodeIdx	Allocator::RemoveFromAddrHierarchy(Nodes* nodes, NodeIdx current, NodeIdx node, uint32_t address, Range range)
-	{
-		HIterator it;
-		while (range.IsBaseLevel() == false)
 		{
-			MNode* mcurrent = nodes->IndexToMNode(current);
-			uint8_t child_occupance = mcurrent->GetUsed();
-			HNode* hnode = nodes->IndexToHNode(current);
-			uint32_t child_index = range.TraverseDown(address);
-
-			it.Push(current, child_index);
-			current = hnode->GetChild(child_index);
-
-			// Is this child a TNode or a HNode ? If it is Null or a TNode
-			// we cannot iterate further down the hierarchy.
-			if (current.IsNull() || current.GetType() == cNodeTypeTNode)
-				break;
-		}
-
-		if (current.IsNull() == false)
-		{
-			if (current == node)
+			// Check if the address of us is smaller than the address of the current
+			// node, if so we need to set node.
+			TNode* head_tnode = mNodes.IndexToTNode(head);
+			LNode* head_lnode = mNodes.IndexToLNode_Addr(head);
+			if (address < head_tnode->GetAddr())
 			{
-				// Found it!
+				head_lnode->InsertBefore(&mNodes, head, node);
 			}
 			else
 			{
-				// Iterate over the addr-list until we move out of the current range.
+				head_lnode->InsertAfter(&mNodes, head, node);
 			}
 		}
-		return NodeIdx();
 	}
 
-	NodeIdx	Allocator::RemoveFromSizeHierarchy(Nodes* nodes, NodeIdx current, NodeIdx node, uint32_t size, Range range)
+	void		Allocator::AddToSize(NodeIdx node, uint32_t size)
 	{
-		HIterator it;
-		while (range.IsBaseLevel() == false)
+		uint32_t const index = mNodes.mSizeRange.GetIndexFromValueAtBaseLevel(size);
+		NodeIdx head = mNodes.mSizeNodes[index];
+
+		// So we found either a TNode as a child or Null
+		if (head.IsNull())
 		{
-			MNode* mcurrent = nodes->IndexToMNode(current);
-			uint8_t child_occupance = mcurrent->GetUsed();
-			HNode* hnode = nodes->IndexToHNode(current);
-			uint32_t child_index = range.TraverseDown(size);
+			// No existing nodes here yet, just set it
+			mNodes.mSizeNodes[index] = node;
 
-			it.Push(current, child_index);
-			current = hnode->GetChild(child_index);
-
-			// Is this child a TNode or a HNode ? If it is Null or a TNode
-			// we cannot iterate further down the hierarchy.
-			if (current.IsNull() || current.GetType() == cNodeTypeTNode)
-				break;
+			Range r = mNodes.mSizeRange.ToBaseLevel(size);
+			mNodes.SetSizeUsed(r, size);
 		}
-
-		if (current.IsNull() == false)
-		{
-			if (current == node)
+		else
+		{	// We have an existing node here, so we have to add it to the list
+			// We do not have to update the Size-Tree
+			TNode* head_tnode = mNodes.IndexToTNode(head);
+			LNode* head_lnode = mNodes.IndexToLNode_Size(head);
+			if (size > head_tnode->GetSize())
 			{
-				// Found it!
-				// When removing it here we need to check if there are any childs left.
-				// If not we should remove our mark from the occupancy and if the occupancy
-				// then becomes 'zero' we should traverse up and remove our child mark from
-				// the parent etc..
+				head_lnode->InsertAfter(&mNodes, head, node);
 			}
 			else
 			{
-				// Iterate over the size-list until we move out of the current range.
-				// When we remove it from the list check if we where the only one in the list.
-				// If so we need to unmark occupancy and traverse upwards resetting occupancy.
+				head_lnode->InsertBefore(&mNodes, head, node);
 			}
 		}
-		return NodeIdx();
 	}
 
-	NodeIdx	Allocator::FindBestFitInSizeHierarchy(Nodes* nodes, NodeIdx current, uint32_t size, Range range)
+	void	Allocator::RemoveFromAddr(NodeIdx node, uint32_t address)
 	{
-		HIterator it;
-		while (current.IsNull() == false)
+		uint32_t const index = mNodes.mAddrRange.GetIndexFromValueAtBaseLevel(address);
+		NodeIdx head = mNodes.mAddrNodes[index];
+
+		if (head.IsNull() == false)
 		{
-			MNode* mcurrent = nodes->IndexToMNode(current);
-			uint8_t child_occupancy = mcurrent->GetUsed();
-			HNode* hnode = nodes->IndexToHNode(current);
-			uint32_t child_index = range.TraverseDown(size);
-			
-			uint32_t existing_index;
-			if (FindExistingChild_GE(child_occupancy, child_index, existing_index) == -1)
+			Range r = mNodes.mAddrRange.ToBaseLevel(address);
+			NodeIdx current = head;
+			TNode* tnode = mNodes.IndexToTNode(current);
+			while (current != node && r.Contains(tnode->GetAddr()))
 			{
-				// This means there are no TNodes in the hierarchy that can match this size
-				return NodeIdx();
+				tnode = mNodes.IndexToTNode(current);
+				LNode* lnode = mNodes.IndexToLNode_Addr(current);
+				current = lnode->Next();
+			};
+
+			if (current == node)
+			{
+				LNode* lnode = mNodes.IndexToLNode_Addr(current);
+				lnode->RemoveFrom(&mNodes, current, head);
+				mNodes.mAddrNodes[index] = head;
 			}
-
-			it.Push(current, child_index);
-			current = hnode->GetChild(existing_index);
-
-			// Is this child a TNode or a HNode ? If it is Null or a TNode
-			// we cannot iterate further down the hierarchy.
-			if (current.IsNull() || current.GetType() == cNodeTypeTNode)
-				break;
-		}
-
-		if (current.IsNull() == false)
-		{
-			TNode* tnode = nodes->IndexToTNode(current);
-			if (size >= tnode->GetSize())
+			else
 			{
-				// Ok, this TNode can give us the size that is requested
-				// See if there is any size left, if so then this node
-				// should be removed and added back to the hierarchy,
-				// otherwise take all!
-				if ((tnode->GetSize() - size) >= cMinimumAllocSize)
+				// ? error
+			}
+		}
+		else
+		{
+			// ? error
+		}
+	}
+
+	void	Allocator::RemoveFromSize(NodeIdx node, uint32_t size)
+	{
+		uint32_t const index = mNodes.mSizeRange.GetIndexFromValueAtBaseLevel(size);
+		NodeIdx head = mNodes.mSizeNodes[index];
+
+		if (head.IsNull() == false)
+		{
+			Range r = mNodes.mAddrRange.ToBaseLevel(size);
+			NodeIdx current = head;
+			TNode* tnode = mNodes.IndexToTNode(current);
+			while (current != node && r.Contains(tnode->GetAddr()))
+			{
+				tnode = mNodes.IndexToTNode(current);
+				LNode* lnode = mNodes.IndexToLNode_Size(current);
+				current = lnode->Next();
+			};
+
+			if (current == node)
+			{
+				LNode* lnode = mNodes.IndexToLNode_Size(current);
+				lnode->RemoveFrom(&mNodes, current, head);
+				mNodes.mAddrNodes[index] = head;
+			}
+			else
+			{
+				// ? error
+			}
+		}
+		else
+		{
+			// ? error
+		}
+	}
+
+	void	Allocator::Initialize(void* mem_base, uint32_t mem_size, uint32_t min_alloc_size, uint32_t max_alloc_size)
+	{
+		mMemBase = mem_base;
+		mNodes.Initialize(min_alloc_size, mem_size, min_alloc_size, max_alloc_size);
+
+		// Create initial node that holds all free memory
+		TNode* tnode;
+		NodeIdx tnode_index;
+		mNodes.Alloc(tnode, tnode_index);
+		tnode->SetAddr(0);
+		tnode->SetSize(mem_size);
+		tnode->SetFree();
+		mem_size = tnode->GetSize();
+		AddToSize(tnode_index, mem_size);
+	}
+
+	void*	Allocator::Allocate(uint32_t size)
+	{
+		NodeIdx curr = FindSize(size);
+		if (curr.IsNull() == false)
+		{
+			TNode* curr_tnode = mNodes.IndexToTNode(curr);
+
+			// Split of the size that we need if anything left above 
+			// the minimum alloc size add it back to @size.
+			if (size <= curr_tnode->GetSize())
+			{
+				RemoveFromSize(curr, curr_tnode->GetSize());
+				if (curr_tnode->HasSizeLeft(size))
 				{
-					// Remove current from SizeHierarchy and add it back with
-					// the requested size substracted.
-
+					NodeIdx left_nodeidx;
+					TNode* left_tnode;
+					curr_tnode->Split(&mNodes, curr, size, left_tnode, left_nodeidx);
+					left_tnode->SetFree();
+					AddToSize(left_nodeidx, left_tnode->GetSize());
 				}
+				curr_tnode->SetUsed();
+				AddToAddr(curr, curr_tnode->GetAddr());
+				return curr_tnode->GetPtr(mMemBase);
 			}
 		}
-		return NodeIdx();
-	}
-
-
-	bool	Allocator::FindAddr(uint32_t addr)
-	{
-		return false;
-	}
-
-	bool	Allocator::FindSize(uint32_t addr)
-	{
-		return false;
-	}
-
-	void	Allocator::Initialize(void* base, uint32_t size)
-	{
-
-	}
-
-	void*	Allocator::Alloc(uint32_t size)
-	{
 		return NULL;
 	}
 
-	void	Allocator::Deallocate(void*)
+	void	Allocator::Deallocate(void* p)
 	{
+		uint32_t address = (uint32_t)((uint8_t*)p - (uint8_t*)mMemBase);
+		NodeIdx curr = FindAddr(address);
+		TNode* curr_tnode = mNodes.IndexToTNode(curr);
+		curr_tnode->SetFree();
+		RemoveFromAddr(curr, address);
+		Coallesce(curr, curr_tnode);
+		AddToSize(curr, curr_tnode->GetSize());
 	}
 
-	void	Allocator::Coallesce(TNode*& curr)
+	// return: 0 = nothing done
+	//         1 = merged with @next
+	//         2 = merged with @prev
+	//         3 = merged with @next & @prev
+	int32_t	Allocator::Coallesce(NodeIdx& curr, TNode*& curr_tnode)
 	{
+		LNode* curr_lnode = mNodes.IndexToLNode_Addr(curr);
+		NodeIdx curr_next = curr_lnode->Next();
+		NodeIdx curr_prev = curr_lnode->Prev();
+
+		int32_t c = 0;
+
 		// Is @next address free?
-		//   Remove @next from the address hierarchy
-		//   Remove @next from the size hierarchy
-		//   Deallocate @next
+		//   Remove @next from @address 
+		//   Remove @next from @size 
 		//   Update size of @curr
+		//   Deallocate @next
+		TNode* next_tnode = mNodes.IndexToTNode(curr_next);
+		if (next_tnode != NULL && next_tnode->IsFree())
+		{
+			// Ok, @next is going to disappear and merged into current
+			curr_tnode->SetSize(curr_tnode->GetSize() + next_tnode->GetSize());
+			RemoveFromAddr(curr_next, next_tnode->GetAddr());
+			RemoveFromSize(curr_next, next_tnode->GetSize());
+			mNodes.Dealloc(next_tnode, curr_next);
+			c |= 1;
+		}
 
 		// Is @prev free?
-		//   Remove @curr from the address hierarchy
-		//   Remove @prev from the size hierarchy
+		//   Remove @curr from @address 
+		//   Remove @prev from @size 
 		//   Update size of @prev
 		//   Deallocate @curr
-		//   Add @prev to the size hierarchy
+		//   Add @prev to @size 
 		//   @curr = @prev
+		TNode* prev_tnode = mNodes.IndexToTNode(curr_prev);
+		if (prev_tnode != NULL && prev_tnode->IsFree())
+		{
+			prev_tnode->SetSize(curr_tnode->GetSize() + prev_tnode->GetSize());
+			RemoveFromAddr(curr, curr_tnode->GetAddr());
+			RemoveFromSize(curr, curr_tnode->GetSize());
+			mNodes.Dealloc(curr_tnode, curr);
+			curr = curr_prev;
+			curr_tnode = prev_tnode;
+			c |= 2;
+		}
+
+		return c;
 	}
 
 
 
-
-
-
-
-
-
-	HNode*			Nodes::IndexToHNode(NodeIdx i) const
-	{
-		if (i.IsNull())
-			return NULL;
-		uint32_t bi = (i.GetIndex() >> 16) & 0xFFFF;
-		uint32_t ei = i.GetIndex() & 0xFFFF;
-		return &mAllocatedHNodes[bi][ei];
-	}
 	TNode*			Nodes::IndexToTNode(NodeIdx i) const
 	{
 		if (i.IsNull())
@@ -699,19 +968,6 @@ namespace HEXT_Allocator
 		return (TNode*)&mAllocatedTNodes[bi][ei];
 	}
 
-	LNode*			Nodes::IndexToLNode(EListType t, NodeIdx i) const
-	{
-		if (i.IsNull())
-			return NULL;
-		uint32_t bi = (i.GetIndex() >> 16) & 0xFFFF;
-		uint32_t ei = i.GetIndex() & 0xFFFF;
-		switch (t)
-		{
-		case SIZE: return (LNode*)&mAllocatedLNodes_Size[bi][ei];
-		case ADDR: return (LNode*)&mAllocatedLNodes_Addr[bi][ei];
-		}
-		return NULL;
-	}
 	LNode*			Nodes::IndexToLNode_Size(NodeIdx i) const
 	{
 		if (i.IsNull())
@@ -728,23 +984,8 @@ namespace HEXT_Allocator
 		uint32_t ei = i.GetIndex() & 0xFFFF;
 		return (LNode*)&mAllocatedLNodes_Addr[bi][ei];
 	}
-	MNode*			Nodes::IndexToMNode(NodeIdx i) const
-	{
-		if (i.IsNull())
-			return NULL;
-		uint32_t bi = (i.GetIndex() >> 16) & 0xFFFF;
-		uint32_t ei = i.GetIndex() & 0xFFFF;
-		return (MNode*)&mAllocatedMNodes[bi][ei];
-	}
-	Nodes::FNode*	Nodes::IndexToFNodeForHNode(NodeIdx i) const
-	{
-		if (i.IsNull())
-			return NULL;
-		uint32_t bi = (i.GetIndex() >> 16) & 0xFFFF;
-		uint32_t ei = i.GetIndex() & 0xFFFF;
-		return (FNode*)&mAllocatedHNodes[bi][ei];
-	}
-	Nodes::FNode*	Nodes::IndexToFNodeForTNode(NodeIdx i) const
+
+	Nodes::FNode*	Nodes::IndexToFNode(NodeIdx i) const
 	{
 		if (i.IsNull())
 			return NULL;
@@ -753,63 +994,41 @@ namespace HEXT_Allocator
 		return (FNode*)&mAllocatedTNodes[bi][ei];
 	}
 
-	void			Nodes::Alloc(HNode*& p, NodeIdx& i)
-	{
-		if (mHNode_FreeList.IsNull())
-		{
-			mAllocatedHNodes[mNumAllocatedHNodeBlocks] = (HNode*)malloc(sizeof(HNode) * cNodesPerBlock);
-			mAllocatedMNodes[mNumAllocatedHNodeBlocks] = (MNode*)malloc(sizeof(MNode) * cNodesPerBlock);
-			mNumAllocatedHNodeBlocks += 1;
-			const uint32_t block_index = (mNumAllocatedHNodeBlocks << 16) | cNodeTypeHNode;;
-			for (uint32_t i = 0; i<cNodesPerBlock; ++i)
-			{
-				NodeIdx ni(block_index | i);
-				HNode* hnode = IndexToHNode(ni);
-				Dealloc(hnode, ni);
-			}
-		}
-
-		i = mHNode_FreeList;
-		FNode* fnode = IndexToFNodeForHNode(i);
-		mHNode_FreeList = fnode->mNext;
-		p = (HNode*)fnode;
-	}
-
 	void			Nodes::Alloc(TNode*& p, NodeIdx& i)
 	{
 		if (mTNode_FreeList.IsNull())
 		{
-			mAllocatedTNodes[mNumAllocatedTNodeBlocks] = (TNode*)malloc(sizeof(TNode) * cNodesPerBlock);
-			mAllocatedLNodes_Size[mNumAllocatedTNodeBlocks] = (LNode*)malloc(sizeof(LNode) * cNodesPerBlock);
-			mAllocatedLNodes_Addr[mNumAllocatedTNodeBlocks] = (LNode*)malloc(sizeof(LNode) * cNodesPerBlock);
-			mNumAllocatedTNodeBlocks += 1;
-			const uint32_t block_index = (mNumAllocatedTNodeBlocks << 16) | cNodeTypeTNode;
+			mAllocatedTNodes[mNumAllocatedTNodeBlocks] = AllocateAndClear<TNode>(cNodesPerBlock);
+			mAllocatedLNodes_Size[mNumAllocatedTNodeBlocks] = AllocateAndClear<LNode>(cNodesPerBlock);
+			mAllocatedLNodes_Addr[mNumAllocatedTNodeBlocks] = AllocateAndClear<LNode>(cNodesPerBlock);
+			const uint32_t block_index = (mNumAllocatedTNodeBlocks << 16);
 			for (uint32_t i = 0; i<cNodesPerBlock; ++i)
 			{
 				NodeIdx ni(block_index | i);
 				TNode* tnode = IndexToTNode(ni);
 				Dealloc(tnode, ni);
 			}
+			mNumAllocatedTNodeBlocks += 1;
 		}
 
 		i = mTNode_FreeList;
-		FNode* fnode = IndexToFNodeForTNode(i);
+		FNode* fnode = IndexToFNode(i);
 		mTNode_FreeList = fnode->mNext;
 		p = (TNode*)fnode;
 	}
 
-	void			Nodes::Dealloc(HNode* hnode, NodeIdx i)
-	{
-		FNode* fnode = IndexToFNodeForHNode(i);
-		fnode->mNext = mHNode_FreeList;
-		mHNode_FreeList = i;
-	}
-
 	void			Nodes::Dealloc(TNode* tnode, NodeIdx i)
 	{
-		FNode* fnode = IndexToFNodeForTNode(i);
+		FNode* fnode = IndexToFNode(i);
 		fnode->mNext = mTNode_FreeList;
 		mTNode_FreeList = i;
 	}
 
 };
+
+IAllocator*		gCreateExtAllocator2(void* mem_base, uint32_t mem_size, uint32_t min_alloc_size, uint32_t max_alloc_size)
+{
+	HEXT_Allocator2::Allocator* allocator = new HEXT_Allocator2::Allocator();
+	allocator->Initialize(mem_base, mem_size, min_alloc_size, max_alloc_size);
+	return allocator;
+}
