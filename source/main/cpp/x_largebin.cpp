@@ -60,7 +60,7 @@ namespace xcore
 
 		static inline xrbnodep*	allocate_tree_node(x_iallocator* allocator)
 		{
-			void* nodePtr = allocator->allocate(sizeof(xlnode), sizeof(void*));
+			void* nodePtr = allocator->allocate(sizeof(xrbnodep), sizeof(void*));
 			xrbnodep* node = (xrbnodep*)nodePtr;
 			node->clear();
 			node->node = NULL;
@@ -160,6 +160,7 @@ namespace xcore
 			// Allocate the root nodes for the @size and @address tree
 			mNodeAllocator		= a;
 			mRootSizeTree.init(rbtree_compare_size, rbtree_swap);
+			mRootAddrTree.init(rbtree_compare_addr, rbtree_swap);
 
 			mBaseAddress		= mem_begin;
 			mNodeListHead		= NULL;
@@ -383,22 +384,14 @@ namespace xcore
 			return s;
 		}
 
-		void	rbtree_swap(xrbnode* to_replace, xrbnode* to_remove)
-		{
-			xrbnodep* p = (xrbnodep*)to_replace;
-			xrbnodep* r = (xrbnodep*)to_remove;
-			xlnode* tmp = p->node;
-			p->node = r->node;
-			r->node = tmp;
-		}
-
 		// Size tree function implementations
 		static void			insert_size(xrbtree& tree, xrbnodep* node)
 		{
 			ASSERT(node->node->is_free());
 			tree.insert(node->node, node);
 			const char* result = NULL;
-			tree.test(rbtree_compare_size2, result);
+			tree.test(rbtree_compare_size, result);
+			ASSERT(result == NULL);
 		}
 
 		static bool			can_handle_size(xrbnodep* node, u32 size, u32 alignment, u32& outSize)
@@ -452,14 +445,12 @@ namespace xcore
 
 			rb_iterator iterator;
 			xrbnodep* curNode = (xrbnodep*)tree.get_root();
-			s32 s = xrbnode::LEFT;
+
 			while (curNode != NULL)
 			{
 				xsize_t const curSize = get_size(curNode->node);
-
 				if (size == curSize)
-				{
-					// We have found a node that holds the same size, we will
+				{	// We have found a node that holds the same size, we will
 					// traverse the tree from here searching for the best-fit.
 					break;
 				}
@@ -496,7 +487,6 @@ namespace xcore
 			xsize_t const nodeSize = get_size(node);
 
 			xrbnodep* curNode = (xrbnodep*)tree.get_root();
-			s32 s = xrbnode::LEFT;
 			while (curNode != NULL)
 			{
 				xlnode* cur = curNode->node;
@@ -511,7 +501,7 @@ namespace xcore
 				s32 s;
 				if (curSize == nodeSize)
 				{
-					s = ((node->ptr > b->ptr) * 2) - 1;
+					s = ((node->ptr > cur->ptr) * 2) - 1;
 				}
 				else
 				{
@@ -531,20 +521,15 @@ namespace xcore
 		void			insert_addr(xrbtree& tree, xrbnodep* node)
 		{
 			ASSERT(node->node->is_used());
-
 			tree.insert(node->node, node);
 			const char* result = NULL;
 			tree.test(rbtree_compare_addr2, result);
-			if (result != NULL)
-			{
-				return;
-			}
+			ASSERT(result == NULL);
 		}
 
 		bool			find_addr(xrbtree& tree, memptr ptr, xrbnodep*& outNode)
 		{
 			xrbnodep* curNode = (xrbnodep*)tree.get_root();
-			s32 s = xrbnode::LEFT;
 			while (curNode != NULL)
 			{
 				memptr cptr = curNode->node->ptr;
@@ -588,11 +573,8 @@ namespace xcore
 			xrbnode* o = NULL;
 			tree.remove(node->node, o);
 			const char* result = NULL;
-			tree.test(rbtree_compare_size2, result);
-			if (result != NULL)
-			{
-				return NULL;
-			}
+			tree.test(rbtree_compare_size, result);
+			ASSERT(result == NULL);
 			return (xrbnodep*)o;
 		}
 
@@ -602,10 +584,7 @@ namespace xcore
 			tree.remove(node->node, o);
 			const char* result = NULL;
 			tree.test(rbtree_compare_addr2, result);
-			if (result != NULL)
-			{
-				return NULL;
-			}
+			ASSERT(result == NULL);
 			return (xrbnodep*)o;
 		}
 	}

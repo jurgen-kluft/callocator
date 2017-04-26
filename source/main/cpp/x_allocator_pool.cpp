@@ -116,7 +116,7 @@ namespace xcore
 		{
 			xblock* ab = (xblock*)a;
 			xblock* bb = (xblock*)b;
-			return ab->compare(bb);
+			return bb->compare(ab);
 		}
 
 		s32			compare_ptr_block_f(void* a, xrbsnode* b)
@@ -206,12 +206,13 @@ namespace xcore
 			{
 				rbs_iterator it = mTree.root();
 				
-				xrbsnode* node = it.move(ptr, compare_ptr_block_f);
-				while (node == NULL)
+				xrbsnode* node = NULL;
+				while (it.move(ptr, compare_ptr_block_f, node))
 				{
-					node = it.move(ptr, compare_ptr_block_f);
+					
 				}
-				return NULL;
+
+				return (xblock*)node;
 			}
 
 			void				remove(xblock* block)
@@ -237,12 +238,12 @@ namespace xcore
 			void				release(x_iallocator* allocator)
 			{
 				xrbsnode* it = NULL;
-				while (it != NULL)
+				do
 				{
-					xrbsnode* remove = mTree.clear(it);
+					xblock* remove = (xblock*)mTree.clear(it);
 					if (remove != NULL)
-						allocator->deallocate(remove);
-				}
+						remove->release(allocator);
+				} while (it != NULL);
 			}
 		private:
 			xrbstree			mTree;
