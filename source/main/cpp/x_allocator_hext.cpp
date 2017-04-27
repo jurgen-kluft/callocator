@@ -14,25 +14,29 @@ namespace xcore
 {
 	namespace Allocator_HEXT
 	{
-		/*	4 GB
+		/*	Example: 2 GB
+
 		Address Table
-		- Address space = 4 GB
+		- Address space = 2 GB
 		- Address space granularity = 1 KB
-		- Num Entries = 4 MB
-		- 4 nodes per address location
-		- Num Entries, 4 MB / 4 = 1 MB
-		- 1 entry is a NodeIdx(4)
-		- Total memory is 4 MB
+		- Num Entries = 2 MB
+		- Entry is NodeIdx, 4 bytes
+		- Total memory is 8 MB
 
 		Size Table
 		- MinSize = 1 KB
 		- MaxSize = 32 MB
 		- Granularity = 1 KB
 		- Num Entries = 32 K
-		- 1 entry is NodeIdx
+		- Entry is NodeIdx, 4 bytes
+		- Size-Array is 32K * 4 = 128 KB
 		- Bit tree = 8/64/512/4096/32768 = 5 KB
-		- Total Memory = 128 + 5 KB
+		- Total Memory = 128 KB + 5 KB = 133 KB
 
+		Every allocated/free block uses:
+		- 2 LNode
+		- 1 TNode
+		- 2 * 8 + 1 * 8 = 3 * 8 = 24 bytes
 
 		1KB - 8KB - 64KB - 512KB - 4MB - 32MB - 256MB - 2GB
 
@@ -80,24 +84,26 @@ namespace xcore
 			return value;
 		}
 
-		struct Range
+		static inline u32		AlignDown(u32 value, u32 align)
 		{
-			/*
-			Range with a divisor of 8 creates 8 sub-ranges
+			return (value) & ~(align - 1);
+		}
 
-			from_____________________________________________________ to
-			|      |      |      |      |      |      |      |      |
-			---------------------------------------------------------
-			Example
-			Range = 0 - 64 MB, Divisor = 8
-			Sub-Ranges = 0:0-8, 1:8-16, 2:16-24, 3:24-32, 4:32-40, 5:40-48, 6:48-56, 7:56-64
-			value:34 => index:4 => from:32 - to:40
-			*/
+		static inline u32		AlignUp(u32 value, u32 align)
+		{
+			return (value + (align - 1)) & ~(align - 1);
+		}
 
-			// E.g: 
-			//      Range r;
-			//      r.Set(32 * _MB, 1 * _KB, 8);
-			//
+		static inline u32		PowerOf2Up(u32 value)
+		{
+			u32 t = value - 1;
+			t |= t >> 1; t |= t >> 2; t |= t >> 4; t |= t >> 8; t |= t >> 16;
+			t++;
+			return (value == t) ? (value) : (t);
+		}
+
+		struct SizeRange
+		{
 			u32		Set(u32 min_range, u32 max_range, u32 divisor)
 			{
 				mDivisor = divisor;
@@ -118,12 +124,6 @@ namespace xcore
 				return level_size;
 			}
 
-			u32			AlignValue(u32 value) const
-			{
-				value = (value + (mMinRange - 1)) & ~(mMinRange - 1);
-				return value;
-			}
-
 			u32	mDivisor;
 			u32 mLevels;
 			u32	mMinRange;
@@ -134,59 +134,6 @@ namespace xcore
 		struct MNode;
 		struct TNode;
 		struct LNode;
-		enum ELNodeType
-		{
-			ADDR = 0,
-			SIZE = 1
-		};
-
-		struct Nodes
-		{
-			const static s32	cMaximumBlocks = 256;
-			const static s32	cNodesPerBlock = 512;
-
-			struct FNode
-			{
-				NodeIdx			mNext;
-			};
-			
-			x_iallocator*	mAllocator;
-
-			Range			mAddrRange;
-			NodeIdx*		mAddrNodes;
-
-			NodeIdx*		mSizeNodes;
-			Range			mSizeRange;
-			MNode**			mSizeTree;
-
-			// TNode[]
-			NodeIdx			mTNode_FreeList;
-			u32				mNumAllocatedTNodeBlocks;
-			TNode*			mAllocatedTNodes[cMaximumBlocks];
-			LNode*			mAllocatedLNodes_Size[cMaximumBlocks];
-			LNode*			mAllocatedLNodes_Addr[cMaximumBlocks];
-
-			Nodes::Nodes()
-				: mNumAllocatedTNodeBlocks(0)
-			{
-			}
-
-			void			Initialize(x_iallocator* allocator, u32 min_range, u32 max_range, u32 min_alloc_size, u32 max_alloc_size);
-			void			Destroy();
-
-			void			SetSizeUsed(u32 index, u32 level);
-			void			SetSizeEmpty(u32 index, u32 level);
-
-			void			Alloc(TNode*& p, NodeIdx& i);
-			void			Dealloc(TNode* tnode, NodeIdx i);
-
-			TNode*			IndexToTNode(NodeIdx i) const;
-			LNode*			IndexToLNode(ELNodeType l, NodeIdx i) const;
-			LNode*			IndexToLNode_Size(NodeIdx i) const;
-			LNode*			IndexToLNode_Addr(NodeIdx i) const;
-			FNode*			IndexToFNode(NodeIdx i) const;
-		};
-
 
 		// 2 * 4 = 8 bytes
 		struct LNode
@@ -197,31 +144,14 @@ namespace xcore
 				mPrev = cNullNode;
 			}
 
-			void			InsertAfter(ELNodeType l, Nodes* nodes, NodeIdx self, NodeIdx node)
+			void			InsertAfter(NodeIdx self, LNode* noden, NodeIdx node, LNode* nextn, NodeIdx next)
 			{
-				LNode* nextn = nodes->IndexToLNode(l, mNext);
-				LNode* noden = nodes->IndexToLNode(l, node);
 				noden->mNext = mNext;
 				noden->mPrev = self;
 				mNext = node;
 				if (nextn != NULL) nextn->mPrev = node;
 			}
 
-			void			RemoveFrom(ELNodeType l, Nodes* nodes, NodeIdx self, NodeIdx& head)
-			{
-				LNode* prevn = nodes->IndexToLNode(l, mPrev);
-				LNode* nextn = nodes->IndexToLNode(l, mNext);
-				if (prevn != NULL) prevn->mNext = mNext;
-				if (nextn != NULL) nextn->mPrev = mPrev;
-				if (head == self)
-					head = mNext;
-				Init();
-			}
-
-			NodeIdx			Next() const { return mNext; }
-			NodeIdx			Prev() const { return mPrev; }
-
-		private:
 			NodeIdx			mNext, mPrev;
 		};
 
@@ -253,19 +183,6 @@ namespace xcore
 				return size < GetSize();
 			}
 
-			void			Split(Nodes* nodes, NodeIdx self, u32 size, TNode*& next_node, NodeIdx& next_nodeidx)
-			{
-				nodes->Alloc(next_node, next_nodeidx);
-				next_node->mAddr = mAddr + size;
-				next_node->mSize = mSize;
-				next_node->SetSize(GetSize() - size);
-
-				LNode* lnode_self = nodes->IndexToLNode_Addr(self);
-				lnode_self->InsertAfter(ADDR, nodes, self, next_nodeidx);
-
-				SetSize(size);
-			}
-
 		private:
 			enum EFlags
 			{
@@ -274,6 +191,12 @@ namespace xcore
 			};
 			u32		mAddr;					// ADDRESS
 			u32		mSize;					// SIZE (*cMinimumSize)
+		};
+
+		// FNode is a node used in the free-list re-using TNode 
+		struct FNode
+		{
+			NodeIdx			mNext;
 		};
 
 		// MNode is an entity of the bit based Size-Tree
@@ -357,99 +280,9 @@ namespace xcore
 			return ptr;
 		}
 
-
-		void			Nodes::Initialize(x_iallocator* allocator, u32 min_range, u32 max_range, u32 min_alloc_size, u32 max_alloc_size)
-		{
-			mAllocator = allocator;
-
-			mAddrRange.Set(min_range, max_range, 8);
-			const u32 addr_cnt = mAddrRange.mMaxRange / mAddrRange.mMinRange;
-			mAddrNodes = AllocateAndClear<NodeIdx>(allocator, addr_cnt);
-
-			u32 const sizetree_levels = mSizeRange.Set(min_alloc_size, max_alloc_size, 8);
-			const u32 size_cnt = mSizeRange.mMaxRange / mSizeRange.mMinRange;
-			mSizeNodes = AllocateAndClear<NodeIdx>(allocator, size_cnt);
-
-			mSizeTree = AllocateAndClear<MNode*>(allocator, sizetree_levels);
-			u32 sizetree_size = 0;
-			for (u32 i = 0; i < sizetree_levels; ++i)
-			{
-				sizetree_size += mSizeRange.LevelSize(i);
-			}
-			mSizeTree[0] = AllocateAndClear<MNode>(allocator, sizetree_size >> 3);
-			for (u32 i = 1; i < sizetree_levels; ++i)
-			{
-				u32 numbytes = mSizeRange.LevelSize(i - 1) >> 3;
-				mSizeTree[i] = mSizeTree[i - 1] + numbytes;
-			}
-
-			mTNode_FreeList = NodeIdx();
-			mNumAllocatedTNodeBlocks = 0;
-			for (u32 i = 0; i < cMaximumBlocks; ++i)
-			{
-				mAllocatedTNodes[i] = NULL;
-				mAllocatedLNodes_Size[i] = NULL;
-				mAllocatedLNodes_Addr[i] = NULL;
-			}
-		}
-
-		void			Nodes::Destroy()
-		{
-			mAllocator->deallocate(mAddrNodes);
-			mAllocator->deallocate(mSizeNodes);
-
-			mAllocator->deallocate(mSizeTree[0]);
-			mAllocator->deallocate(mSizeTree);
-
-			for (u32 i = 0; i < mNumAllocatedTNodeBlocks; ++i)
-			{
-				mAllocator->deallocate(mAllocatedTNodes[i]);
-				mAllocator->deallocate(mAllocatedLNodes_Size[i]);
-				mAllocator->deallocate(mAllocatedLNodes_Addr[i]);
-			}
-		}
-
-		void			Nodes::SetSizeUsed(u32 index, u32 levels)
-		{
-			u8 bits;
-			do
-			{
-				levels -= 1;
-				u32 ei = index >> 3;
-				MNode* mnode = &mSizeTree[levels][ei];
-				u32 bi = index & 0x7;
-				bits = mnode->GetBits();
-				mnode->SetChildUsed(bi);
-				if (levels == 1)
-					break;
-				index >>= 3;
-			} while (bits == 0);
-		}
-
-		void			Nodes::SetSizeEmpty(u32 index, u32 levels)
-		{
-			u8 bits;
-			do
-			{
-				levels -= 1;
-				u32 ei = index >> 3;
-				MNode* mnode = &mSizeTree[levels][ei];
-				u32 bi = index & 0x7;
-				mnode->SetChildEmpty(bi);
-				if (levels == 1)
-					break;
-				bits = mnode->GetBits();
-				index >>= 3;
-			} while (bits == 0);
-		}
-
 		class Allocator : public x_iallocator
 		{
 		public:
-			const u32		cMinimumAllocSize = 1024;
-			const u32		cMaximumAllocSize = 32 * 1024 * 1024;
-			const u32		cGranulaAllocSize = 1024;
-
 			const char*		name() const;									///< The name of the allocator
 
 			void*			allocate(xsize_t size, u32 align);				///< Allocate memory with alignment
@@ -478,17 +311,49 @@ namespace xcore
 			s32				Coallesce(NodeIdx& n, TNode*& curr_tnode);
 
 			void*			mMemBase;
-			Nodes			mNodes;
+			u32				mMemSize;
+
+			u32				mMinAllocSize;
+			u32				mMaxAllocSize;
+
+			void			SetSizeUsed(u32 index, u32 level);
+			void			SetSizeEmpty(u32 index, u32 level);
+
+			void			AllocNode(TNode*& p, NodeIdx& i);
+			void			DeallocNode(TNode* tnode, NodeIdx i);
+
+			TNode*			IndexToTNode(NodeIdx i) const;
+			LNode*			IndexToLNode_Size(NodeIdx i) const;
+			LNode*			IndexToLNode_Addr(NodeIdx i) const;
+			FNode*			IndexToFNode(NodeIdx i) const;
+
+			const static s32	cMaximumBlocks = 256;
+			const static s32	cNodesPerBlock = 512;
+
+			x_iallocator*	mAllocator;
+
+			NodeIdx*		mAddrNodes;
+
+			NodeIdx*		mSizeNodes;
+			SizeRange		mSizeRange;
+			MNode**			mSizeTree;
+
+			// TNode[]
+			NodeIdx			mTNode_FreeList;
+			u32				mNumAllocatedTNodeBlocks;
+			TNode*			mAllocatedTNodes[cMaximumBlocks];
+			LNode*			mAllocatedLNodes_Size[cMaximumBlocks];
+			LNode*			mAllocatedLNodes_Addr[cMaximumBlocks];
 		};
 
 		const char*		Allocator::name() const
 		{
-			return "hext allocator";
+			return "h-ext allocator";
 		}
 
 		void*			Allocator::allocate(xsize_t size, u32 align)
 		{
-			size = (size + (cMinimumAllocSize - 1)) & ~(cMinimumAllocSize - 1);
+			size = (size + (mMinAllocSize - 1)) & ~(mMinAllocSize - 1);
 			return Allocate(size);
 		}
 
@@ -510,12 +375,12 @@ namespace xcore
 
 		NodeIdx		Allocator::FindSize(u32 size) const
 		{
-			if (size > (mNodes.mSizeRange.mMaxRange - mNodes.mSizeRange.mMinRange))
+			if (size > (mSizeRange.mMaxRange - mSizeRange.mMinRange))
 				return NodeIdx();
 
-			u32 index = size / mNodes.mSizeRange.mMinRange;
-			NodeIdx current = mNodes.mSizeNodes[index];
-			TNode* tnode = mNodes.IndexToTNode(current);
+			u32 index = size / mSizeRange.mMinRange;
+			NodeIdx current = mSizeNodes[index];
+			TNode* tnode = IndexToTNode(current);
 
 			// So can this TNode fullfill the size request ?
 			if (tnode != NULL)
@@ -533,9 +398,9 @@ namespace xcore
 			// Ok, so here we did not find an exact fit, go and find a best fit
 			// Move up the tree to find a branch that holds a larger size.
 			u32 child_index = index & 0x7;
-			u32 level = mNodes.mSizeRange.mLevels - 1;
+			u32 level = mSizeRange.mLevels - 1;
 			u32 node_index = index >> 3;
-			MNode* mnode = &mNodes.mSizeTree[level][node_index];
+			MNode* mnode = &mSizeTree[level][node_index];
 
 			enum ETraverseDir { UP = -1, DOWN = 1 };
 			ETraverseDir traverse_dir = UP;
@@ -560,16 +425,16 @@ namespace xcore
 
 						child_index = index & 0x7;
 						node_index = index >> 3;
-						mnode = &mNodes.mSizeTree[level][node_index];
+						mnode = &mSizeTree[level][node_index];
 					}
 				}
 				else if (traverse_dir == DOWN)
 				{
-					if ((level+1) == mNodes.mSizeRange.mLevels)
+					if ((level+1) == mSizeRange.mLevels)
 					{
 						// So do we have an existing TNode here ?
 						node_index = index;
-						current = mNodes.mSizeNodes[node_index];
+						current = mSizeNodes[node_index];
 						break;
 					}
 
@@ -577,7 +442,7 @@ namespace xcore
 					index = index * 8;
 
 					node_index = index >> 3;
-					mnode = &mNodes.mSizeTree[level][node_index];
+					mnode = &mSizeTree[level][node_index];
 
 					// When traversing down we need to traverse to the most minimum existing leaf.
 					// So on every level pick the minimum existing child index and traverse down
@@ -589,7 +454,7 @@ namespace xcore
 				}
 			}
 
-			tnode = mNodes.IndexToTNode(current);
+			tnode = IndexToTNode(current);
 			if (tnode == NULL || !tnode->IsFree())
 			{
 				tnode = NULL;
@@ -599,27 +464,27 @@ namespace xcore
 
 		NodeIdx		Allocator::FindAddr(u32 address) const
 		{
-			u32 const index = address / mNodes.mAddrRange.mMinRange;
-			NodeIdx current = mNodes.mAddrNodes[index];
+			u32 const index = address / mMinAllocSize;
+			NodeIdx current = mAddrNodes[index];
 			return current;
 		}
 
 		void		Allocator::AddToAddr(NodeIdx node, u32 address)
 		{
-			ASSERT(mNodes.IndexToTNode(node)->GetAddr() == address);
+			ASSERT(IndexToTNode(node)->GetAddr() == address);
 
 			// The TNode is already linked into the address-list, so we do not have to search an existing child.
-			u32 const index = address / mNodes.mAddrRange.mMinRange;
-			NodeIdx head = mNodes.mAddrNodes[index];
+			u32 const index = address / mMinAllocSize;
+			NodeIdx head = mAddrNodes[index];
 
 			if (head.IsNull())
 			{
 				// So the location where we should put this entry is not used yet
-				mNodes.mAddrNodes[index] = node;
+				mAddrNodes[index] = node;
 			}
 			else
 			{
-				TNode* tnode = mNodes.IndexToTNode(head);
+				TNode* tnode = IndexToTNode(head);
 				ASSERT(head.IsNull());
 			}
 		}
@@ -627,44 +492,50 @@ namespace xcore
 		void		Allocator::AddToSize(NodeIdx node, u32 size)
 		{
 			ASSERT(size > 0);
-			ASSERT(mNodes.IndexToTNode(node)->GetSize() == size);
+			ASSERT(IndexToTNode(node)->GetSize() == size);
 
-			size = Clamp(size, mNodes.mSizeRange.mMinRange, mNodes.mSizeRange.mMaxRange - mNodes.mSizeRange.mMinRange);
-			u32 const index = size / mNodes.mSizeRange.mMinRange;
-			NodeIdx head = mNodes.mSizeNodes[index];
+			size = Clamp(size, mSizeRange.mMinRange, mSizeRange.mMaxRange - mSizeRange.mMinRange);
+			u32 const index = size / mSizeRange.mMinRange;
+			NodeIdx head = mSizeNodes[index];
 
 			// So we found either a TNode as a child or Null
 			if (head.IsNull())
 			{
 				// No existing nodes here yet, just set it
-				mNodes.mSizeNodes[index] = node;
-				mNodes.SetSizeUsed(index, mNodes.mSizeRange.mLevels);
+				mSizeNodes[index] = node;
+				SetSizeUsed(index, mSizeRange.mLevels);
 			}
 			else
 			{	// We have an existing node here, so we have to add it to the list
 				// We do not have to update the Size-Tree
-				LNode* head_lnode = mNodes.IndexToLNode_Size(head);
-				head_lnode->InsertAfter(SIZE, &mNodes, head, node);
+				LNode* head_lnode = IndexToLNode_Size(head);
+				LNode* node_lnode = IndexToLNode_Size(node);
+				LNode* next_lnode = IndexToLNode_Size(head_lnode->mNext);
+				head_lnode->InsertAfter(head, node_lnode, node, next_lnode, head_lnode->mNext);
 			}
 		}
 
 		void	Allocator::RemoveFromAddrList(NodeIdx node)
 		{
 			NodeIdx head;
-			LNode* lnode = mNodes.IndexToLNode_Addr(node);
-			lnode->RemoveFrom(ADDR, &mNodes, node, head);
+			LNode* lnode = IndexToLNode_Addr(node);
+			LNode* prevn = IndexToLNode_Addr(lnode->mPrev);
+			LNode* nextn = IndexToLNode_Addr(lnode->mNext);
+			if (prevn != NULL) prevn->mNext = lnode->mNext;
+			if (nextn != NULL) nextn->mPrev = lnode->mPrev;
+			lnode->Init();
 		}
 
 		void	Allocator::RemoveFromAddr(NodeIdx node, u32 address)
 		{
-			ASSERT(mNodes.IndexToTNode(node)->GetAddr() == address);
+			ASSERT(IndexToTNode(node)->GetAddr() == address);
 
-			u32 const index = address / mNodes.mAddrRange.mMinRange;
-			NodeIdx current = mNodes.mAddrNodes[index];
+			u32 const index = address / mMinAllocSize;
+			NodeIdx current = mAddrNodes[index];
 
 			if (current == node)
 			{
-				mNodes.mAddrNodes[index] = NodeIdx();
+				mAddrNodes[index] = NodeIdx();
 			}
 			else
 			{
@@ -674,30 +545,37 @@ namespace xcore
 
 		void	Allocator::RemoveFromSize(NodeIdx node, u32 size)
 		{
-			ASSERT(mNodes.IndexToTNode(node)->GetSize() == size);
-			size = Clamp(size, mNodes.mSizeRange.mMinRange, mNodes.mSizeRange.mMaxRange - mNodes.mSizeRange.mMinRange);
+			ASSERT(IndexToTNode(node)->GetSize() == size);
+			size = Clamp(size, mSizeRange.mMinRange, mSizeRange.mMaxRange - mSizeRange.mMinRange);
 
-			u32 const index = size / mNodes.mSizeRange.mMinRange;
-			NodeIdx head = mNodes.mSizeNodes[index];
+			u32 const index = size / mSizeRange.mMinRange;
+			NodeIdx head = mSizeNodes[index];
 
 			if (head.IsNull() == false)
 			{
 				NodeIdx current = head;
-				TNode* tnode = mNodes.IndexToTNode(current);
+				TNode* tnode = IndexToTNode(current);
 				while (current != node && !current.IsNull())
 				{
-					LNode* lnode = mNodes.IndexToLNode_Size(current);
-					current = lnode->Next();
+					LNode* lnode = IndexToLNode_Size(current);
+					current = lnode->mNext;
 				};
 				
 				if (current == node)
 				{
-					LNode* lnode = mNodes.IndexToLNode_Size(current);
-					lnode->RemoveFrom(SIZE, &mNodes, current, head);
-					mNodes.mSizeNodes[index] = head;
+					LNode* lnode = IndexToLNode_Size(current);
+					//lnode->RemoveFrom(SIZE, this, current, head);
+					LNode* prevn = IndexToLNode_Size(lnode->mPrev);
+					LNode* nextn = IndexToLNode_Size(lnode->mNext);
+					if (prevn != NULL) prevn->mNext = lnode->mNext;
+					if (nextn != NULL) nextn->mPrev = lnode->mPrev;
+					if (head == current) head = lnode->mNext;
+					lnode->Init();
+
+					mSizeNodes[index] = head;
 					if (head.IsNull())
 					{
-						mNodes.SetSizeEmpty(index, mNodes.mSizeRange.mLevels);
+						SetSizeEmpty(index, mSizeRange.mLevels);
 					}
 				}
 				else
@@ -713,23 +591,69 @@ namespace xcore
 
 		void	Allocator::Initialize(x_iallocator* allocator, void* mem_base, u32 mem_size, u32 min_alloc_size, u32 max_alloc_size)
 		{
+			mMinAllocSize = PowerOf2Up(Clamp(min_alloc_size, 1024, 64 * 1024));
+			mMaxAllocSize = AlignUp(max_alloc_size, mMinAllocSize);
+
 			mMemBase = mem_base;
-			mNodes.Initialize(allocator, min_alloc_size, mem_size, min_alloc_size, max_alloc_size);
+			mMemSize = AlignDown(mem_size, mMinAllocSize);
+
+			// Initialize size and nodes
+			mAllocator = allocator;
+
+			const u32 addr_cnt = mMemSize / mMinAllocSize;
+			mAddrNodes = AllocateAndClear<NodeIdx>(allocator, addr_cnt);
+
+			u32 const sizetree_levels = mSizeRange.Set(min_alloc_size, max_alloc_size, 8);
+			const u32 size_cnt = mSizeRange.mMaxRange / mSizeRange.mMinRange;
+			mSizeNodes = AllocateAndClear<NodeIdx>(allocator, size_cnt);
+
+			mSizeTree = AllocateAndClear<MNode*>(allocator, sizetree_levels);
+			u32 sizetree_size = 0;
+			for (u32 i = 0; i < sizetree_levels; ++i)
+			{
+				sizetree_size += mSizeRange.LevelSize(i);
+			}
+			mSizeTree[0] = AllocateAndClear<MNode>(allocator, sizetree_size >> 3);
+			for (u32 i = 1; i < sizetree_levels; ++i)
+			{
+				u32 numbytes = mSizeRange.LevelSize(i - 1) >> 3;
+				mSizeTree[i] = mSizeTree[i - 1] + numbytes;
+			}
+
+			mTNode_FreeList = NodeIdx();
+			mNumAllocatedTNodeBlocks = 0;
+			for (u32 i = 0; i < cMaximumBlocks; ++i)
+			{
+				mAllocatedTNodes[i] = NULL;
+				mAllocatedLNodes_Size[i] = NULL;
+				mAllocatedLNodes_Addr[i] = NULL;
+			}
 
 			// Create initial node that holds all free memory
 			TNode* tnode;
 			NodeIdx tnode_index;
-			mNodes.Alloc(tnode, tnode_index);
+			AllocNode(tnode, tnode_index);
 			tnode->SetAddr(0);
-			tnode->SetSize(mem_size);
+			tnode->SetSize(mMemSize);
 			tnode->SetFree();
-			mem_size = tnode->GetSize();
-			AddToSize(tnode_index, mem_size);
+			mMemSize = tnode->GetSize();
+			AddToSize(tnode_index, mMemSize);
 		}
 
 		void	Allocator::Destroy()
 		{
-			mNodes.Destroy();
+			mAllocator->deallocate(mAddrNodes);
+			mAllocator->deallocate(mSizeNodes);
+
+			mAllocator->deallocate(mSizeTree[0]);
+			mAllocator->deallocate(mSizeTree);
+
+			for (u32 i = 0; i < mNumAllocatedTNodeBlocks; ++i)
+			{
+				mAllocator->deallocate(mAllocatedTNodes[i]);
+				mAllocator->deallocate(mAllocatedLNodes_Size[i]);
+				mAllocator->deallocate(mAllocatedLNodes_Addr[i]);
+			}
 		}
 
 		void*	Allocator::Allocate(u32 size)
@@ -737,10 +661,10 @@ namespace xcore
 			NodeIdx curr = FindSize(size);
 			if (curr.IsNull() == false)
 			{
-				TNode* curr_tnode = mNodes.IndexToTNode(curr);
+				TNode* curr_tnode = IndexToTNode(curr);
 				if (!FindAddr(curr_tnode->GetAddr()).IsNull())
 				{
-					curr_tnode = mNodes.IndexToTNode(curr);
+					curr_tnode = IndexToTNode(curr);
 				}
 
 				// Split of the size that we need if anything left above 
@@ -750,11 +674,20 @@ namespace xcore
 					RemoveFromSize(curr, curr_tnode->GetSize());
 					if (curr_tnode->HasSizeLeft(size))
 					{
-						NodeIdx left_nodeidx;
-						TNode* left_tnode;
-						curr_tnode->Split(&mNodes, curr, size, left_tnode, left_nodeidx);
-						left_tnode->SetFree();
-						AddToSize(left_nodeidx, left_tnode->GetSize());
+						NodeIdx new_nodeidx;
+						TNode* new_tnode;
+						AllocNode(new_tnode, new_nodeidx);
+						new_tnode->SetAddr(curr_tnode->GetAddr() + size);
+						new_tnode->SetSize(curr_tnode->GetSize() - size);
+						new_tnode->SetFree();
+
+						LNode* new_lnode = IndexToLNode_Addr(new_nodeidx);
+						LNode* curr_lnode = IndexToLNode_Addr(curr);
+						LNode* next_lnode = IndexToLNode_Addr(curr_lnode->mNext);
+						curr_lnode->InsertAfter(curr, new_lnode, new_nodeidx, next_lnode, curr_lnode->mNext);
+
+						curr_tnode->SetSize(size);
+						AddToSize(new_nodeidx, new_tnode->GetSize());
 					}
 					curr_tnode->SetUsed();
 					AddToAddr(curr, curr_tnode->GetAddr());
@@ -768,7 +701,7 @@ namespace xcore
 		{
 			u32 address = (u32)((u8*)p - (u8*)mMemBase);
 			NodeIdx curr = FindAddr(address);
-			TNode* curr_tnode = mNodes.IndexToTNode(curr);
+			TNode* curr_tnode = IndexToTNode(curr);
 			ASSERT(curr_tnode->IsUsed());
 			curr_tnode->SetFree();
 			RemoveFromAddr(curr, address);
@@ -782,9 +715,9 @@ namespace xcore
 		//         3 = merged with @next & @prev
 		s32	Allocator::Coallesce(NodeIdx& curr, TNode*& curr_tnode)
 		{
-			LNode* curr_lnode = mNodes.IndexToLNode_Addr(curr);
-			NodeIdx curr_next = curr_lnode->Next();
-			NodeIdx curr_prev = curr_lnode->Prev();
+			LNode* curr_lnode = IndexToLNode_Addr(curr);
+			NodeIdx curr_next = curr_lnode->mNext;
+			NodeIdx curr_prev = curr_lnode->mPrev;
 
 			s32 c = 0;
 			NodeIdx fake_list_head;
@@ -794,7 +727,7 @@ namespace xcore
 			//   Remove @next from @size 
 			//   Update size of @curr
 			//   Deallocate @next
-			TNode* next_tnode = mNodes.IndexToTNode(curr_next);
+			TNode* next_tnode = IndexToTNode(curr_next);
 			if (next_tnode != NULL && next_tnode->IsFree())
 			{
 				ASSERT(next_tnode->GetSize() > 0);
@@ -802,7 +735,7 @@ namespace xcore
 				curr_tnode->SetSize(curr_tnode->GetSize() + next_tnode->GetSize());
 				RemoveFromSize(curr_next, next_tnode->GetSize());
 				RemoveFromAddrList(curr_next);
-				mNodes.Dealloc(next_tnode, curr_next);
+				DeallocNode(next_tnode, curr_next);
 				c |= 1;
 			}
 
@@ -813,7 +746,7 @@ namespace xcore
 			//   Deallocate @curr
 			//   Add @prev to @size 
 			//   @curr = @prev
-			TNode* prev_tnode = mNodes.IndexToTNode(curr_prev);
+			TNode* prev_tnode = IndexToTNode(curr_prev);
 			if (prev_tnode != NULL && prev_tnode->IsFree())
 			{
 				ASSERT(prev_tnode->GetSize() > 0);
@@ -821,7 +754,7 @@ namespace xcore
 				RemoveFromSize(curr_prev, prev_tnode->GetSize());
 				prev_tnode->SetSize(curr_tnode->GetSize() + prev_tnode->GetSize());
 				RemoveFromAddrList(curr);
-				mNodes.Dealloc(curr_tnode, curr);
+				DeallocNode(curr_tnode, curr);
 				curr = curr_prev;
 				curr_tnode = prev_tnode;
 				c |= 2;
@@ -831,8 +764,41 @@ namespace xcore
 		}
 
 
+		void			Allocator::SetSizeUsed(u32 index, u32 levels)
+		{
+			u8 bits;
+			do
+			{
+				levels -= 1;
+				u32 ei = index >> 3;
+				MNode* mnode = &mSizeTree[levels][ei];
+				u32 bi = index & 0x7;
+				bits = mnode->GetBits();
+				mnode->SetChildUsed(bi);
+				if (levels == 1)
+					break;
+				index >>= 3;
+			} while (bits == 0);
+		}
 
-		TNode*			Nodes::IndexToTNode(NodeIdx i) const
+		void			Allocator::SetSizeEmpty(u32 index, u32 levels)
+		{
+			u8 bits;
+			do
+			{
+				levels -= 1;
+				u32 ei = index >> 3;
+				MNode* mnode = &mSizeTree[levels][ei];
+				u32 bi = index & 0x7;
+				mnode->SetChildEmpty(bi);
+				if (levels == 1)
+					break;
+				bits = mnode->GetBits();
+				index >>= 3;
+			} while (bits == 0);
+		}
+
+		TNode*			Allocator::IndexToTNode(NodeIdx i) const
 		{
 			if (i.IsNull())
 				return NULL;
@@ -841,28 +807,7 @@ namespace xcore
 			return (TNode*)&mAllocatedTNodes[bi][ei];
 		}
 
-		LNode*			Nodes::IndexToLNode(ELNodeType l, NodeIdx i) const
-		{
-			if (i.IsNull())
-				return NULL;
-
-			u32 const bi = (i.GetIndex() >> 16) & 0xFFFF;
-			u32 const ei = i.GetIndex() & 0xFFFF;
-
-			LNode* lnode = NULL;
-			switch (l)
-			{
-			case SIZE:
-				lnode = (LNode*)&mAllocatedLNodes_Size[bi][ei];
-				break;
-			case ADDR:
-				lnode = (LNode*)&mAllocatedLNodes_Addr[bi][ei];
-				break;
-			}
-			return lnode;
-		}
-
-		LNode*			Nodes::IndexToLNode_Size(NodeIdx i) const
+		LNode*			Allocator::IndexToLNode_Size(NodeIdx i) const
 		{
 			if (i.IsNull())
 				return NULL;
@@ -870,7 +815,7 @@ namespace xcore
 			u32 const ei = i.GetIndex() & 0xFFFF;
 			return (LNode*)&mAllocatedLNodes_Size[bi][ei];
 		}
-		LNode*			Nodes::IndexToLNode_Addr(NodeIdx i) const
+		LNode*			Allocator::IndexToLNode_Addr(NodeIdx i) const
 		{
 			if (i.IsNull())
 				return NULL;
@@ -879,7 +824,7 @@ namespace xcore
 			return (LNode*)&mAllocatedLNodes_Addr[bi][ei];
 		}
 
-		Nodes::FNode*	Nodes::IndexToFNode(NodeIdx i) const
+		FNode*			Allocator::IndexToFNode(NodeIdx i) const
 		{
 			if (i.IsNull())
 				return NULL;
@@ -888,7 +833,7 @@ namespace xcore
 			return (FNode*)&mAllocatedTNodes[bi][ei];
 		}
 
-		void			Nodes::Alloc(TNode*& p, NodeIdx& i)
+		void			Allocator::AllocNode(TNode*& p, NodeIdx& i)
 		{
 			if (mTNode_FreeList.IsNull())
 			{
@@ -900,7 +845,7 @@ namespace xcore
 				{
 					NodeIdx ni(block_index | i);
 					TNode* tnode = IndexToTNode(ni);
-					Dealloc(tnode, ni);
+					DeallocNode(tnode, ni);
 				}
 				mNumAllocatedTNodeBlocks += 1;
 			}
@@ -912,7 +857,7 @@ namespace xcore
 			p->Init();
 		}
 
-		void			Nodes::Dealloc(TNode* tnode, NodeIdx i)
+		void			Allocator::DeallocNode(TNode* tnode, NodeIdx i)
 		{
 			tnode->Init();
 			LNode* lnode_size = IndexToLNode_Size(i);
