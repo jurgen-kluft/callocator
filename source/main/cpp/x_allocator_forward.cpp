@@ -1,12 +1,12 @@
-#include "xbase\x_target.h"
-#include "xbase\x_memory_std.h"
-#include "xbase\x_limits.h"
-#include "xbase\x_integer.h"
-#include "xbase\x_allocator.h"
-#include "xbase\x_integer.h"
+#include "xbase/x_target.h"
+#include "xbase/x_memory_std.h"
+#include "xbase/x_limits.h"
+#include "xbase/x_integer.h"
+#include "xbase/x_allocator.h"
+#include "xbase/x_integer.h"
 
-#include "xallocator\x_allocator_forward.h"
-#include "xallocator\private\x_forwardbin.h"
+#include "xallocator/x_allocator_forward.h"
+#include "xallocator/private/x_forwardbin.h"
 
 namespace xcore
 {

@@ -1,7 +1,7 @@
-#include "xbase\x_allocator.h"
-#include "xallocator\x_allocator_forward.h"
+#include "xbase/x_allocator.h"
+#include "xallocator/x_allocator_forward.h"
 
-#include "xunittest\xunittest.h"
+#include "xunittest/xunittest.h"
 
 using namespace xcore;
 

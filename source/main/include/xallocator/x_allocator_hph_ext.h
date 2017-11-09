@@ -3,7 +3,7 @@
 //==============================================================================
 #ifndef __X_HPEHA_ALLOCATOR_H__
 #define __X_HPEHA_ALLOCATOR_H__
-#include "xbase\x_target.h"
+#include "xbase/x_target.h"
 #ifdef USE_PRAGMA_ONCE 
 #pragma once 
 #endif

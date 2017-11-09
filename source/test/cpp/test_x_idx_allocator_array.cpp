@@ -1,8 +1,8 @@
-#include "xbase\x_target.h"
-#include "xbase\x_idx_allocator.h"
-#include "xallocator\x_idx_allocator.h"
+#include "xbase/x_target.h"
+#include "xbase/x_idx_allocator.h"
+#include "xallocator/x_idx_allocator.h"
 
-#include "xunittest\xunittest.h"
+#include "xunittest/xunittest.h"
 
 using namespace xcore;
 

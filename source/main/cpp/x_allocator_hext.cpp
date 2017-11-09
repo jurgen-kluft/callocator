@@ -1,13 +1,13 @@
-#include "xbase\x_target.h"
-#include "xbase\x_debug.h"
-#include "xbase\x_memory_std.h"
-#include "xbase\x_integer.h"
-#include "xbase\x_allocator.h"
-#include "xbase\x_idx_allocator.h"
-#include "xbase\x_integer.h"
-#include "xbase\x_tree.h"
+#include "xbase/x_target.h"
+#include "xbase/x_debug.h"
+#include "xbase/x_memory_std.h"
+#include "xbase/x_integer.h"
+#include "xbase/x_allocator.h"
+#include "xbase/x_idx_allocator.h"
+#include "xbase/x_integer.h"
+#include "xbase/x_tree.h"
 
-#include "xallocator\x_allocator_hext.h"
+#include "xallocator/x_allocator_hext.h"
 
 
 namespace xcore
@@ -38,29 +38,48 @@ namespace xcore
 		- 1 TNode
 		- 2 * 8 + 1 * 8 = 3 * 8 = 24 bytes
 
+		Behavior:
+
+		- Allocate
+		  Will do a search for the appropriate size, when found it could split the size of the found node
+		  that is then added back to the size-array/size-tree. The node for the allocation is then added
+		  to the address-array.
+
+		- Deallocate
+		  Address is searched in the address-array, when found it will go through a coallesce procedure to 
+		  merge with @prev and @next blocks if they are 'free'. The final free node will be added back to the
+		  size-array/size-tree. Merged nodes will be removed from the size-array/size-tree and the address-list.
+
+		- Remove/Add to Size-Array/Size-Tree
+		  This is a simple traversal of the bit-tree after which a remove/add to a linked-list will be executed
+
+		- Remove/Add to Address-Array
+		  This is a direct reset/set into an array
+
+
 		1KB - 8KB - 64KB - 512KB - 4MB - 32MB - 256MB - 2GB
 
 		*/
 
-		const static u32	cNullNode = 0xFFFFFFFF;
-
 		struct NodeIdx
 		{
+			const static u32 cNullNode = 0xFFFFFFFF;
+
 			inline			NodeIdx() : mIndex(cNullNode) {}
 			inline			NodeIdx(u32 index) : mIndex(index) {}
 			inline			NodeIdx(const NodeIdx& c) : mIndex(c.mIndex) {}
 
-			void			Init() { mIndex = cNullNode; }
-			bool			IsNull() const { return mIndex == cNullNode; }
+			void			Init()					{ mIndex = cNullNode; }
+			bool			IsNull() const			{ return mIndex == cNullNode; }
 
-			inline void		SetIndex(u32 index) { mIndex = index; }
-			inline u32		GetIndex() const { return mIndex; }
+			inline void		SetIndex(u32 index)		{ mIndex = index; }
+			inline u32		GetIndex() const		{ return mIndex; }
 
 			inline bool		operator == (const NodeIdx& other) const { return mIndex == other.mIndex; }
 			inline bool		operator != (const NodeIdx& other) const { return mIndex != other.mIndex; }
 
 		private:
-			u32		mIndex;
+			u32				mIndex;
 		};
 
 		static inline void*		ToVoidPtr(void* base, u32 offset)
@@ -104,7 +123,7 @@ namespace xcore
 
 		struct SizeRange
 		{
-			u32		Set(u32 min_range, u32 max_range, u32 divisor)
+			inline u32		Set(u32 min_range, u32 max_range, u32 divisor)
 			{
 				mDivisor = divisor;
 				mLevels = 1;
@@ -118,7 +137,7 @@ namespace xcore
 				return mLevels;
 			}
 
-			u32			LevelSize(u32 level) const
+			inline u32		LevelSize(u32 level) const
 			{
 				u32 const level_size = (((1 << (3 * level)) + (8 - 1)) >> 3) << 3;
 				return level_size;
@@ -138,13 +157,13 @@ namespace xcore
 		// 2 * 4 = 8 bytes
 		struct LNode
 		{
-			void			Init()
+			inline void		Init()
 			{
-				mNext = cNullNode;
-				mPrev = cNullNode;
+				mNext.Init();
+				mPrev.Init();
 			}
 
-			void			InsertAfter(NodeIdx self, LNode* noden, NodeIdx node, LNode* nextn, NodeIdx next)
+			inline void		InsertAfter(NodeIdx self, LNode* noden, NodeIdx node, LNode* nextn, NodeIdx next)
 			{
 				noden->mNext = mNext;
 				noden->mPrev = self;
@@ -159,29 +178,22 @@ namespace xcore
 		// TNode is a leaf entity of the SizeNodes and AddrNodes
 		struct TNode
 		{
-			void			Init()
-			{
-				mAddr = 0;
-				mSize = 0;
-			}
+			inline void		Init()						{ mAddr = 0; mSize = 0; }
 
-			void			SetFree() { mSize = (mSize & ~USED); }
-			void			SetUsed() { mSize = mSize | USED; }
+			void			SetFree()					{ mSize = (mSize & ~USED); }
+			void			SetUsed()					{ mSize = mSize | USED; }
 
-			bool			IsUsed() const { return (mSize & USED) == USED; }
-			bool			IsFree() const { return (mSize & USED) == 0; }
+			bool			IsUsed() const				{ return (mSize & USED) == USED; }
+			bool			IsFree() const				{ return (mSize & USED) == 0; }
 
-			u32				GetAddr() const { return (mAddr); }
-			void			SetAddr(u32 addr) { mAddr = addr; }
-			void*			GetPtr(void* ptr) const { return (u8*)ptr + mAddr; }
+			u32				GetAddr() const				{ return (mAddr); }
+			void			SetAddr(u32 addr)			{ mAddr = addr; }
+			void*			GetPtr(void* ptr) const		{ return (u8*)ptr + mAddr; }
 
-			void			SetSize(u32 size) { mSize = (mSize & FMASK) | ((size >> 4) & ~FMASK); }
-			u32				GetSize() const { return (mSize & ~FMASK) << 4; }
+			void			SetSize(u32 size)			{ mSize = (mSize & FMASK) | ((size >> 4) & ~FMASK); }
+			u32				GetSize() const				{ return (mSize & ~FMASK) << 4; }
 
-			bool			HasSizeLeft(u32 size) const
-			{
-				return size < GetSize();
-			}
+			bool			HasSizeLeft(u32 size) const	{ return size < GetSize(); }
 
 		private:
 			enum EFlags
@@ -204,13 +216,10 @@ namespace xcore
 		{
 			inline			MNode() : mBits(0) {}
 
-			void			Init()
-			{
-				mBits = 0;
-			}
+			void			Init()						{ mBits = 0; }
 
-			u8				GetBits() const { return mBits; }
-			void			SetBits(u8 bits) { mBits = bits; }
+			u8				GetBits() const				{ return mBits; }
+			void			SetBits(u8 bits)			{ mBits = bits; }
 
 			bool			GetChildLower(u32 child_index, u32& next_index) const
 			{
@@ -268,7 +277,7 @@ namespace xcore
 			bool			GetChildUsed(u32 index) const { u8 const bit = (u8)(1 << index); return (mBits & bit) == bit; }
 
 		private:
-			u8			mBits;
+			u8				mBits;
 		};
 
 		template<>
@@ -455,10 +464,6 @@ namespace xcore
 			}
 
 			tnode = IndexToTNode(current);
-			if (tnode == NULL || !tnode->IsFree())
-			{
-				tnode = NULL;
-			}
 			return current;
 		}
 

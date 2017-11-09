@@ -1,9 +1,9 @@
-#include "xbase\x_target.h"
-#include "xbase\x_debug.h"
-#include "xbase\x_allocator.h"
-#include "xbase\x_integer.h"
-#include "xbase\x_tree.h"
-#include "xallocator\private\x_smallbin.h"
+#include "xbase/x_target.h"
+#include "xbase/x_debug.h"
+#include "xbase/x_allocator.h"
+#include "xbase/x_integer.h"
+#include "xbase/x_tree.h"
+#include "xallocator/private/x_smallbin.h"
 
 namespace xcore
 {

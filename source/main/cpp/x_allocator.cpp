@@ -1,7 +1,7 @@
-#include "xbase\x_target.h"
+#include "xbase/x_target.h"
 
-#include "xallocator\x_allocator.h"
-#include "xallocator\x_allocator_tlsf.h"
+#include "xallocator/x_allocator.h"
+#include "xallocator/x_allocator_tlsf.h"
 
 namespace xcore
 {

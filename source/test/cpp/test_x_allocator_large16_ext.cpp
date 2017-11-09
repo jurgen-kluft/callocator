@@ -1,9 +1,9 @@
-#include "xbase\x_allocator.h"
-#include "xbase\x_idx_allocator.h"
-#include "xallocator\x_allocator_freelist.h"
-#include "xallocator\private\x_largebin16.h"
+#include "xbase/x_allocator.h"
+#include "xbase/x_idx_allocator.h"
+#include "xallocator/x_allocator_freelist.h"
+#include "xallocator/private/x_largebin16.h"
 
-#include "xunittest\xunittest.h"
+#include "xunittest/xunittest.h"
 
 using namespace xcore;
 

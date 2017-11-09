@@ -1,9 +1,9 @@
-#include "xbase\x_base.h"
-#include "xbase\x_allocator.h"
-#include "xbase\x_console.h"
+#include "xbase/x_base.h"
+#include "xbase/x_allocator.h"
+#include "xbase/x_console.h"
 
-#include "xunittest\xunittest.h"
-#include "xunittest\private\ut_ReportAssert.h"
+#include "xunittest/xunittest.h"
+#include "xunittest/private/ut_ReportAssert.h"
 
 using namespace xcore;
 

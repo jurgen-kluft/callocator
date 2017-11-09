@@ -1,9 +1,9 @@
-#include "xbase\x_target.h"
-#include "xbase\x_integer.h"
-#include "xbase\x_memory_std.h"
-#include "xbase\x_allocator.h"
+#include "xbase/x_target.h"
+#include "xbase/x_integer.h"
+#include "xbase/x_memory_std.h"
+#include "xbase/x_allocator.h"
 
-#include "xallocator\x_allocator_dl.h"
+#include "xallocator/x_allocator_dl.h"
 
 #ifdef TARGET_PS3
 #pragma diag_suppress=no_corresponding_delete

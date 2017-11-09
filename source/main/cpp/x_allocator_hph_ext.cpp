@@ -1,14 +1,14 @@
-#include "xbase\x_target.h"
-#include "xbase\x_debug.h"
-#include "xbase\x_memory_std.h"
-#include "xbase\x_integer.h"
-#include "xbase\x_allocator.h"
-#include "xbase\x_idx_allocator.h"
-#include "xbase\x_integer.h"
-#include "xbase\x_tree.h"
+#include "xbase/x_target.h"
+#include "xbase/x_debug.h"
+#include "xbase/x_memory_std.h"
+#include "xbase/x_integer.h"
+#include "xbase/x_allocator.h"
+#include "xbase/x_idx_allocator.h"
+#include "xbase/x_integer.h"
+#include "xbase/x_tree.h"
 
-#include "xallocator\x_allocator_hph_ext.h"
-#include "xallocator\x_allocator_pool.h"
+#include "xallocator/x_allocator_hph_ext.h"
+#include "xallocator/x_allocator_pool.h"
 
 #if 0
 namespace xcore

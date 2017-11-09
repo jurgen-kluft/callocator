@@ -1,7 +1,7 @@
-#include "xbase\x_allocator.h"
-#include "xallocator\private\x_smallbin.h"
+#include "xbase/x_allocator.h"
+#include "xallocator/private/x_smallbin.h"
 
-#include "xunittest\xunittest.h"
+#include "xunittest/xunittest.h"
 
 using namespace xcore;
 

@@ -3,13 +3,13 @@
 //==============================================================================
 #ifndef __X_ALLOCATOR_LARGE_BIN16_H__
 #define __X_ALLOCATOR_LARGE_BIN16_H__
-#include "xbase\x_target.h"
+#include "xbase/x_target.h"
 #ifdef USE_PRAGMA_ONCE 
 #pragma once 
 #endif
 
-#include "xbase\private\x_rbtree15.h"
-#include "xbase\x_idx_allocator.h"
+#include "xbase/private/x_rbtree15.h"
+#include "xbase/x_idx_allocator.h"
 
 //==============================================================================
 // xCore namespace

@@ -1,12 +1,12 @@
-#include "xbase\x_target.h"
-#include "xbase\x_console.h"
-#include "xbase\x_debug.h"
-#include "xbase\x_integer.h"
-#include "xbase\x_memory_std.h"
-#include "xbase\x_string_ascii.h"
-#include "xbase\x_allocator.h"
+#include "xbase/x_target.h"
+#include "xbase/x_console.h"
+#include "xbase/x_debug.h"
+#include "xbase/x_integer.h"
+#include "xbase/x_memory_std.h"
+#include "xbase/x_string_ascii.h"
+#include "xbase/x_allocator.h"
 
-#include "xallocator\x_allocator_tlsf.h"
+#include "xallocator/x_allocator_tlsf.h"
 
 ///< TLSF allocator, Two-Level Segregate Fit
 ///< http://rtportal.upv.es/rtmalloc/

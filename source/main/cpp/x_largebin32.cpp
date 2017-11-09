@@ -1,8 +1,8 @@
-#include "xbase\x_target.h"
-#include "xbase\x_debug.h"
-#include "xbase\x_integer.h"
-#include "xbase\x_tree.h"
-#include "xallocator\private\x_largebin32.h"
+#include "xbase/x_target.h"
+#include "xbase/x_debug.h"
+#include "xbase/x_integer.h"
+#include "xbase/x_tree.h"
+#include "xallocator/private/x_largebin32.h"
 
 namespace xcore
 {
