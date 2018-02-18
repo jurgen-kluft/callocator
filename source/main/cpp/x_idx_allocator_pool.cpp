@@ -50,7 +50,7 @@ namespace xcore
 			mBlockAllocator = block_allocator;
 			mObjectArrayAllocator = object_array_allocator;
 
-			mSizeOfItem = x_intu::alignUp(size_of_item, item_alignment);
+			mSizeOfItem = xalignUp(size_of_item, item_alignment);
 			mAlignOfItem = item_alignment;
 
 			mInitialNumBlocks = num_initial_blocks;
@@ -59,9 +59,9 @@ namespace xcore
 			mSizeOfBlockData = num_items_per_block * mSizeOfItem;
 
 			mItemsPerBlock = num_items_per_block;
-			mItemsPerBlockBitMask = x_intu::ceilPower2(num_items_per_block) - 1;
+			mItemsPerBlockBitMask = xceilpo2(num_items_per_block) - 1;
 			
-			mBlockIndexBitShift = x_intu::ilog2(mItemsPerBlockBitMask+1);
+			mBlockIndexBitShift = xilog2(mItemsPerBlockBitMask+1);
 		}
 
 		void				initialize(u32 size_of_item, u32 item_alignment, u32 num_items_per_block, u32 num_initial_blocks, u32 num_grow_blocks=0, u32 num_shrink_blocks=0)

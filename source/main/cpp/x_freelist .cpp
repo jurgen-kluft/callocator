@@ -30,9 +30,9 @@ namespace xcore
 
 			// Clamp/Guard parameters
 			mElemAlignment     = mElemAlignment==0 ? X_ALIGNMENT_DEFAULT : mElemAlignment;
-			mElemAlignment     = x_intu::alignUp(mElemAlignment, sizeof(void*));					// Align element alignment to the size of a pointer
-			mElemSize          = x_intu::alignUp(mElemSize, sizeof(void*));							// Align element size to the size of a pointer
-			mElemSize          = x_intu::alignUp(mElemSize, mElemAlignment);						// Align element size to a multiple of element alignment
+			mElemAlignment     = xalignUp(mElemAlignment, sizeof(void*));					// Align element alignment to the size of a pointer
+			mElemSize          = xalignUp(mElemSize, sizeof(void*));							// Align element size to the size of a pointer
+			mElemSize          = xalignUp(mElemSize, mElemAlignment);						// Align element size to a multiple of element alignment
 
 			// Check parameters	
 			ASSERT(mElemSize >= sizeof(void*));

@@ -105,8 +105,8 @@ namespace xcore
 
 			// Align the size up with 'mSizeAlignment'
 			// Align the alignment up with 'mAddressAlignment'
-			size      = x_intu::alignUp(size , mSizeAlignment   );
-			alignment = x_intu::max(alignment, mAddressAlignment);
+			size      = xalignUp(size , mSizeAlignment   );
+			alignment = xmax(alignment, mAddressAlignment);
 
 			// Find the first node in the size tree that has the same or larger size
 			// Start to iterate through the tree until we find a node that can hold
@@ -272,7 +272,7 @@ namespace xcore
 			// of the next node and substracting them.
 			xsize_t const node_size = diff_ptr(nodep->ptr, nextp->ptr);
 
-			ASSERT(x_intu::isPowerOf2(alignment));
+			ASSERT(xispo2(alignment));
 			u32 align_mask = alignment - 1;
 
 			// See if we can use this block

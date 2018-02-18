@@ -197,7 +197,7 @@ namespace xcore
 		xbyte*		xallocator::allocate(u32 size, u32 alignment)
 		{
 			// do we have to align up ?
-			size = x_intu::alignUp(size, 4);
+			size = xalignUp(size, 4);
 
 			xbyte* alloc_address = NULL;
 			while (true)

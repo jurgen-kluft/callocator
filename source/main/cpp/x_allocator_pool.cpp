@@ -460,7 +460,7 @@ namespace xcore
 
 			// Save initial parameters
 			mElemAlignment     = mElemAlignment==0 ? X_ALIGNMENT_DEFAULT : mElemAlignment;
-			mElemSize          = x_intu::alignUp(mElemSize, mElemAlignment);			// Align element size to a multiple of element alignment
+			mElemSize          = xalignUp(mElemSize, mElemAlignment);			// Align element size to a multiple of element alignment
 
 			extend(mStaticBlocks, mBlockInitialCount, mBlockMaxCount);
 		}

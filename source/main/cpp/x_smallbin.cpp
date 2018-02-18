@@ -269,7 +269,7 @@ namespace xcore
 			}
 
 			// This allows us to compute the maximum index per level
-			u32 const level_idxs = x_intu::ceilPower2(mBinSize / mChunkSize) - 1;
+			u32 const level_idxs = xceilpo2(mBinSize / mChunkSize) - 1;
 
 			u32 chunk_idx;
 			if (sb_allocate(mLevels,level_idxs, mNode, node_allocator, chunk_idx) == 0)
@@ -282,7 +282,7 @@ namespace xcore
 		void		xsmallbin::deallocate(void* ptr)
 		{
 			ptr = ptr_relative(mBaseAddress, ptr);
-			u32 const chunk_idx = (u32)ptr / (u32)mChunkSize;
+			u32 const chunk_idx = (uptr)ptr / (u32)mChunkSize;
 			if (mLevels == 0)
 			{
 				sb_deallocate(chunk_idx, (xbnode*)mNode);

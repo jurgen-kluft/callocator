@@ -83,13 +83,13 @@ namespace xcore
 
 	void		x_indexed_array_allocator::initialize(void* object_array, u32 size_of_object, u32 object_alignment, u32 size)
 	{
-		object_alignment = x_intu::alignUp(object_alignment, 4);
+		object_alignment = xalignUp(object_alignment, 4);
 
 		mFreeObjectList = NULL;
 		mAllocCount = 0;
 		mObjectArrayAllocator = NULL;
 		mObjectArraySize = size;
-		mSizeOfObject = x_intu::alignUp(size_of_object, object_alignment);
+		mSizeOfObject = xalignUp(size_of_object, object_alignment);
 		mObjectArray = (xbyte*)object_array;
 		mObjectArrayEnd = mObjectArray + (mObjectArraySize * mSizeOfObject);
 	}
@@ -102,8 +102,8 @@ namespace xcore
 		mObjectArrayAllocator = allocator;
 		mObjectArraySize = size;
 
-		mAlignOfObject = x_intu::alignUp(object_alignment, 4);
-		mSizeOfObject = x_intu::alignUp(size_of_object, mAlignOfObject);
+		mAlignOfObject = xalignUp(object_alignment, 4);
+		mSizeOfObject = xalignUp(size_of_object, mAlignOfObject);
 	}
 
 	void		x_indexed_array_allocator::init()
