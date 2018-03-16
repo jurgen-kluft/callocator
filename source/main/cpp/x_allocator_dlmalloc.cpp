@@ -2520,7 +2520,7 @@ namespace xcore
 	{
 		x_allocator_dlmalloc* allocator = new (mem) x_allocator_dlmalloc();
 
-		s32 allocator_class_size = x_intu::ceilPower2(sizeof(x_allocator_dlmalloc));
+		s32 allocator_class_size = xceilpo2(sizeof(x_allocator_dlmalloc));
 		mem = (void*)((u8*)mem + allocator_class_size);
 
 		allocator->init(mem, memsize - allocator_class_size);

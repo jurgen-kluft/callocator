@@ -8,110 +8,83 @@
 
 namespace xcore
 {
-	namespace xfreelist
+	xfreelist_t::xfreelist_t()
+		: mElemSize(0)
+		, mElemAlignment(0)
+		, mSize(0)
+		, mElementArray(0)
 	{
-		/**
-		@brief		The back-end data of the fixed size free list
-		@desc		Contains the configuration and the raw element array of the list.
-		**/
-		xdata::xdata() 
-			: mElemSize(0)
-			, mElemAlignment(0)
-			, mElemMaxCount(0)
-			, mElementArray(0) {}
+	}
 
+	void                xfreelist_t::init(xbyte* array, u32 array_size, u32 elem_size, u32 elem_alignment)
+	{
+		// Check parameters
+		ASSERT(mElemSize >= sizeof(void*));
 
-		void				xdata::init(u32 elem_size, u32 elem_alignment, u32 elem_max_count)
+		mAllocator = nullptr;
+		mElementArray = array;
+
+		// Take over the parameters
+		mElemSize = elem_size;
+		mElemAlignment = elem_alignment;
+		mSize = 0;
+
+		// Clamp/Guard parameters
+		mElemAlignment     = mElemAlignment == 0 ? X_ALIGNMENT_DEFAULT : mElemAlignment;
+		mElemAlignment     = xalignUp(mElemAlignment, sizeof(void*));                   // Align element alignment to the size of a pointer
+		mElemSize          = xalignUp(mElemSize, sizeof(void*));                        // Align element size to the size of a pointer
+		mElemSize          = xalignUp(mElemSize, mElemAlignment);                       // Align element size to a multiple of element alignment
+		mSize              = (array_size / mElemSize);
+	}
+
+	void                xfreelist_t::alloc(x_iallocator* allocator, u32 elem_size, u32 elem_alignment, s32 count)
+	{
+		// Check parameters
+		ASSERT(mElemSize >= sizeof(void*));
+		ASSERT(count != 0);
+
+		mAllocator = allocator;
+		mSize = count;
+
+		// Take over the parameters
+		mElemSize = elem_size;
+		mElemAlignment = elem_alignment;
+
+		// Clamp/Guard parameters
+		mElemAlignment = mElemAlignment == 0 ? X_ALIGNMENT_DEFAULT : mElemAlignment;
+		mElemAlignment = xalignUp(mElemAlignment, sizeof(void*));                       // Align element alignment to the size of a pointer
+		mElemSize = xalignUp(mElemSize, sizeof(void*));                                 // Align element size to the size of a pointer
+		mElemSize = xalignUp(mElemSize, mElemAlignment);                                // Align element size to a multiple of element alignment
+
+		// Initialize the element array
+		mElementArray = (xbyte*)allocator->allocate(mElemSize * mSize, mElemAlignment);
+	}
+
+	void                xfreelist_t::release()
+	{
+		if (mAllocator != nullptr)
 		{
-			// Take over the parameters
-			mElemSize = elem_size;
-			mElemAlignment = elem_alignment;
-			mElemMaxCount = elem_max_count;
-
-			// Clamp/Guard parameters
-			mElemAlignment     = mElemAlignment==0 ? X_ALIGNMENT_DEFAULT : mElemAlignment;
-			mElemAlignment     = xalignUp(mElemAlignment, sizeof(void*));					// Align element alignment to the size of a pointer
-			mElemSize          = xalignUp(mElemSize, sizeof(void*));							// Align element size to the size of a pointer
-			mElemSize          = xalignUp(mElemSize, mElemAlignment);						// Align element size to a multiple of element alignment
-
-			// Check parameters	
-			ASSERT(mElemSize >= sizeof(void*));
-			ASSERT(mElemMaxCount > 0);
-		}
-
-		void				xdata::alloc_array(x_iallocator* allocator)
-		{
-			// Initialize the element array
-			mElementArray = (xbyte*)allocator->allocate(mElemSize * mElemMaxCount, mElemAlignment);
-		}
-
-		void				xdata::dealloc_array(x_iallocator* allocator)
-		{
-			allocator->deallocate(mElementArray);
-			mElementArray = NULL;
-		}
-
-
-		void				xdata::set_array(xbyte* elem_array)
-		{
-			// Set/Reset the user provided element array
-			mElementArray = elem_array;
-		}
-
-
-		/**
-		@brief		Fixed size type, element
-		@desc		It implements linked list behavior for free elements in the block.
-					Works on 64-bit systems since we use indexing here instead of pointers.
-		**/
-		class xelement	
-		{
-		public:
-			xelement*			getNext(xdata const* info)						{ return info->pat(mIndex); }
-			void				setNext(xdata const* info, xelement* next)		{ mIndex = info->iof(next); }
-			void*				getObject()										{ return (void*)&mIndex; }
-		private:
-			u32					mIndex;	
-		};
-
-		xelement*		xlist::allocate()
-		{
-			if (mFreeList == NULL)
-				return NULL;
-			xelement* e = mFreeList;
-			mFreeList = e->getNext(mInfo);
-			return e;
-		}
-			
-		void			xlist::deallocate(xelement* element)
-		{
-			if (mFreeList == NULL)
-				return;
-
-			u32 idx = mInfo->iof(element);
-			ASSERT(idx>=0 && idx<mInfo->getElemMaxCount());
-			element->setNext(mInfo, mFreeList);
-			mFreeList = element;
-		}
-
-
-		void			xlist::init(xdata const* info)
-		{
-			mInfo = info;
-			ASSERT(mInfo->valid());
-			mFreeList = NULL;
-			reset();
-		}
-
-		void			xlist::reset()
-		{
-			mFreeList = NULL;
-			for (s32 i=mInfo->getElemMaxCount()-1; i>=0; --i)
-			{
-				xelement* e = mInfo->pat(i);
-				e->setNext(mInfo, mFreeList);
-				mFreeList = e;
-			}
+			mAllocator->deallocate(mElementArray);
+			mElementArray = nullptr;
+			mAllocator = nullptr;
 		}
 	}
+
+
+	/**
+	@brief      Fixed size type, element
+	@desc       It implements linked list behavior for free elements in the block.
+	            Works on 64-bit systems since we use indexing here instead of pointers.
+	**/
+	class xelement
+	{
+	public:
+		xelement*           getNext(xfreelist_t const* info)                        { return info->ptr_of(mIndex); }
+		void                setNext(xfreelist_t const* info, xelement* next)        { mIndex = info->idx_of(next); }
+		void*               getObject()                                             { return (void*)&mIndex; }
+	private:
+		u32                 mIndex;
+	};
+
+
 };

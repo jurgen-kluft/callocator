@@ -25,7 +25,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_freelist)
 		{
 			// We only need the lower bits, so 32 or 64 bits is not an issue here
 			u32 bits = (u32)p;
-			return xcore::x_intu::isAligned(bits, alignment);
+			return xcore::xisAligned(bits, alignment);
 		}
 
 		static void gFill(void* p, u32 size, xbyte v)
