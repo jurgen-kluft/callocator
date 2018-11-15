@@ -9,21 +9,53 @@ using namespace xcore;
 
 extern x_iallocator* gSystemAllocator;
 
+class node_allocator : public x_iallocator
+{
+public:
+	x_iallocator*		m_allocator;
+	u64					m_size;
+
+	u64					size() const { return m_size; }
+
+	virtual const char*	name() const { return "tree node allocator"; }
+
+	virtual void*		allocate(xsize_t size, u32 align)
+	{
+		m_size += 1;
+		return m_allocator->allocate(size, align);
+	}
+
+	virtual void*		reallocate(void* p, xsize_t size, u32 align)
+	{
+		return m_allocator->reallocate(p, size, align);
+	}
+
+	virtual void		deallocate(void* p)
+	{
+		m_size -= 1;
+		return m_allocator->deallocate(p);
+	}
+
+	virtual void		release() {}
+};
 
 UNITTEST_SUITE_BEGIN(x_allocator_large32_ext)
 {
     UNITTEST_FIXTURE(main)
     {
-		static x_iidx_allocator* gIdxAllocator = NULL;
+		static node_allocator sNodeAllocator;
+		static node_allocator* gNodeAllocator;
 
         UNITTEST_FIXTURE_SETUP()
 		{
-			gIdxAllocator = gCreateFreeListIdxAllocator(gSystemAllocator, sizeof(xexternal32::xlnode), 8, 65536);
+			sNodeAllocator.m_allocator = gSystemAllocator;
+			sNodeAllocator.m_size = 0;
+			gNodeAllocator = &sNodeAllocator;
 		}
 
         UNITTEST_FIXTURE_TEARDOWN()
 		{
-			gIdxAllocator->release();
+			
 		}
 
         UNITTEST_TEST(advance_ptr1)
@@ -55,34 +87,34 @@ UNITTEST_SUITE_BEGIN(x_allocator_large32_ext)
 		UNITTEST_TEST(init1)
         {
 			xexternal32::xlargebin sb;
-			CHECK_EQUAL(0, gIdxAllocator->size());
-			sb.init((void*)0x80000000, 65536, 64, 4, gIdxAllocator);
-			CHECK_EQUAL(5, gIdxAllocator->size());
+			CHECK_EQUAL(0, gNodeAllocator->size());
+			sb.init((void*)(uptr)0x80000000, 65536, 64, 4, gNodeAllocator);
+			CHECK_EQUAL(5, gNodeAllocator->size());
 			sb.release();
-			CHECK_EQUAL(0, gIdxAllocator->size());
+			CHECK_EQUAL(0, gNodeAllocator->size());
         }
 
 		UNITTEST_TEST(allocate1)
 		{
 			xexternal32::xlargebin sb;
-			CHECK_EQUAL(0, gIdxAllocator->size());
-			sb.init((void*)0x80000000, 65536, 64, 4, gIdxAllocator);
-			CHECK_EQUAL(5, gIdxAllocator->size());
+			CHECK_EQUAL(0, gNodeAllocator->size());
+			sb.init((void*)(uptr)0x80000000, 65536, 64, 4, gNodeAllocator);
+			CHECK_EQUAL(5, gNodeAllocator->size());
 
 			void* p1 = sb.allocate(60, 4);
 			sb.deallocate(p1);
 
 			sb.release();
-			CHECK_EQUAL(0, gIdxAllocator->size());
+			CHECK_EQUAL(0, gNodeAllocator->size());
 		}	
 	
 		UNITTEST_TEST(allocate2)
 		{
 			xexternal32::xlargebin sb;
-			void* base = (void*)0x80000000;
-			CHECK_EQUAL(0, gIdxAllocator->size());
-			sb.init(base, 65536, 2048, 32, gIdxAllocator);
-			CHECK_EQUAL(5, gIdxAllocator->size());
+			void* base = (void*)(uptr)0x80000000;
+			CHECK_EQUAL(0, gNodeAllocator->size());
+			sb.init(base, 65536, 2048, 32, gNodeAllocator);
+			CHECK_EQUAL(5, gNodeAllocator->size());
 
 			for (s32 i=0; i<32; ++i)
 			{
@@ -93,23 +125,23 @@ UNITTEST_SUITE_BEGIN(x_allocator_large32_ext)
 			}
 			// Last allocation caused the allocator to deplete the memory so it
 			// did not have to allocate a 'split' node.
-			CHECK_EQUAL(32-1+5, gIdxAllocator->size());
+			CHECK_EQUAL(32-1+5, gNodeAllocator->size());
 
 			// Allocator has no memory left so this should fail
 			void* p2 = sb.allocate(60, 4);
 			CHECK_NULL(p2);
 
 			sb.release();
-			CHECK_EQUAL(0, gIdxAllocator->size());
+			CHECK_EQUAL(0, gNodeAllocator->size());
 		}
 
 		UNITTEST_TEST(allocate3)
 		{
 			xexternal32::xlargebin sb;
-			void* base = (void*)0x80000000;
-			CHECK_EQUAL(0, gIdxAllocator->size());
-			sb.init(base, 1 * 1024 * 1024 * 1024, 256, 256, gIdxAllocator);
-			CHECK_EQUAL(5, gIdxAllocator->size());
+			void* base = (void*)(uptr)0x80000000;
+			CHECK_EQUAL(0, gNodeAllocator->size());
+			sb.init(base, 1 * 1024 * 1024 * 1024, 256, 256, gNodeAllocator);
+			CHECK_EQUAL(5, gNodeAllocator->size());
 
 			const int max_tracked_allocs = 1000;
 			void*	allocations[max_tracked_allocs];
@@ -143,7 +175,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_large32_ext)
 
 
 			sb.release();
-			CHECK_EQUAL(0, gIdxAllocator->size());
+			CHECK_EQUAL(0, gNodeAllocator->size());
 		}
 	}
 }

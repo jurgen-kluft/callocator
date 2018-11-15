@@ -1,6 +1,3 @@
-//==============================================================================
-//  x_freelist.h
-//==============================================================================
 #ifndef __X_FREELIST_H__
 #define __X_FREELIST_H__
 #include "xbase/x_target.h"
@@ -8,67 +5,35 @@
 #pragma once 
 #endif
 
-//==============================================================================
-// xCore namespace
-//==============================================================================
 namespace xcore
 {
-	namespace xfreelist
+	class xelement;
+
+	struct xfreelist_t
 	{
-		class xelement;
+		xfreelist_t();
 
-		struct xdata
-		{
-								xdata();
+		void				init(xbyte* array, u32 array_size, u32 elem_size, u32 elem_alignment);
+		void				alloc(x_iallocator* allocator, u32 elem_size, u32 elem_alignment, s32 size);
+		void				release();
 
-			void				init(u32 elem_size, u32 elem_alignment, u32 elem_max_count);
+		inline bool			valid() const							{ return (mElementArray!=nullptr); }
+		inline s32			size() const							{ return mSize; }
 
-			void				alloc_array(x_iallocator* allocator);
-			void				dealloc_array(x_iallocator* allocator);
+		inline u32			getElemSize() const						{ return mElemSize; }
+		inline u32			getElemAlignment() const				{ return mElemAlignment; }
 
-			void				set_array(xbyte* elem_array);
+		inline s32			idx_of(xelement const* element) const	{ return ((s32)((xbyte const*)element - (xbyte const*)mElementArray)) / (s32)mElemSize; }
+		inline xelement*	ptr_of(u32 index) const					{ return (xelement*)(mElementArray + (index * mElemSize)); }
 
-			inline bool			valid() const							{ return (mElementArray!=0); }
+	private:
+		x_iallocator *		mAllocator;
+		u32					mElemSize;
+		u32					mElemAlignment;
+		u32 				mSize;
+		xbyte*				mElementArray;
+	};
 
-			inline u32			getElemSize() const						{ return mElemSize; }
-			inline u32			getElemAlignment() const				{ return mElemAlignment; }
-			inline u32			getElemMaxCount() const					{ return mElemMaxCount; }
-
-			inline s32			iof(xelement const* element) const		{ return ((s32)((xbyte const*)element - (xbyte const*)mElementArray)) / (s32)mElemSize; }
-			inline xelement*	pat(u32 index) const					{ return (xelement*)(mElementArray + (index * mElemSize)); }
-
-		private:
-
-			u32					mElemSize;
-			u32					mElemAlignment;
-			u32 				mElemMaxCount;
-			xbyte*				mElementArray;
-		};
-
-		class xlist
-		{
-		public:
-			inline				xlist() 
-									: mFreeList (0)
-									, mInfo (0) { }
-
-			void				init(xdata const* info);
-			void				reset();
-
-			inline bool			valid() const							{ return (mInfo->valid()); }
-			inline bool			full() const							{ ASSERT(valid()); return mFreeList==0; }
-
-			xelement*			allocate();
-			void				deallocate(xelement* element);
-
-			inline s32			iof(xelement const* element) const		{ return mInfo->iof(element); }
-			inline xelement*	pat(u32 index) const					{ return mInfo->pat(index); }
-
-		private:
-			xelement*		mFreeList;
-			xdata const*	mInfo;
-		};
-	}
 };
 
 

@@ -4,7 +4,6 @@
 #include "xbase/x_integer.h"
 #include "xbase/x_allocator.h"
 #include "xbase/x_tree.h"
-#include "xbase/private/x_rbtree_sentinel.h"
 
 #include "xallocator/x_allocator_pool.h"
 
@@ -50,10 +49,10 @@ namespace xcore
 
 				xblock has a 32 bytes overhead caused by the bookkeeping data.
 		**/
-		class xblock : public xrbsnode
+		class xblock
 		{
 		public:
-								xblock() : mElementArrayBegin (0), mElementArrayEnd (0), mFreeList (0), mNumManagedElements(0), mNumFreeElements(0) { clear(); }
+								xblock() : mElementArrayBegin (0), mElementArrayEnd (0), mFreeList (0), mNumManagedElements(0), mNumFreeElements(0) { }
 
 			static xblock*		create(x_iallocator* allocator, u32 inElemSize, u32 inNumElements, s32 inAlignment);
 
@@ -65,22 +64,20 @@ namespace xcore
 
 			inline s32			compare(xblock* block)
 			{ 
-				if (block == this) 
-					return 0; 
+				if (block->mElementArrayBegin > mElementArrayBegin)
+					return 1; 
 				else if (block->mElementArrayBegin < mElementArrayBegin) 
 					return -1;
-				else 
-					return 1; 
+				return 0; 
 			}
 
 			inline s32			compare_ptr(void* ptr)
 			{
-				if (ptr < mElementArrayBegin) 
-					return -1;
-				else if (ptr > mElementArrayEnd) 
-					return 1; 
-				else
-					return 0; 
+				if (ptr > mElementArrayEnd) 
+					return 1;
+				else if (ptr < mElementArrayBegin)
+					return -1; 
+				return 0; 
 			}
 
 			inline xelement*	pop()
@@ -112,17 +109,18 @@ namespace xcore
 			u32					mNumFreeElements;
 		};
 
-		s32			compare_blocks_f(void* a, xrbsnode* b)
+		s32			compare_blocks_f(void const* a, void const* b)
 		{
 			xblock* ab = (xblock*)a;
 			xblock* bb = (xblock*)b;
 			return bb->compare(ab);
 		}
 
-		s32			compare_ptr_block_f(void* a, xrbsnode* b)
+		s32			compare_ptr_block_f(void const* a, void const* b)
 		{
+			xblock* aa = (xblock*)a;
 			xblock* bb = (xblock*)b;
-			return bb->compare_ptr(a);
+			return bb->compare_ptr(aa);
 		}
 
 		xblock*		xblock::create(x_iallocator* allocator, u32 inElemSize, u32 inNumElements, s32 inAlignment)
@@ -161,7 +159,6 @@ namespace xcore
 			}
 		}
 
-
 		void xblock::release(x_iallocator* allocator)
 		{ 
 			allocator->deallocate(mElementArrayBegin);
@@ -176,7 +173,7 @@ namespace xcore
 		**/
 		struct xblocktree
 		{
-			inline				xblocktree() : mNumBlocks(0)		{ mTree.init(compare_blocks_f); }
+			inline				xblocktree(x_iallocator* allocator) : mNumBlocks(0), mTree(allocator)	{ mTree.set_cmp(compare_blocks_f); }
 
 			u32					size() const						{ return mNumBlocks; }
 			bool				empty() const						{ return mNumBlocks == 0; }
@@ -187,66 +184,78 @@ namespace xcore
 					return NULL;
 
 				// The node to remove
-				xblock* node = (xblock*)mTree.min().current();
-				mTree.remove(node);
+				xtree::iterator it = mTree.iterate();
 
-				--mNumBlocks;
-
-				node->clear();
-				return node;
+				s32 dir = xtree::cRight;
+				void* data;
+				if (it.sortorder(dir, data))
+				{
+					xblock* node = (xblock*)data;
+					mTree.remove(data);
+					--mNumBlocks;
+					return node;
+				}
+				return nullptr;
 			}
 
 			void				push(xblock* block)
 			{
-				mTree.insert(block, block);
+				mTree.insert(block);
 				++mNumBlocks;
 			}
 
 			xblock*				find(void* ptr)
 			{
-				rbs_iterator it = mTree.root();
-				
-				xrbsnode* node = NULL;
-				while (it.move(ptr, compare_ptr_block_f, node))
+				xtree::iterator it = mTree.iterate();
+				s32 dir = xtree::cRight;
+				void* data = nullptr;
+				xblock* found = nullptr;
+				while (it.traverse(dir, data))
 				{
-					
+					xblock* block = (xblock*)data;
+					s32 const c = block->compare_ptr(ptr);
+					if (c == 0)
+					{
+						found = block;
+						break;
+					}
+					dir = it.getdir(c);
 				}
 
-				return (xblock*)node;
+				return found;
 			}
 
 			void				remove(xblock* block)
 			{
-				xrbsnode* r = block;
-				mTree.remove(r);
-				--mNumBlocks;
-				r->clear();
+				if (mTree.remove(block))
+				{
+					--mNumBlocks;
+				}
 			}
 
 			void				reset(u32 inNumElements, u32 inElemSize)
 			{
-				rbs_iterator it = mTree.min();
-				xrbsnode* node = it.current();
-				while (node != NULL)
+				xtree::iterator it = mTree.iterate();
+				s32 d = xtree::cRight;
+				void* data;
+				while (it.sortorder(d, data))
 				{
-					xblock* block = (xblock*)node;
+					xblock* block = (xblock*)data;
 					block->reset(inElemSize);
-					node = it.move();
 				}
 			}
 
 			void				release(x_iallocator* allocator)
 			{
-				xrbsnode* it = NULL;
-				do
+				void* data;
+				while (mTree.clear(data))
 				{
-					xblock* remove = (xblock*)mTree.clear(it);
-					if (remove != NULL)
-						remove->release(allocator);
-				} while (it != NULL);
+					allocator->deallocate(data);
+				}
 			}
+
 		private:
-			xrbstree			mTree;
+			xtree				mTree;
 			u32					mNumBlocks;
 		};
 
@@ -296,7 +305,7 @@ namespace xcore
 
 			struct Blocks
 			{
-										Blocks() : mCurrent(0), mSize(0)	{ }
+										Blocks(x_iallocator* allocator) : mFree(allocator), mFull(allocator), mCurrent(0), mSize(0)	{ }
 
 				u32						size() const
 				{
@@ -420,6 +429,8 @@ namespace xcore
 		xallocator_imp::xallocator_imp()
 			: mIsInitialized(false)
 			, mAllocator(NULL)
+			, mStaticBlocks(NULL)
+			, mDynamicBlocks(NULL)
 			, mElemSize(4)
 			, mElemAlignment(X_ALIGNMENT_DEFAULT)
 			, mBlockElemCount(0)
@@ -432,6 +443,8 @@ namespace xcore
 		xallocator_imp::xallocator_imp(x_iallocator* allocator, u32 inElemSize, u32 inBlockElemCnt, u32 inBlockInitialCount, u32 inBlockGrowthCount, u32 inBlockMaxCount, u32 inElemAlignment)
 			: mIsInitialized(false)
 			, mAllocator(allocator)
+			, mStaticBlocks(allocator)
+			, mDynamicBlocks(allocator)
 			, mElemSize(inElemSize)
 			, mElemAlignment(inElemAlignment)
 			, mBlockElemCount(inBlockElemCnt)
