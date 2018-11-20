@@ -5,7 +5,7 @@
 
 namespace xcore
 {
-	x_iallocator*		gCreateHeapAllocator(void* mem_begin, u32 mem_size)
+	xalloc*		gCreateHeapAllocator(void* mem_begin, u32 mem_size)
 	{
 		return gCreateTlsfAllocator(mem_begin, mem_size);
 	}

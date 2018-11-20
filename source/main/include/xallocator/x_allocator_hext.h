@@ -14,14 +14,14 @@
 namespace xcore
 {
 	/// Forward declares
-	class x_iallocator;
+	class xalloc;
 
 
 	// WORK IN PROGRESS, NOT FINISHED!
 
 	/// High performance external heap allocator, manages external memory like Texture Memory, Sound Memory
 	/// by putting bookkeeping data in separate ('main') memory.
-	extern x_iallocator*		gCreateHextAllocator(x_iallocator *allocator, void* mem_base, u32 mem_size, u32 min_alloc_size, u32 max_alloc_size);
+	extern xalloc*		gCreateHextAllocator(xalloc *allocator, void* mem_base, u32 mem_size, u32 min_alloc_size, u32 max_alloc_size);
 
 };
 

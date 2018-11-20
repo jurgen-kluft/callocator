@@ -7,7 +7,7 @@
 
 using namespace xcore;
 
-extern xcore::x_iallocator* gSystemAllocator;
+extern xcore::xalloc* gSystemAllocator;
 
 UNITTEST_SUITE_BEGIN(x_idx_allocator_pool)
 {

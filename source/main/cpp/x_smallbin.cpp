@@ -72,7 +72,7 @@ namespace xcore
 			return state;	// We have no more free chunks
 		}
 
-		static u32		sb_allocate(u32 level_idx, u32 const level_idxs, xsnode* snode, x_iallocator* node_allocator, u32& outChunkIdx)
+		static u32		sb_allocate(u32 level_idx, u32 const level_idxs, xsnode* snode, xalloc* node_allocator, u32& outChunkIdx)
 		{
 			// We need to get to a level where there are free bits
 			
@@ -197,7 +197,7 @@ namespace xcore
 		{
 			xsnode*		node;
 			u32					level;
-			x_iallocator*		node_allocator;
+			xalloc*		node_allocator;
 		};
 
 		static void	release_r				(release_info& info)
@@ -231,7 +231,7 @@ namespace xcore
 			}
 		}
 
-		void		xsmallbin::release		(x_iallocator* node_allocator)
+		void		xsmallbin::release		(xalloc* node_allocator)
 		{
 			if (mLevels > 0)
 			{
@@ -245,7 +245,7 @@ namespace xcore
 			mNode = NULL;
 		}
 
-		void*		xsmallbin::allocate(u32 size, u32 alignment, x_iallocator* node_allocator)
+		void*		xsmallbin::allocate(u32 size, u32 alignment, xalloc* node_allocator)
 		{
 			if (((uptr)mNode & 1) == 1)
 			{

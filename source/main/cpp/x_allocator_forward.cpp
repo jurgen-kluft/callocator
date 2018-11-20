@@ -11,11 +11,11 @@
 namespace xcore
 {
 
-	class x_allocator_forward : public x_iallocator
+	class x_allocator_forward : public xalloc
 	{
 	public:
 							x_allocator_forward();
-							x_allocator_forward(xbyte* beginAddress, u32 size, x_iallocator* allocator);
+							x_allocator_forward(xbyte* beginAddress, u32 size, xalloc* allocator);
 		virtual				~x_allocator_forward();
 
 		virtual const char*	name() const									{ return TARGET_FULL_DESCR_STR "[Allocator, Type=Forward]"; }
@@ -33,7 +33,7 @@ namespace xcore
 		void				operator delete(void* pMem, void* )				{ }
 
 	private:
-		x_iallocator*		mAllocator;
+		xalloc*		mAllocator;
 		u32					mTotalSize;
 		xbyte*				mMemBegin;
 		xforwardbin::xallocator mForwardAllocator;
@@ -51,7 +51,7 @@ namespace xcore
 
 	}
 
-	x_allocator_forward::x_allocator_forward(xbyte* beginAddress, u32 size, x_iallocator* allocator)
+	x_allocator_forward::x_allocator_forward(xbyte* beginAddress, u32 size, xalloc* allocator)
 		: mAllocator(allocator)
 		, mTotalSize(size)
 		, mMemBegin(beginAddress)
@@ -91,7 +91,7 @@ namespace xcore
 		return mForwardAllocator.deallocate(ptr);
 	}
 
-	x_iallocator*		gCreateForwardAllocator(x_iallocator* allocator, u32 memsize)
+	xalloc*		gCreateForwardAllocator(xalloc* allocator, u32 memsize)
 	{
 		void* memForAllocator = allocator->allocate(sizeof(x_allocator_forward), 4);
 		void* mem = allocator->allocate(memsize + 32, 4);

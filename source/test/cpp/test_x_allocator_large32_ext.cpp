@@ -7,12 +7,12 @@
 
 using namespace xcore;
 
-extern x_iallocator* gSystemAllocator;
+extern xalloc* gSystemAllocator;
 
-class node_allocator : public x_iallocator
+class node_allocator : public xalloc
 {
 public:
-	x_iallocator*		m_allocator;
+	xalloc*		m_allocator;
 	u64					m_size;
 
 	u64					size() const { return m_size; }

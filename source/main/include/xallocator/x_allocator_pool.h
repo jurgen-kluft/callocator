@@ -14,7 +14,7 @@
 namespace xcore
 {
 	/// Forward declares
-	class x_iallocator;
+	class xalloc;
 
 	/// The pool (fixed sized type) allocator
 	struct xpool_params
@@ -50,7 +50,7 @@ namespace xcore
 		u32		mBlockMaxCount;
 	};
 
-	extern x_iallocator*		gCreatePoolAllocator(x_iallocator* main_allocator, xpool_params const& params);
+	extern xalloc*		gCreatePoolAllocator(xalloc* main_allocator, xpool_params const& params);
 	
 };
 

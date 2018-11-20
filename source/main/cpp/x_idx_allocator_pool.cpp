@@ -23,7 +23,7 @@ namespace xcore
 		enum { NILL_IDX = 0xffffffff };
 		typedef u32	block_idx_t;
 
-		x_indexed_pool_allocator(x_iallocator* allocator) 
+		x_indexed_pool_allocator(xalloc* allocator) 
 			: mAllocator(allocator)
 			, mGrowNumBlocks(0)
 			, mSizeOfBlockData(0)
@@ -45,7 +45,7 @@ namespace xcore
 
 		const char*			name() const	{ return "x_idx_allocator_pool; an indexed pool allocator that can grow and shrink"; }
 		
-		void				initialize(x_iallocator* block_allocator, x_iallocator* object_array_allocator, u32 size_of_item, u32 item_alignment, u32 num_items_per_block, u32 num_initial_blocks, u32 num_grow_blocks=0, u32 num_shrink_blocks=0)
+		void				initialize(xalloc* block_allocator, xalloc* object_array_allocator, u32 size_of_item, u32 item_alignment, u32 num_items_per_block, u32 num_initial_blocks, u32 num_grow_blocks=0, u32 num_shrink_blocks=0)
 		{
 			mBlockAllocator = block_allocator;
 			mObjectArrayAllocator = object_array_allocator;
@@ -111,13 +111,13 @@ namespace xcore
 				++mFreeListCnt;
 			}
 
-			void				init(x_iallocator* allocator, u32 size_of_object, u32 align_of_object, u32 items_per_block)
+			void				init(xalloc* allocator, u32 size_of_object, u32 align_of_object, u32 items_per_block)
 			{
 				mData = (xbyte*)allocator->allocate(size_of_object * items_per_block, align_of_object);
 				make_freelist(items_per_block, size_of_object);
 			}
 
-			void				dealloc_data(x_iallocator* allocator)
+			void				dealloc_data(xalloc* allocator)
 			{
 				allocator->deallocate(mData);
 				mData = NULL;
@@ -556,7 +556,7 @@ namespace xcore
 		}
 
 	private:
-		x_iallocator*		mAllocator;
+		xalloc*		mAllocator;
 
 		u32					mInitialNumBlocks;
 		u32					mGrowNumBlocks;
@@ -578,11 +578,11 @@ namespace xcore
 
 		u32					mAllocCount;
 
-		x_iallocator*		mBlockAllocator;
-		x_iallocator*		mObjectArrayAllocator;
+		xalloc*		mBlockAllocator;
+		xalloc*		mObjectArrayAllocator;
 	};
 
-	x_iidx_allocator*		gCreatePoolIdxAllocator(x_iallocator* allocator, x_iallocator* block_array_allocator, x_iallocator* object_array_allocator, u32 size_of_object, u32 object_alignment, u32 num_objects_per_block, u32 num_initial_blocks, u32 num_grow_blocks, u32 num_shrink_blocks)
+	x_iidx_allocator*		gCreatePoolIdxAllocator(xalloc* allocator, xalloc* block_array_allocator, xalloc* object_array_allocator, u32 size_of_object, u32 object_alignment, u32 num_objects_per_block, u32 num_initial_blocks, u32 num_grow_blocks, u32 num_shrink_blocks)
 	{
 		void* mem = allocator->allocate(sizeof(x_indexed_pool_allocator), sizeof(void*));
 		x_indexed_pool_allocator* pool_allocator = new (mem) x_indexed_pool_allocator(allocator);
@@ -590,7 +590,7 @@ namespace xcore
 		return pool_allocator;
 	}
 
-	x_iidx_allocator*		gCreatePoolIdxAllocator(x_iallocator* allocator, u32 size_of_object, u32 object_alignment, u32 num_objects_per_block, u32 num_initial_blocks, u32 num_grow_blocks, u32 num_shrink_blocks)
+	x_iidx_allocator*		gCreatePoolIdxAllocator(xalloc* allocator, u32 size_of_object, u32 object_alignment, u32 num_objects_per_block, u32 num_initial_blocks, u32 num_grow_blocks, u32 num_shrink_blocks)
 	{
 		void* mem = allocator->allocate(sizeof(x_indexed_pool_allocator), sizeof(void*));
 		x_indexed_pool_allocator* pool_allocator = new (mem) x_indexed_pool_allocator(allocator);

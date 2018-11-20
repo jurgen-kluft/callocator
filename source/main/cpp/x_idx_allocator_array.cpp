@@ -9,9 +9,9 @@ namespace xcore
 	class x_indexed_array_allocator : public x_iidx_allocator
 	{
 	public:
-		x_indexed_array_allocator(x_iallocator* allocator) : mAllocator(allocator)	{ }
+		x_indexed_array_allocator(xalloc* allocator) : mAllocator(allocator)	{ }
 		void				initialize(void* object_array, u32 size_of_object, u32 object_alignment, u32 size);
-		void				initialize(x_iallocator* allocator, u32 size_of_object, u32 object_alignment, u32 size);
+		void				initialize(xalloc* allocator, u32 size_of_object, u32 object_alignment, u32 size);
 
 		XCORE_CLASS_PLACEMENT_NEW_DELETE
 
@@ -41,10 +41,10 @@ namespace xcore
 		virtual void		release();
 
 	private:
-		x_iallocator*		mAllocator;
+		xalloc*		mAllocator;
 		u32*				mFreeObjectList;
 		u32					mAllocCount;
-		x_iallocator*		mObjectArrayAllocator;
+		xalloc*		mObjectArrayAllocator;
 		u32					mObjectArraySize;
 		xbyte*				mObjectArray;
 		xbyte*				mObjectArrayEnd;
@@ -52,7 +52,7 @@ namespace xcore
 		u32					mAlignOfObject;
 	};
 
-	x_iidx_allocator*		gCreateArrayIdxAllocator(x_iallocator* allocator, x_iallocator* object_array_allocator, u32 size_of_object, u32 object_alignment, u32 size)
+	x_iidx_allocator*		gCreateArrayIdxAllocator(xalloc* allocator, xalloc* object_array_allocator, u32 size_of_object, u32 object_alignment, u32 size)
 	{
 		void* mem = allocator->allocate(sizeof(x_indexed_array_allocator), 4);
 		x_indexed_array_allocator* array_allocator = new (mem) x_indexed_array_allocator(allocator);
@@ -60,7 +60,7 @@ namespace xcore
 		return array_allocator;
 	}
 
-	x_iidx_allocator*		gCreateArrayIdxAllocator(x_iallocator* allocator, void* object_array, u32 size_of_object, u32 object_alignment, u32 size)
+	x_iidx_allocator*		gCreateArrayIdxAllocator(xalloc* allocator, void* object_array, u32 size_of_object, u32 object_alignment, u32 size)
 	{
 		void* mem = allocator->allocate(sizeof(x_indexed_array_allocator), 4);
 		x_indexed_array_allocator* array_allocator = new (mem) x_indexed_array_allocator(allocator);
@@ -94,7 +94,7 @@ namespace xcore
 		mObjectArrayEnd = mObjectArray + (mObjectArraySize * mSizeOfObject);
 	}
 
-	void		x_indexed_array_allocator::initialize(x_iallocator* allocator, u32 size_of_object, u32 object_alignment, u32 size)
+	void		x_indexed_array_allocator::initialize(xalloc* allocator, u32 size_of_object, u32 object_alignment, u32 size)
 	{
 		mFreeObjectList = NULL;
 		mAllocCount = 0;

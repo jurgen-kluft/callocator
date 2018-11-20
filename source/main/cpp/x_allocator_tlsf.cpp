@@ -1272,7 +1272,7 @@ namespace xcore
 	}
 
 
-	class x_allocator_tlsf : public x_iallocator
+	class x_allocator_tlsf : public xalloc
 	{
 		void*				mPool;
 		xsize_t				mPoolSize;
@@ -1330,7 +1330,7 @@ namespace xcore
 		virtual					~x_allocator_tlsf()								{ }
 	};
 
-	x_iallocator*		gCreateTlsfAllocator(void* mem, u32 memsize)
+	xalloc*		gCreateTlsfAllocator(void* mem, u32 memsize)
 	{
 		x_allocator_tlsf* allocator = new (mem) x_allocator_tlsf();
 

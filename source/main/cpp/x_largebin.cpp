@@ -53,7 +53,7 @@ namespace xcore
 			memptr			ptr;						// (8) pointer/offset in external memory
 		};
 
-		static inline xlnode*	allocate_node(x_iallocator* allocator)
+		static inline xlnode*	allocate_node(xalloc* allocator)
 		{
 			void* nodePtr = allocator->allocate(sizeof(xlnode), sizeof(void*));
 			xlnode* node = (xlnode*)nodePtr;
@@ -69,7 +69,7 @@ namespace xcore
 			node->ptr = offset;
 		}
 
-		static inline void		deallocate_node(x_iallocator* allocator, xlnode* nodePtr)
+		static inline void		deallocate_node(xalloc* allocator, xlnode* nodePtr)
 		{
 			allocator->deallocate(nodePtr);
 		}
@@ -80,15 +80,15 @@ namespace xcore
 			xsize_t const nodeSize = (nextNodePtr->ptr) - (nodePtr->ptr);
 			return nodeSize;
 		}
-		static void			insert_size(xtree& tree, xlnode* node, x_iallocator* node_allocator);
-		static bool			find_bestfit(xtree& tree, u32 size, u32 alignment, x_iallocator* a, xlnode *& outNode, u32& outNodeSize);
+		static void			insert_size(xtree& tree, xlnode* node, xalloc* node_allocator);
+		static bool			find_bestfit(xtree& tree, u32 size, u32 alignment, xalloc* a, xlnode *& outNode, u32& outNodeSize);
 
-		static void			insert_addr(xtree& tree, xlnode* node, x_iallocator* node_allocator);
-		static bool			find_addr(xtree& tree, memptr ptr, x_iallocator* a, xlnode *& outNode);
+		static void			insert_addr(xtree& tree, xlnode* node, xalloc* node_allocator);
+		static bool			find_addr(xtree& tree, memptr ptr, xalloc* a, xlnode *& outNode);
 
-		static xlnode*		insert_in_list(xlnode* nodep, u32 size, x_iallocator* a, xlnode*& newNode);
-		static void			remove_from_list(xlnode* node, x_iallocator* a);
-		static void			remove_from_tree(xtree& tree, xlnode* node, x_iallocator* a);
+		static xlnode*		insert_in_list(xlnode* nodep, u32 size, xalloc* a, xlnode*& newNode);
+		static void			remove_from_list(xlnode* node, xalloc* a);
+		static void			remove_from_tree(xtree& tree, xlnode* node, xalloc* a);
 
 		s32					compare_addr(void const* p1, void const* p2)
 		{
@@ -132,9 +132,9 @@ namespace xcore
 		{
 		}
 
-		void				xlargebin::init(void* mem_begin, u32 mem_size, u32 size_alignment, u32 address_alignment, x_iallocator* node_allocator)
+		void				xlargebin::init(void* mem_begin, u32 mem_size, u32 size_alignment, u32 address_alignment, xalloc* node_allocator)
 		{
-			x_iallocator* a = node_allocator;
+			xalloc* a = node_allocator;
 
 			// Allocate the root nodes for the @size and @address tree
 			mNodeAllocator = a;
@@ -177,7 +177,7 @@ namespace xcore
 
 		void				xlargebin::release()
 		{
-			x_iallocator* a = mNodeAllocator;
+			xalloc* a = mNodeAllocator;
 
 			void* node;
 			while (!mRootSizeTree.clear(node))
@@ -196,7 +196,7 @@ namespace xcore
 
 		void*				xlargebin::allocate(u32 size, u32 alignment)
 		{
-			x_iallocator* a = mNodeAllocator;
+			xalloc* a = mNodeAllocator;
 
 			// Align the size up with 'mSizeAlignment'
 			// Align the alignment up with 'mAddressAlignment'
@@ -250,7 +250,7 @@ namespace xcore
 
 		void				xlargebin::deallocate(void* ptr)
 		{
-			x_iallocator* a = mNodeAllocator;
+			xalloc* a = mNodeAllocator;
 
 			memptr p = (memptr)((uptr)ptr - (uptr)mBaseAddress);
 
@@ -306,7 +306,7 @@ namespace xcore
 		}
 
 		// Size tree function implementations
-		static void			insert_size(xtree& tree, xlnode* nodePtr, x_iallocator* a)
+		static void			insert_size(xtree& tree, xlnode* nodePtr, xalloc* a)
 		{
 			ASSERT(nodePtr->is_free());
 
@@ -316,7 +316,7 @@ namespace xcore
 			tree.insert(nodePtr);
 		}
 
-		static bool	can_handle_size(xlnode* nodep, u32 size, u32 alignment, x_iallocator* a, u32& outSize)
+		static bool	can_handle_size(xlnode* nodep, u32 size, u32 alignment, xalloc* a, u32& outSize)
 		{
 			// Convert index to node ptr
 			xlnode* nextp = nodep->next;
@@ -363,7 +363,7 @@ namespace xcore
 			return false;
 		}
 
-		static bool			find_bestfit(xtree& tree, u32 size, u32 alignment, x_iallocator* a, xlnode*& outNode, u32& outNodeSize)
+		static bool			find_bestfit(xtree& tree, u32 size, u32 alignment, xalloc* a, xlnode*& outNode, u32& outNodeSize)
 		{
 			xtree::iterator iter;
 			tree.iterate(iter);
@@ -416,13 +416,13 @@ namespace xcore
 			return false;
 		}
 
-		void			insert_addr(xtree& tree, xlnode* node, x_iallocator* a)
+		void			insert_addr(xtree& tree, xlnode* node, xalloc* a)
 		{
 			ASSERT(node->is_used());
 			tree.insert(node);
 		}
 
-		bool			find_addr(xtree& tree, memptr ptr, x_iallocator* a, xlnode*& outNode)
+		bool			find_addr(xtree& tree, memptr ptr, xalloc* a, xlnode*& outNode)
 		{
 			xlnode fnode;
 			fnode.ptr = ptr;
@@ -436,7 +436,7 @@ namespace xcore
 			return false;
 		}
 
-		xlnode*			insert_in_list(xlnode* nodep, u32 size, x_iallocator* a, xlnode*& newNode)
+		xlnode*			insert_in_list(xlnode* nodep, u32 size, xalloc* a, xlnode*& newNode)
 		{
 			{
 				newNode = (xlnode*)a->allocate(sizeof(xlnode), sizeof(void*));
@@ -456,7 +456,7 @@ namespace xcore
 			return newNode;
 		}
 
-		void			remove_from_list(xlnode* nodep, x_iallocator* a)
+		void			remove_from_list(xlnode* nodep, xalloc* a)
 		{
 			// The node to remove from the linear list
 			xlnode* nextp = nodep->next;
@@ -466,7 +466,7 @@ namespace xcore
 		}
 
 
-		static void		remove_from_tree(xtree& tree, xlnode* node, x_iallocator* a)
+		static void		remove_from_tree(xtree& tree, xlnode* node, xalloc* a)
 		{
 			tree.remove(node);
 		}

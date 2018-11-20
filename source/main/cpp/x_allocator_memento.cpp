@@ -201,7 +201,7 @@ namespace xcore
 
 			x_memento*				m_memento;
 			x_memento_reporter*		m_report;
-			x_iallocator*			m_allocator;
+			xalloc*			m_allocator;
 			x_memento_handler*		m_event_handler;
 
 			void					initialize();
@@ -1534,7 +1534,7 @@ namespace xcore
 		}
 
 		/// 
-		/// x_iallocator interface
+		/// xalloc interface
 		/// 
 		virtual void*			allocate(xsize_t size, u32 alignment)
 		{
@@ -1562,7 +1562,7 @@ namespace xcore
 		void					operator delete(void* pMem)						{ }
 		void					operator delete(void* pMem, void*)				{ }
 
-		x_iallocator*			m_allocator;
+		xalloc*			m_allocator;
 		memento::Instance		m_memento;
 
 	private:
@@ -1570,7 +1570,7 @@ namespace xcore
 
 	};
 
-	x_memento*				gCreateMementoAllocator(x_iallocator* allocator)
+	x_memento*				gCreateMementoAllocator(xalloc* allocator)
 	{
 		void* mem = allocator->allocate(sizeof(x_memento_allocator), sizeof(void*));
 		x_memento_allocator* memento_allocator = new (mem)x_memento_allocator();

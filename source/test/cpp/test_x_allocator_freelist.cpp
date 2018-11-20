@@ -7,7 +7,7 @@
 
 using namespace xcore;
 
-extern x_iallocator* gSystemAllocator;
+extern xalloc* gSystemAllocator;
 
 UNITTEST_SUITE_BEGIN(x_allocator_freelist)
 {
@@ -52,7 +52,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_freelist)
         UNITTEST_TEST(alloc3_free3)
         {
 			u32 const alignment = 2048;
-			x_iallocator* alloc = gCreateFreeListAllocator(gSystemAllocator, alignment, alignment, 128);
+			xalloc* alloc = gCreateFreeListAllocator(gSystemAllocator, alignment, alignment, 128);
 
 			void* mem1 = alloc->allocate( 512,    8);
 			CHECK_TRUE(gIsAligned(mem1, alignment));
@@ -98,7 +98,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_freelist)
         UNITTEST_TEST(alloc3_free3_idx)
         {
 			u32 const alignment = 2048;
-			x_iallocator* alloc = gCreateFreeListIdxAllocator(gSystemAllocator, alignment, alignment, 128);
+			xalloc* alloc = gCreateFreeListIdxAllocator(gSystemAllocator, alignment, alignment, 128);
 
 			void* mem1 = alloc->allocate( 512,    8);
 			CHECK_TRUE(gIsAligned(mem1, alignment));

@@ -44,20 +44,20 @@ namespace xcore
 
 	class UnitTestAllocator : public UnitTest::Allocator
 	{
-		xcore::x_iallocator*	mAllocator;
+		xcore::xalloc*	mAllocator;
 	public:
-		inline			UnitTestAllocator(xcore::x_iallocator* allocator)	{ mAllocator = allocator; mNumAllocations = 0; }
+		inline			UnitTestAllocator(xcore::xalloc* allocator)	{ mAllocator = allocator; mNumAllocations = 0; }
 		virtual void*	Allocate(xsize_t size)								{ ++mNumAllocations; return mAllocator->allocate((u32)size, 4); }
 		virtual void	Deallocate(void* ptr)								{ --mNumAllocations; mAllocator->deallocate(ptr); }
 
 		u64				mNumAllocations;
 	};
 
-	class TestAllocator : public x_iallocator
+	class TestAllocator : public xalloc
 	{
-		x_iallocator*		mAllocator;
+		xalloc*		mAllocator;
 	public:
-		TestAllocator(x_iallocator* allocator) : mAllocator(allocator) { }
+		TestAllocator(xalloc* allocator) : mAllocator(allocator) { }
 
 		virtual const char*	name() const										{ return "xbase unittest test heap allocator"; }
 
@@ -89,12 +89,12 @@ namespace xcore
 	};
 }
 
-xcore::x_iallocator* gSystemAllocator = NULL;
+xcore::xalloc* gSystemAllocator = NULL;
 xcore::UnitTestAssertHandler gAssertHandler;
 
 bool gRunUnitTest(UnitTest::TestReporter& reporter)
 {
-	xcore::x_iallocator* systemAllocator = gCreateSystemAllocator();
+	xcore::xalloc* systemAllocator = gCreateSystemAllocator();
 	xcore::UnitTestAllocator unittestAllocator(systemAllocator);
 	UnitTest::SetAllocator(&unittestAllocator);
 

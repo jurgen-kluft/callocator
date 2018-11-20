@@ -14,7 +14,7 @@
 namespace xcore
 {
 	// Forward declares
-	class x_iallocator;
+	class xalloc;
 
 	namespace xexternal
 	{
@@ -29,10 +29,10 @@ namespace xcore
 		struct xsmallbin
 		{
 			void			init		(void* base_address, u32 bin_size, u16 chunk_size);
-			void			release		(x_iallocator* node_allocator);
+			void			release		(xalloc* node_allocator);
 		
 			//@note: 'node_allocator' is used to allocate fixed size (16 bytes) structures
-			void*			allocate	(u32 size, u32 alignment, x_iallocator* node_allocator);
+			void*			allocate	(u32 size, u32 alignment, xalloc* node_allocator);
 			void			deallocate	(void* ptr);
 		
 		private:

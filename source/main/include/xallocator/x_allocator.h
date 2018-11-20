@@ -14,10 +14,10 @@
 namespace xcore
 {
 	/// Forward declares
-	class x_iallocator;
+	class xalloc;
 
 	/// Heap allocator (dlmalloc allocator)
-	extern x_iallocator*	gCreateHeapAllocator(void* mem_begin, u32 mem_size);
+	extern xalloc*	gCreateHeapAllocator(void* mem_begin, u32 mem_size);
 };
 
 #endif	/// __X_ALLOCATOR_H__

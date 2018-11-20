@@ -33,14 +33,14 @@ namespace xcore
 			xlargebin();
 
 			//@note: 'node_allocator' is used to allocate fixed size (16/32 bytes) structures
-			void				init(void* mem_begin, u32 mem_size, u32 size_alignment, u32 address_alignment, x_iallocator* node_allocator);
+			void				init(void* mem_begin, u32 mem_size, u32 size_alignment, u32 address_alignment, xalloc* node_allocator);
 			void				release();
 
 			void*				allocate(u32 size, u32 alignment);
 			void				deallocate(void* ptr);
 
 		private:
-			x_iallocator * mNodeAllocator;				// 
+			xalloc * mNodeAllocator;				// 
 			void*				mBaseAddress;				// Base address of the memory we are managing
 			xtree				mRootSizeTree;				// First node of our internal tree, key=size
 			xtree				mRootAddrTree;				// First node of our internal tree, key=address

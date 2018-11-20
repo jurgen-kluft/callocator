@@ -23,7 +23,7 @@
 // ----------------------------------------------------------------------------
 // Usage:
 //    First include this header file wherever you use malloc, realloc or free.
-//    Implement your own class derived from x_iallocator that either use 
+//    Implement your own class derived from xalloc that either use 
 //    malloc/realloc/free or your own allocator.
 //    Also you need to give memento an allocator that doesn't use this memento
 //    instance so that this instance can allocate book-keeping data.
@@ -140,7 +140,7 @@ namespace xcore
 	};
 
 
-	class x_memento : public x_iallocator
+	class x_memento : public xalloc
 	{
 	public:
 		virtual void*			allocate(xsize_t size, u32 alignment) = 0;
@@ -168,7 +168,7 @@ namespace xcore
 		virtual void			break_on_free(void*) = 0;
 	};
 
-	x_memento*				gCreateMementoAllocator(x_iallocator* internal_mem_allocator);
+	x_memento*				gCreateMementoAllocator(xalloc* internal_mem_allocator);
 
 };
 

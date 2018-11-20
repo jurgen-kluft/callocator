@@ -11,10 +11,10 @@
 namespace xcore
 {
 	/// Forward declares
-	class x_iallocator;
+	class xalloc;
 
 	/// A custom allocator; 'Two-Level Segregate Fit' allocator
-	extern x_iallocator*		gCreateTlsfAllocator(void* mem, u32 memsize);
+	extern xalloc*		gCreateTlsfAllocator(void* mem, u32 memsize);
 
 };
 

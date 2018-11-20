@@ -54,10 +54,10 @@ namespace xcore
 		public:
 								xblock() : mElementArrayBegin (0), mElementArrayEnd (0), mFreeList (0), mNumManagedElements(0), mNumFreeElements(0) { }
 
-			static xblock*		create(x_iallocator* allocator, u32 inElemSize, u32 inNumElements, s32 inAlignment);
+			static xblock*		create(xalloc* allocator, u32 inElemSize, u32 inNumElements, s32 inAlignment);
 
 			void				reset(u32 sizeOfElement);
-			void				release(x_iallocator* allocator);
+			void				release(xalloc* allocator);
 			
 			inline bool			full() const						{ return mFreeList == NULL; }
 			inline bool			empty() const						{ return mNumManagedElements == mNumFreeElements; }	
@@ -123,7 +123,7 @@ namespace xcore
 			return bb->compare_ptr(aa);
 		}
 
-		xblock*		xblock::create(x_iallocator* allocator, u32 inElemSize, u32 inNumElements, s32 inAlignment)
+		xblock*		xblock::create(xalloc* allocator, u32 inElemSize, u32 inNumElements, s32 inAlignment)
 		{
 			ASSERT(inElemSize != 0);			// Check input parameters
 			ASSERT(inNumElements > 0);
@@ -159,7 +159,7 @@ namespace xcore
 			}
 		}
 
-		void xblock::release(x_iallocator* allocator)
+		void xblock::release(xalloc* allocator)
 		{ 
 			allocator->deallocate(mElementArrayBegin);
 		}
@@ -173,7 +173,7 @@ namespace xcore
 		**/
 		struct xblocktree
 		{
-			inline				xblocktree(x_iallocator* allocator) : mNumBlocks(0), mTree(allocator)	{ mTree.set_cmp(compare_blocks_f); }
+			inline				xblocktree(xalloc* allocator) : mNumBlocks(0), mTree(allocator)	{ mTree.set_cmp(compare_blocks_f); }
 
 			u32					size() const						{ return mNumBlocks; }
 			bool				empty() const						{ return mNumBlocks == 0; }
@@ -245,7 +245,7 @@ namespace xcore
 				}
 			}
 
-			void				release(x_iallocator* allocator)
+			void				release(xalloc* allocator)
 			{
 				void* data;
 				while (mTree.clear(data))
@@ -273,7 +273,7 @@ namespace xcore
 
 		@note	This allocator does not guarantee that two objects allocated sequentially are sequential in memory.
 		**/
-		class xallocator_imp : public x_iallocator
+		class xallocator_imp : public xalloc
 		{
 		public:
 									xallocator_imp();
@@ -283,7 +283,7 @@ namespace xcore
 			// @inInitialBlockCount	Initial number of blocks in the memory pool
 			// @inBlockGrowthCount	Number of blocks by which it will grow if all space is used
 			// @inElemAlignment		Alignment of the start of each pool (can be 0, which creates fixed size memory pool)
-									xallocator_imp(x_iallocator* allocator, u32 inElemSize, u32 inBlockElemCnt, u32 inInitialBlockCount, u32 inBlockGrowthCount, u32 inBlockMaxCount, u32 inElemAlignment = 0);
+									xallocator_imp(xalloc* allocator, u32 inElemSize, u32 inBlockElemCnt, u32 inInitialBlockCount, u32 inBlockGrowthCount, u32 inBlockMaxCount, u32 inElemAlignment = 0);
 			virtual					~xallocator_imp();
 
 			virtual const char*		name() const									{ return TARGET_FULL_DESCR_STR " Fixed size pool allocator"; }
@@ -305,7 +305,7 @@ namespace xcore
 
 			struct Blocks
 			{
-										Blocks(x_iallocator* allocator) : mFree(allocator), mFull(allocator), mCurrent(0), mSize(0)	{ }
+										Blocks(xalloc* allocator) : mFree(allocator), mFull(allocator), mCurrent(0), mSize(0)	{ }
 
 				u32						size() const
 				{
@@ -379,7 +379,7 @@ namespace xcore
 					}
 				}
 
-				void					release(x_iallocator* allocator)
+				void					release(xalloc* allocator)
 				{
 					mFree.release(allocator);
 					mFull.release(allocator);
@@ -404,7 +404,7 @@ namespace xcore
 
 		protected:
 			bool					mIsInitialized;
-			x_iallocator*			mAllocator;
+			xalloc*			mAllocator;
 
 			Blocks					mStaticBlocks;						///< These are the initial blocks
 			Blocks					mDynamicBlocks;						///< These are the blocks that are create/destroyed during runtime
@@ -440,7 +440,7 @@ namespace xcore
 		{
 		}
 
-		xallocator_imp::xallocator_imp(x_iallocator* allocator, u32 inElemSize, u32 inBlockElemCnt, u32 inBlockInitialCount, u32 inBlockGrowthCount, u32 inBlockMaxCount, u32 inElemAlignment)
+		xallocator_imp::xallocator_imp(xalloc* allocator, u32 inElemSize, u32 inBlockElemCnt, u32 inBlockInitialCount, u32 inBlockGrowthCount, u32 inBlockMaxCount, u32 inElemAlignment)
 			: mIsInitialized(false)
 			, mAllocator(allocator)
 			, mStaticBlocks(allocator)
@@ -565,7 +565,7 @@ namespace xcore
 
 	}	// End of xpool_allocator namespace
 
-	x_iallocator*		gCreatePoolAllocator(x_iallocator* allocator, xpool_params const& params)
+	xalloc*		gCreatePoolAllocator(xalloc* allocator, xpool_params const& params)
 	{
 		void* mem = allocator->allocate(sizeof(xpool_allocator::xallocator_imp), X_ALIGNMENT_DEFAULT);
 		xpool_allocator::xallocator_imp* pool_allocator = new (mem) xpool_allocator::xallocator_imp(allocator, params.get_elem_size(), params.get_block_size(), params.get_block_initial_count(), params.get_block_growth_count(), params.get_block_max_count(), params.get_elem_alignment());

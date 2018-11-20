@@ -5,13 +5,13 @@
 
 using namespace xcore;
 
-extern x_iallocator* gSystemAllocator;
+extern xalloc* gSystemAllocator;
 
 UNITTEST_SUITE_BEGIN(x_allocator_forward)
 {
 	UNITTEST_FIXTURE(main)
 	{
-		x_iallocator*	gCustomAllocator;
+		xalloc*	gCustomAllocator;
 
 		UNITTEST_FIXTURE_SETUP()
 		{

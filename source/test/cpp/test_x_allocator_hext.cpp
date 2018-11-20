@@ -7,7 +7,7 @@
 
 using namespace xcore;
 
-extern x_iallocator* gSystemAllocator;
+extern xalloc* gSystemAllocator;
 
 
 UNITTEST_SUITE_BEGIN(x_allocator_hext)
@@ -25,13 +25,13 @@ UNITTEST_SUITE_BEGIN(x_allocator_hext)
 
 		UNITTEST_TEST(create_release)
         {
-			x_iallocator* a = gCreateHextAllocator(gSystemAllocator, (void*)0x87654000, 128 * 1024 * 1024, 1024, 1 * 1024 * 1024);
+			xalloc* a = gCreateHextAllocator(gSystemAllocator, (void*)0x87654000, 128 * 1024 * 1024, 1024, 1 * 1024 * 1024);
 			a->release();
         }
 
 		UNITTEST_TEST(allocate1)
 		{
-			x_iallocator* a = gCreateHextAllocator(gSystemAllocator, (void*)0x87654000, 128 * 1024 * 1024, 1024, 1 * 1024 * 1024);
+			xalloc* a = gCreateHextAllocator(gSystemAllocator, (void*)0x87654000, 128 * 1024 * 1024, 1024, 1 * 1024 * 1024);
 
 			void* p1 = a->allocate(60, 4);
 			a->deallocate(p1);
@@ -42,7 +42,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_hext)
 		UNITTEST_TEST(allocate2)
 		{
 			void* base = (void*)0x87654000;
-			x_iallocator* a = gCreateHextAllocator(gSystemAllocator, base, 32 * 1024, 1024, 1 * 1024 * 1024);
+			xalloc* a = gCreateHextAllocator(gSystemAllocator, base, 32 * 1024, 1024, 1 * 1024 * 1024);
 
 			for (s32 i=0; i<32; ++i)
 			{
@@ -62,7 +62,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_hext)
 		UNITTEST_TEST(allocate3)
 		{
 			void* base = (void*)0x80000000;
-			x_iallocator* ha = gCreateHextAllocator(gSystemAllocator, base, 1024 * 1024 * 1024, 1024, 1 * 1024 * 1024);
+			xalloc* ha = gCreateHextAllocator(gSystemAllocator, base, 1024 * 1024 * 1024, 1024, 1 * 1024 * 1024);
 
 			const int max_tracked_allocs = 1000;
 			void*	allocations[max_tracked_allocs];

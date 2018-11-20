@@ -14,10 +14,10 @@
 namespace xcore
 {
 	/// Forward declares
-	class x_iallocator;
+	class xalloc;
 
 	/// A custom allocator; Doug Lea malloc
-	extern x_iallocator*		gCreateDlAllocator(void* mem, u32 memsize);
+	extern xalloc*		gCreateDlAllocator(void* mem, u32 memsize);
 
 };
 

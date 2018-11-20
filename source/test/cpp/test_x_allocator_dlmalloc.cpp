@@ -5,7 +5,7 @@
 
 using namespace xcore;
 
-extern x_iallocator* gSystemAllocator;
+extern xalloc* gSystemAllocator;
 
 UNITTEST_SUITE_BEGIN(x_allocator_dlmalloc)
 {
@@ -13,7 +13,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_dlmalloc)
 	{
 		void*			gBlock;
 		s32				gBlockSize;
-		x_iallocator*	gCustomAllocator;
+		xalloc*	gCustomAllocator;
 
 		UNITTEST_FIXTURE_SETUP()
 		{

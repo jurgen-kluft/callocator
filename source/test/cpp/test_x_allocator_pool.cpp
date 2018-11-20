@@ -6,7 +6,7 @@
 
 using namespace xcore;
 
-extern x_iallocator* gSystemAllocator;
+extern xalloc* gSystemAllocator;
 
 
 UNITTEST_SUITE_BEGIN(x_allocator_pool)
@@ -32,7 +32,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_pool)
 			params.set_block_growth_count(1);
 			params.set_block_max_count(4);
 
-			x_iallocator* pool_allocator = gCreatePoolAllocator(gSystemAllocator, params);
+			xalloc* pool_allocator = gCreatePoolAllocator(gSystemAllocator, params);
 
 			const s32 N = 4*16;
 			void* allocs[N];
@@ -77,7 +77,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_pool)
 			params.set_block_growth_count(1);
 			params.set_block_max_count(2048 / 16);
 
-			x_iallocator* pool_allocator = gCreatePoolAllocator(gSystemAllocator, params);
+			xalloc* pool_allocator = gCreatePoolAllocator(gSystemAllocator, params);
 
 			const s32 N = 2048;
 			void* allocs[N];
@@ -124,7 +124,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_pool)
 			params.set_block_growth_count(1);
 			params.set_block_max_count(4);
 
-			x_iallocator* pool_allocator = gCreatePoolAllocator(gSystemAllocator, params);
+			xalloc* pool_allocator = gCreatePoolAllocator(gSystemAllocator, params);
 
 			void* mem = pool_allocator->allocate(12, params.get_elem_alignment());
 			mem = pool_allocator->reallocate(mem, 10, params.get_elem_alignment());

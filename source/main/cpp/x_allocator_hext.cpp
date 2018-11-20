@@ -88,7 +88,7 @@ namespace xcore
 		}
 
 		template<typename T>
-		static inline T*		AllocateAndClear(x_iallocator* allocator, s32 count)
+		static inline T*		AllocateAndClear(xalloc* allocator, s32 count)
 		{
 			T* ptr = (T*)allocator->allocate(count * sizeof(T), sizeof(void*));
 			while (--count >= 0)
@@ -281,7 +281,7 @@ namespace xcore
 		};
 
 		template<>
-		static inline MNode**	AllocateAndClear<MNode*>(x_iallocator* allocator, s32 count)
+		static inline MNode**	AllocateAndClear<MNode*>(xalloc* allocator, s32 count)
 		{
 			MNode** ptr = (MNode**)allocator->allocate(count * sizeof(MNode*), sizeof(void*));
 			while (--count >= 0)
@@ -289,7 +289,7 @@ namespace xcore
 			return ptr;
 		}
 
-		class Allocator : public x_iallocator
+		class Allocator : public xalloc
 		{
 		public:
 			const char*		name() const;									///< The name of the allocator
@@ -300,7 +300,7 @@ namespace xcore
 
 			void			release();										///< Release/Destruct this allocator
 
-			void			Initialize(x_iallocator* allocator, void* mem_base, u32 mem_size, u32 min_alloc_size, u32 max_alloc_size);
+			void			Initialize(xalloc* allocator, void* mem_base, u32 mem_size, u32 min_alloc_size, u32 max_alloc_size);
 			void			Destroy();
 
 			void*			Allocate(u32 size);
@@ -339,7 +339,7 @@ namespace xcore
 			const static s32	cMaximumBlocks = 256;
 			const static s32	cNodesPerBlock = 512;
 
-			x_iallocator*	mAllocator;
+			xalloc*	mAllocator;
 
 			NodeIdx*		mAddrNodes;
 
@@ -594,7 +594,7 @@ namespace xcore
 			}
 		}
 
-		void	Allocator::Initialize(x_iallocator* allocator, void* mem_base, u32 mem_size, u32 min_alloc_size, u32 max_alloc_size)
+		void	Allocator::Initialize(xalloc* allocator, void* mem_base, u32 mem_size, u32 min_alloc_size, u32 max_alloc_size)
 		{
 			mMinAllocSize = PowerOf2Up(Clamp(min_alloc_size, 1024, 64 * 1024));
 			mMaxAllocSize = AlignUp(max_alloc_size, mMinAllocSize);
@@ -878,7 +878,7 @@ namespace xcore
 
 	};
 
-	x_iallocator*	gCreateHextAllocator(x_iallocator* allocator, void* mem_base, u32 mem_size, u32 min_alloc_size, u32 max_alloc_size)
+	xalloc*	gCreateHextAllocator(xalloc* allocator, void* mem_base, u32 mem_size, u32 min_alloc_size, u32 max_alloc_size)
 	{
 		Allocator_HEXT::Allocator* hext = new Allocator_HEXT::Allocator();
 		hext->Initialize(allocator, mem_base, mem_size, min_alloc_size, max_alloc_size);

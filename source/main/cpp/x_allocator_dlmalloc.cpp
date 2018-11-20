@@ -2465,7 +2465,7 @@ namespace xcore
 		return chunksize(chunkPtr);
 	}
 
-	class x_allocator_dlmalloc : public x_iallocator
+	class x_allocator_dlmalloc : public xalloc
 	{
 		xmem_heap			mDlMallocHeap;
 
@@ -2516,7 +2516,7 @@ namespace xcore
 		void					operator delete(void* pMem, void* )				{ }
 	};
 
-	x_iallocator*		gCreateDlAllocator(void* mem, u32 memsize)
+	xalloc*		gCreateDlAllocator(void* mem, u32 memsize)
 	{
 		x_allocator_dlmalloc* allocator = new (mem) x_allocator_dlmalloc();
 
