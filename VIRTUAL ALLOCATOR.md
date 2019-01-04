@@ -110,5 +110,6 @@ Pros and Cons:
 ## Notes
 
 PS4 = 994 GB address space
+<http://twvideo01.ubm-us.net/o1/vault/gdc2016/Presentations/MacDougall_Aaron_Building_A_Low.pdf>
 
 */
