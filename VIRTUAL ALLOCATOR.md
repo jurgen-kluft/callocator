@@ -16,7 +16,16 @@ Let's say an APP has 640 GB of address space and it has the following behaviour:
 
 Not too hard to make multi-thread safe using atomics where the only hard multi-threading problem is page commit/decommit.
 
-Page Size = 4 KB, 16 KB or 64 KB
+FSA very small
+Page Size = 4 * 1024
+RegionSize = 256 x 1024 x 1024
+MaxSize = 64
+
+FSA small
+PageSize = 64 * 1024
+RegionSize = 256 x 1024 x 1024
+MaxSize = 4096
+
 FSA  = 512 MB Address Space / page size = 8192 pages  
 Address space, BEGIN - END  
 
@@ -81,7 +90,7 @@ Pros and Cons:
 - All other sizes go here (4 KB < Size < 32 MB)
 - Non-contiguous virtual pages
 - Grows and shrinks
-- 512 GB address space
+- 256 GB address space
 - Page = 2 MB
 - Space = 32 MB (16 pages)
 - Space is tracked with external bookkeeping
@@ -111,7 +120,7 @@ Address Table
 
 Size Table
 
-- MinSize = 8 KB
+- MinSize = 4 KB
 - MaxSize = 32 MB
 - Granularity = 1 KB
 - Num Entries = 32 K
@@ -121,8 +130,21 @@ Size Table
 - Bit tree = 8/64/512/4096/32768 = 8 KB
 - Total Memory = 128 KB + 8 KB = 136 KB
 
+- Size-Tree
+- 4, 16, 64, 256, 1024, 4096, 16384, 65536, 262144
+
 You can have a `Medium Size Allocator` per thread under the condition that you keep the pointer/memory to that thread. If you need memory to pass around we can use a global 'Medium Size Allocator'.
 
+COALESCE HEAP REGION SIZE 1 = 768 MB
+COALESCE HEAP REGION SIZE 2 = 768 MB
+
+Coalesce Heap RegionSize = COALESCE HEAP REGION SIZE 1
+Coalesce Heap MinSize = 4 KB
+Coalesce Heap MaxSize = 128 KB
+
+Coalesce Heap Region Size = COALESCE HEAP REGION SIZE 2
+Coalesce Heap Min Size = 128 KB,
+Coalesce Heap Max Size = 1 MB
 
 ## Notes
 

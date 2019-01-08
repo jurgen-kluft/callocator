@@ -559,7 +559,6 @@ namespace xcore
 			if (head.IsNull() == false)
 			{
 				NodeIdx current = head;
-				TNode* tnode = IndexToTNode(current);
 				while (current != node && !current.IsNull())
 				{
 					LNode* lnode = IndexToLNode_Size(current);
@@ -569,7 +568,6 @@ namespace xcore
 				if (current == node)
 				{
 					LNode* lnode = IndexToLNode_Size(current);
-					//lnode->RemoveFrom(SIZE, this, current, head);
 					LNode* prevn = IndexToLNode_Size(lnode->mPrev);
 					LNode* nextn = IndexToLNode_Size(lnode->mNext);
 					if (prevn != NULL) prevn->mNext = lnode->mNext;
@@ -884,4 +882,230 @@ namespace xcore
 		hext->Initialize(allocator, mem_base, mem_size, min_alloc_size, max_alloc_size);
 		return hext;
 	}
+}
+
+namespace BranchingTree {
+	struct BIndex
+	{
+		enum { Null = 0, Type_Mask = 0x8000000, Type_Leaf = 0x0, Type_Node = 0x80000000 };
+
+		inline		BIndex() : m_index(Null) { }
+
+		void		reset() { m_index = Null; }
+
+		bool		is_null() const   { return m_index == Null; }
+		bool		is_node() const   { return m_index & Type_Mask == Type_Node; }
+		bool		is_leaf() const   { return m_index & Type_Mask == Type_Leaf; }
+
+		void		set_node(u32 index)	{ m_index = index | Type_Node; }
+		void		set_leaf(u32 index)	{ m_index = index | Type_Leaf; }
+
+		u32			get_node() const	{ return m_index & ~Type_Mask; }
+		u32			get_leaf() const	{ return m_index & ~Type_Mask; }
+
+		u32			m_index;
+	};
+
+	class BAllocator
+	{
+	public:
+		virtual void*	allocate(BIndex& index) = 0;
+		virtual void	deallocate(BIndex index) = 0;
+		virtual void*	idx2ptr(BIndex index) const = 0;
+		virtual BIndex	ptr2idx(void* ptr) const = 0;
+	};
+
+
+	// Note: sizeof(BLeaf) == sizeof(BNode) !
+
+	struct BLeaf
+	{
+		HIndex		m_prev;
+		HIndex		m_next;
+		u32			m_value;
+		u32			m_flags;
+	};
+
+	struct BNode
+	{
+		BIndex		m_nodes[4];
+	};
+
+	class BIndexer
+	{
+		u8*			m_masks;
+		u8*			m_shifts;
+		s32			m_levels;
+	public:
+		void		initialize(s32 levels, u8* masks, u8* shifts);
+		s32			max_levels() const { return m_levels; }
+		s32			get_index(u64 value, s32 level) const
+		{
+			u64 const msk = (u64)m_masks[level];
+			s32 const shr = (s32)m_shifts[level];
+			return (value >> shr) & msk;
+		}
+	};
+
+	// e.g.:
+	// 26 bits
+	// masks  = { 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3 };
+	// shifts = { 24,   22,  20,  18,  16,  14,  12,  10,   8,   6,   4,   2,   0 };
+
+	struct BTree
+	{
+		void			init(BIndexer* indexer, BAllocator* node_allocator, BAllocator* leaf_allocator);
+
+		bool			add(u32 value, BIndex& leaf_index);
+		bool			rem(u32 value);
+
+		bool			find(u32 value, BIndex& leaf_index) const;
+
+		BNode			m_root;
+		BIndexer*		m_idxr;
+		BAllocator*		m_node_allocator;
+		BAllocator*		m_leaf_allocator;
+	};
+
+	bool BTree::add(u32 value, BIndex& leaf_index)
+	{
+		s32 level = 0;
+		BNode* node = &m_root;
+		do
+		{
+			s32 childIndex = m_idxr.get_index(value, level);
+			BIndex nodeIndex = node->m_nodes[childIndex];
+			if (nodeIndex.is_null())
+			{
+				// No brainer, create leaf and insert child
+				BLeaf* leafNode = m_leaf_allocator->allocate(leaf_index);
+				leafNode->m_value = value;
+				node->m_nodes[childIndex] = leaf_index;
+				return true;
+			}
+			else if (nodeIndex.is_leaf())
+			{
+				// Check for duplicate, see if this value is the value of this leaf
+				// Create new node and add the existing item first and continue
+			}
+			else if (nodeIndex.is_node())
+			{
+				// Continue
+				node = (BNode*)m_node_allocator->idx2ptr(nodeIndex);
+			}
+			level++;
+		} while (level < m_idxr.max_levels());
+
+		leaf_index.reset();
+		return false;
+	}
+
+
+	bool BTree::remove(u32 value)
+	{
+		s32 level = 0;
+		BNode* node = &m_root;
+		do
+		{
+			s32 childIndex = m_idxr.get_index(value, level);
+			BIndex nodeIndex = node->m_nodes[childIndex];
+			if (nodeIndex.is_null())
+			{
+				break;
+			}
+			else if (nodeIndex.is_leaf())
+			{
+				BLeaf* leaf = (BLeaf*)m_leaf_allocator->idx2ptr(nodeIndex);
+				if (leaf->m_value == value)
+				{
+					// We should track the all parents
+					// Remove this leaf from node, if this results in node
+					// having no more children then this node should also be
+					// removed etc...
+					return true;
+				}
+				break;
+			}
+			else if (nodeIndex.is_node())
+			{
+				// Continue
+				node = (BNode*)m_node_allocator->idx2ptr(nodeIndex);
+			}
+			level++;
+		} while (level < m_idxr.max_levels());
+
+		leaf_index.reset();
+		return false;
+	}
+
+	bool BTree::find(u32 value, BIndex& leaf_index) const
+	{
+		s32 level = 0;
+		BNode* node = &m_root;
+		do
+		{
+			s32 childIndex = m_idxr.get_index(value, level);
+			BIndex nodeIndex = node->m_nodes[childIndex];
+			if (nodeIndex.is_null())
+			{
+				break;
+			}
+			else if (nodeIndex.is_leaf())
+			{
+				BLeaf* leaf = (BLeaf*)m_leaf_allocator->idx2ptr(nodeIndex);
+				if (leaf->m_value == value)
+				{
+					leaf_index = nodeIndex;
+					return true;
+				}
+				break;
+			}
+			else if (nodeIndex.is_node())
+			{
+				// Continue
+				node = (BNode*)m_node_allocator->idx2ptr(nodeIndex);
+			}
+			level++;
+		} while (level < m_idxr.max_levels());
+
+		leaf_index.reset();
+		return false;
+	}
+
+}
+
+namespace MediumSizedAllocator
+{
+	// Range = 256 GB
+	// 1. Min Size = 4 KB / Max Size = 128 KB
+	// 2. Min Size = 128 KB / Max Size = 1 MB
+
+	// 256 GB / 4 KB = 64 MB (26 bits)
+
+
+	struct HSizeTree
+	{
+		void		add_size(u32)
+	};
+
+
+	// 2 MB
+	struct HPage
+	{
+		u16			m_refcount;		// We need to know when we can 'release' this page
+	};
+
+	// 32 MB
+	struct HBlock
+	{
+		void*		m_baseptr;
+		HPage		m_pages[16];	// Page = 2 MB
+	};
+
+	// 256 GB / 32 MB = 8192 blocks
+	struct HRegion
+	{
+		u16			m_blocks[8192];
+	};
+
 }
