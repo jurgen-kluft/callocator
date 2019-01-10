@@ -39,7 +39,7 @@ namespace xcore
 			void*			mBaseAddress;				// Base address of the memory we are managing
 			xsnode*			mNode;						// First node of our internal tree
 			u32				mBinSize;					// 65536 is a good size
-			u16				mChunkSize;					// 8/16/32/64/128/256/512/1024/2048/4096
+			u16				mChunkSize;					// 8/12/16/20/24/28/32/../4096
 			u16				mLevels;					// Number of levels
 		};
 	}

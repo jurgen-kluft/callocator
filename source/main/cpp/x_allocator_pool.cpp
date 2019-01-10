@@ -9,254 +9,26 @@
 
 namespace xcore
 {
-	void	xpool_params::set_elem_size(u32 size)									{ mElemSize = size; }
-	void	xpool_params::set_elem_alignment(u32 alignment)							{ mElemAlignment = alignment; }
-	void	xpool_params::set_block_size(u32 num_elements)							{ mBlockElemCount = num_elements; }
-	void	xpool_params::set_block_initial_count(u32 initial_num_blocks)			{ mBlockInitialCount = initial_num_blocks; }
-	void	xpool_params::set_block_growth_count(u32 growth_num_blocks)				{ mBlockGrowthCount = growth_num_blocks; }
-	void	xpool_params::set_block_max_count(u32 max_num_blocks)					{ mBlockMaxCount = max_num_blocks; }
+	void	xfsa_params::set_elem_size(u32 size)									{ mElemSize = size; }
+	void	xfsa_params::set_elem_alignment(u32 alignment)							{ mElemAlignment = alignment; }
+	void	xfsa_params::set_block_min_count(u32 min_num_blocks)					{ mMinNumberOfBlocks = min_num_blocks; }
+	void	xfsa_params::set_block_max_count(u32 max_num_blocks)					{ mMaxNumberOfBlocks = max_num_blocks; }
 
-	u32		xpool_params::get_elem_size() const										{ return mElemSize; }
-	u32		xpool_params::get_elem_alignment() const								{ return mElemAlignment; }
-	u32		xpool_params::get_block_size() const									{ return mBlockElemCount; }
-	u32		xpool_params::get_block_initial_count() const							{ return mBlockInitialCount; }
-	u32		xpool_params::get_block_growth_count() const							{ return mBlockGrowthCount; }
-	u32		xpool_params::get_block_max_count() const								{ return mBlockMaxCount; }
+	u32		xfsa_params::get_elem_size() const										{ return mElemSize; }
+	u32		xfsa_params::get_elem_alignment() const									{ return mElemAlignment; }
+	u32		xfsa_params::get_block_min_count() const								{ return mMinNumberOfBlocks; }
+	u32		xfsa_params::get_block_max_count() const								{ return mMaxNumberOfBlocks; }
 
-
-	namespace xpool_allocator
+	namespace xfsa_allocator
 	{
-		/**
-		@brief		Fixed size type, element
-		@desc		It implements linked list behavior for free elements in the block.
-		**/
 		class xelement	
 		{
 		public:
-			// This part is a little bit dirty...
 			xelement*			getNext()							{ return *reinterpret_cast<xelement**>(&mData); }
 			void				setNext(xelement* next)				{ xelement** temp = reinterpret_cast<xelement**>(&mData); *temp = next; }
 			void*				getObject()							{ return (void*)&mData; }
 		private:
 			u32					mData;	
-		};
-
-		/**
-		@brief	xblock contains an array of xelement objects. This is the smallest
-				memory chunk which is allocated from system (via allocated/deallocator) and is the
-				smallest unit by which the allocator can grow. The inElemSize and inNumElements 
-				parameter sent to init function determines the size of the block.
-
-				xblock has a 32 bytes overhead caused by the bookkeeping data.
-		**/
-		class xblock
-		{
-		public:
-								xblock() : mElementArrayBegin (0), mElementArrayEnd (0), mFreeList (0), mNumManagedElements(0), mNumFreeElements(0) { }
-
-			static xblock*		create(xalloc* allocator, u32 inElemSize, u32 inNumElements, s32 inAlignment);
-
-			void				reset(u32 sizeOfElement);
-			void				release(xalloc* allocator);
-			
-			inline bool			full() const						{ return mFreeList == NULL; }
-			inline bool			empty() const						{ return mNumManagedElements == mNumFreeElements; }	
-
-			inline s32			compare(xblock* block)
-			{ 
-				if (block->mElementArrayBegin > mElementArrayBegin)
-					return 1; 
-				else if (block->mElementArrayBegin < mElementArrayBegin) 
-					return -1;
-				return 0; 
-			}
-
-			inline s32			compare_ptr(void* ptr)
-			{
-				if (ptr > mElementArrayEnd) 
-					return 1;
-				else if (ptr < mElementArrayBegin)
-					return -1; 
-				return 0; 
-			}
-
-			inline xelement*	pop()
-			{
-				xelement* e = mFreeList;
-				mFreeList = e->getNext();
-				--mNumFreeElements;
-				return e;
-			}
-			
-			inline void			push(xelement* element)
-			{
-				ASSERT(element >= mElementArrayBegin && element < mElementArrayEnd);
-				element->setNext(mFreeList);
-				mFreeList = element;
-				++mNumFreeElements;
-			}
-
-			XCORE_CLASS_PLACEMENT_NEW_DELETE
-
-		private:
-			void				init(xbyte* elementArray, u32 inElemSize, u32 inNumElements, s32 inAlignment);
-			inline xelement*	at(u32 index, u32 sizeOfElement)		{ return (xelement*)((xbyte*)mElementArrayBegin + (index * sizeOfElement)); }
-
-			xelement*			mElementArrayBegin;
-			void*				mElementArrayEnd;
-			xelement*			mFreeList;
-			u32					mNumManagedElements;
-			u32					mNumFreeElements;
-		};
-
-		s32			compare_blocks_f(void const* a, void const* b)
-		{
-			xblock* ab = (xblock*)a;
-			xblock* bb = (xblock*)b;
-			return bb->compare(ab);
-		}
-
-		s32			compare_ptr_block_f(void const* a, void const* b)
-		{
-			xblock* aa = (xblock*)a;
-			xblock* bb = (xblock*)b;
-			return bb->compare_ptr(aa);
-		}
-
-		xblock*		xblock::create(xalloc* allocator, u32 inElemSize, u32 inNumElements, s32 inAlignment)
-		{
-			ASSERT(inElemSize != 0);			// Check input parameters
-			ASSERT(inNumElements > 0);
-		
-			u32 const elementArraySize = inElemSize * inNumElements;
-			u32 const allocationSize = elementArraySize + sizeof(xblock);
-			xbyte* p = (xbyte*)allocator->allocate(allocationSize, inAlignment);
-
-			xblock* block = new (p + elementArraySize) xblock();
-			block->init(p, inElemSize, inNumElements, inAlignment);
-			return block;
-		}
-
-		void		xblock::init(xbyte* elementArray, u32 inElemSize, u32 inNumElements, s32 inAlignment)
-		{
-			mNumManagedElements = inNumElements;
-			mNumFreeElements    = inNumElements;
-
-			mElementArrayBegin = static_cast<xelement*>((void*)elementArray);
-			mElementArrayEnd   = static_cast<void    *>((xbyte*)elementArray + (mNumManagedElements*inElemSize));
-			ASSERT(mElementArrayBegin != 0);
-			reset(inElemSize);
-		}
-
-		void		xblock::reset(u32 sizeOfElement)
-		{
-			mFreeList = NULL;
-			for (s32 i=mNumManagedElements-1; i>=0; --i)
-			{
-				xelement* e = at(i, sizeOfElement);
-				e->setNext(mFreeList);
-				mFreeList = e;
-			}
-		}
-
-		void xblock::release(xalloc* allocator)
-		{ 
-			allocator->deallocate(mElementArrayBegin);
-		}
-
-		/**
-		@brief	xblocktree
-
-		@desc	It holds a tree of blocks
-
-		@note	Used a red-black tree implementation to insert/find/remove blocks in a tree.
-		**/
-		struct xblocktree
-		{
-			inline				xblocktree(xalloc* allocator) : mNumBlocks(0), mTree(allocator)	{ mTree.set_cmp(compare_blocks_f); }
-
-			u32					size() const						{ return mNumBlocks; }
-			bool				empty() const						{ return mNumBlocks == 0; }
-
-			xblock*				pop()
-			{
-				if (mNumBlocks == 0)
-					return NULL;
-
-				// The node to remove
-				xtree::iterator it = mTree.iterate();
-
-				s32 dir = xtree::cRight;
-				void* data;
-				if (it.sortorder(dir, data))
-				{
-					xblock* node = (xblock*)data;
-					mTree.remove(data);
-					--mNumBlocks;
-					return node;
-				}
-				return nullptr;
-			}
-
-			void				push(xblock* block)
-			{
-				mTree.insert(block);
-				++mNumBlocks;
-			}
-
-			xblock*				find(void* ptr)
-			{
-				xtree::iterator it = mTree.iterate();
-				s32 dir = xtree::cRight;
-				void* data = nullptr;
-				xblock* found = nullptr;
-				while (it.traverse(dir, data))
-				{
-					xblock* block = (xblock*)data;
-					s32 const c = block->compare_ptr(ptr);
-					if (c == 0)
-					{
-						found = block;
-						break;
-					}
-					dir = it.getdir(c);
-				}
-
-				return found;
-			}
-
-			void				remove(xblock* block)
-			{
-				if (mTree.remove(block))
-				{
-					--mNumBlocks;
-				}
-			}
-
-			void				reset(u32 inNumElements, u32 inElemSize)
-			{
-				xtree::iterator it = mTree.iterate();
-				s32 d = xtree::cRight;
-				void* data;
-				while (it.sortorder(d, data))
-				{
-					xblock* block = (xblock*)data;
-					block->reset(inElemSize);
-				}
-			}
-
-			void				release(xalloc* allocator)
-			{
-				void* data;
-				while (mTree.clear(data))
-				{
-					allocator->deallocate(data);
-				}
-			}
-
-		private:
-			xtree				mTree;
-			u32					mNumBlocks;
 		};
 
 
@@ -273,152 +45,52 @@ namespace xcore
 
 		@note	This allocator does not guarantee that two objects allocated sequentially are sequential in memory.
 		**/
-		class xallocator_imp : public xalloc
+		class xfsallocator : public xfsalloc
 		{
 		public:
-									xallocator_imp();
+									xfsallocator();
 
 			// @inElemSize			This determines the size in bytes of an element
 			// @inBlockElemCnt		This determines the number of elements that are part of a block
 			// @inInitialBlockCount	Initial number of blocks in the memory pool
 			// @inBlockGrowthCount	Number of blocks by which it will grow if all space is used
 			// @inElemAlignment		Alignment of the start of each pool (can be 0, which creates fixed size memory pool)
-									xallocator_imp(xalloc* allocator, u32 inElemSize, u32 inBlockElemCnt, u32 inInitialBlockCount, u32 inBlockGrowthCount, u32 inBlockMaxCount, u32 inElemAlignment = 0);
-			virtual					~xallocator_imp();
+									xfsallocator(xalloc* allocator, xfsa_params const& params);
+			virtual					~xfsallocator();
 
-			virtual const char*		name() const									{ return TARGET_FULL_DESCR_STR " Fixed size pool allocator"; }
+			virtual const char*		name() const									{ return TARGET_FULL_DESCR_STR " FSA"; }
 
 			///@name	Should be called when created with default constructor
 			//			Parameters are the same as for constructor with parameters
 			void					init();
 
-			virtual void*			allocate(xsize_t size, u32 alignment);
-			virtual void*			reallocate(void* p, xsize_t size, u32 alignment);
+			virtual void*			allocate(u32& size);
 			virtual void			deallocate(void* p);
 
 			///@name	Placement new/delete
 			XCORE_CLASS_PLACEMENT_NEW_DELETE
 
 		protected:
-			///@name	Resets allocator
 			void					reset(xbool inRestoreToInitialSize = xFALSE);
-
-			struct Blocks
-			{
-										Blocks(xalloc* allocator) : mFree(allocator), mFull(allocator), mCurrent(0), mSize(0)	{ }
-
-				u32						size() const
-				{
-					ASSERT(mSize == (mFree.size() + mFull.size() + (mCurrent!=NULL?1:0)));
-					return mSize;
-				}
-
-				void					reset(u32 inNumElements, u32 inElemSize)
-				{
-					while (!mFull.empty())
-					{
-						xblock* block = mFull.pop();
-						mFree.push(block);
-					}
-					mFree.reset(inNumElements, inElemSize);
-					mCurrent = NULL;
-				}
-
-				void*					allocate()
-				{
-					if (mCurrent == NULL)
-						mCurrent = mFree.pop();
-
-					void* p = NULL;
-					if (mCurrent != NULL)
-					{
-						xelement* element = mCurrent->pop();
-						p = element->getObject();
-
-						if (mCurrent->full())
-						{
-							mFull.push(mCurrent);
-							mCurrent = NULL;
-						}
-					}
-					return p;
-				}
-
-				s32						deallocate(void* ptr)
-				{
-					if (mCurrent!=NULL && mCurrent->compare_ptr(ptr)==0)
-					{
-						mCurrent->push((xelement*)ptr);
-						if (mCurrent->full())
-						{
-							mFree.push(mCurrent);
-							mCurrent = NULL;
-						}
-						return 1;
-					}
-					else
-					{
-						xblock* block = mFree.find(ptr);
-						if (block == NULL)
-						{
-							block = mFull.find(ptr);
-							if (block != NULL)
-							{
-								block->push((xelement*)ptr);
-
-								// Swap this block from Full to Free
-								mFull.remove(block);
-								mFree.push(block);
-							}
-						}
-						else
-						{
-							block->push((xelement*)ptr);
-						}
-						return block!=NULL ? 1 : 0;
-					}
-				}
-
-				void					release(xalloc* allocator)
-				{
-					mFree.release(allocator);
-					mFull.release(allocator);
-
-					if (mCurrent!=NULL)
-					{
-						mCurrent->release(allocator);
-						mCurrent = NULL;
-					}
-				}
-
-				xblocktree				mFree;
-				xblocktree				mFull;
-				xblock*					mCurrent;						///< The block where we allocate from (does not belong to any tree yet)
-				u32						mSize;							///< The number of blocks
-			};
-
-		protected:
-			///< Grows memory pool by blockSize * blockCount
-			void					extend (Blocks& blocks, u32 inBlockCount, u32 inBlockMaxCount) const;
+			void					extend (u32 inBlockCount, u32 inBlockMaxCount);
 			virtual void			release ();
 
 		protected:
 			bool					mIsInitialized;
-			xalloc*			mAllocator;
+			xalloc*					mAllocator;
 
-			Blocks					mStaticBlocks;						///< These are the initial blocks
-			Blocks					mDynamicBlocks;						///< These are the blocks that are create/destroyed during runtime
+			struct block_t
+			{
+				void*	m_block;
+				u32*	m_freelist;
+			};
 
-			// Save initial parameters
-			u32						mElemSize;
-			u32						mElemAlignment;
-			u32 					mBlockElemCount;
-			u32 					mBlockInitialCount;
-			u32 					mBlockGrowthCount;
-			u32 					mBlockMaxCount;
+			block_t					m
 
-			// Helper members
-			s32						mUsedItems;
+			xranges32				mBlocks;
+			xranges32				mBlocksNotFull;
+
+			xfsa_params				mParams;
 
 		private:
 			// Copy construction and assignment are forbidden
@@ -429,29 +101,16 @@ namespace xcore
 		xallocator_imp::xallocator_imp()
 			: mIsInitialized(false)
 			, mAllocator(NULL)
-			, mStaticBlocks(NULL)
-			, mDynamicBlocks(NULL)
-			, mElemSize(4)
-			, mElemAlignment(X_ALIGNMENT_DEFAULT)
-			, mBlockElemCount(0)
-			, mBlockInitialCount(0)
-			, mBlockGrowthCount(0)
-			, mUsedItems(0)
+			, mBlocks()
+			, mParams()
 		{
 		}
 
-		xallocator_imp::xallocator_imp(xalloc* allocator, u32 inElemSize, u32 inBlockElemCnt, u32 inBlockInitialCount, u32 inBlockGrowthCount, u32 inBlockMaxCount, u32 inElemAlignment)
+		xallocator_imp::xallocator_imp(xalloc* allocator, xfsa_params const& params)
 			: mIsInitialized(false)
 			, mAllocator(allocator)
-			, mStaticBlocks(allocator)
-			, mDynamicBlocks(allocator)
-			, mElemSize(inElemSize)
-			, mElemAlignment(inElemAlignment)
-			, mBlockElemCount(inBlockElemCnt)
-			, mBlockInitialCount(inBlockInitialCount)
-			, mBlockGrowthCount(inBlockGrowthCount)
-			, mBlockMaxCount(inBlockMaxCount)
-			, mUsedItems(0)
+			, mBlocks(allocator)
+			, mParams(params)
 		{
 			init();
 		}
@@ -502,7 +161,7 @@ namespace xcore
 				p = mDynamicBlocks.allocate();
 				if (p == NULL)
 				{
-					extend(mDynamicBlocks, mBlockGrowthCount, mBlockMaxCount - mStaticBlocks.size());
+					extend(mBlockGrowthCount, mBlockMaxCount);
 					p = mDynamicBlocks.allocate();
 				}
 			}

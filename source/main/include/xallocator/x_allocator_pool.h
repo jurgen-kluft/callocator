@@ -1,6 +1,3 @@
-//==============================================================================
-//  x_pool_allocator.h
-//==============================================================================
 #ifndef __X_POOL_ALLOCATOR_H__
 #define __X_POOL_ALLOCATOR_H__
 #include "xbase/x_target.h"
@@ -8,49 +5,44 @@
 #pragma once 
 #endif
 
-//==============================================================================
-// xCore namespace
-//==============================================================================
+#include "xallocator/x_fsalloc.h"
+
 namespace xcore
 {
 	/// Forward declares
 	class xalloc;
 
-	/// The pool (fixed sized type) allocator
-	struct xpool_params
+	struct xfsa_params
 	{
-		xpool_params()
-			: mElemSize(4)												///< The size of the element
-			, mElemAlignment(4)											///< Alignment of the element
-			, mBlockElemCount(16)										///< Number of elements per block
-			, mBlockInitialCount(1)										///< Number of initial blocks
-			, mBlockGrowthCount(1)										///< How many blocks to add to fullfill and alloc when all blocks are full
-			, mBlockMaxCount(4096) { }									///< Maximum number of blocks
+		xfsa_params()
+			: mElemSize(4)												// The size of the element
+			, mElemAlignment(4)											// Alignment of the element
+			, mMinNumberOfBlocks(1)										// Minimum number of blocks
+			, mMaxNumberOfBlocks(4096)									// Maximum number of blocks
+			, mBlockAllocator(nullptr)									// Allocator to obtain blocks from
 
-		void	set_elem_size(u32 size);
-		void	set_elem_alignment(u32 alignment);
-		void	set_block_size(u32 num_elements);
-		void	set_block_initial_count(u32 initial_num_blocks);
-		void	set_block_growth_count(u32 growth_num_blocks);
-		void	set_block_max_count(u32 max_num_blocks);
+		void		set_elem_size(u32 size);
+		void		set_elem_alignment(u32 alignment);
 
-		u32		get_elem_size() const;
-		u32		get_elem_alignment() const;
-		u32		get_block_size() const;
-		u32		get_block_initial_count() const;
-		u32		get_block_growth_count() const;
-		u32		get_block_max_count() const;
+		void		set_block_min_count(u32 min_num_blocks);
+		void		set_block_max_count(u32 max_num_blocks);
+		void		set_block_allocator(xfsalloc* block_allocator);
+
+		u32			get_elem_size() const;
+		u32			get_elem_alignment() const;
+		u32			get_block_min_count() const;
+		u32			get_block_max_count() const;
+		xfsalloc*	get_block_allocator() const;
 
 	private:
-		u32		mElemSize;
-		u32		mElemAlignment;
-		u32		mBlockElemCount;
-		u32		mBlockInitialCount;
-		u32		mBlockGrowthCount;
-		u32		mBlockMaxCount;
+		u32			mElemSize;
+		u32			mElemAlignment;
+		u32			mMinNumberOfBlocks;		
+		u32			mMaxNumberOfBlocks;
+		xfsalloc*	mBlockAllocator;
 	};
 
-	extern xalloc*		gCreatePoolAllocator(xalloc* main_allocator, xpool_params const& params);
+	extern xfsalloc*	gCreateFixedSizeAllocator(xalloc* main_allocator, xfsa_params const& params);
 	
 };
 
