@@ -34,7 +34,7 @@ namespace xcore
 		s32			m_size;
 	};
 
-	class xhbitmap
+	class xbitlist
 	{
 	public:
 		// this hierarchical bitmap has 2 modes set by 'invert'
@@ -47,7 +47,7 @@ namespace xcore
 		void		set(u32 bit);
 		void		clr(u32 bit);
 
-		u32			find();			// First 0 or 1
+		bool		find(u32& bit) const;			// First 0 or 1
 
 		// 32/1Kbit/32Kbit/1Mbit/32Mbit/1Gbit
 		//  4/  128/   4KB/128KB/   4MB/128MB

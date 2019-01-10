@@ -38,20 +38,21 @@ namespace xcore
         XCORE_CLASS_PLACEMENT_NEW_DELETE
 
     protected:
-        void         reset(xbool inRestoreToInitialSize = xFALSE);
-        void         extend(u32 inBlockCount, u32 inBlockMaxCount);
+        bool         extend(u32& page_index, void* page_address);
+
         virtual void release();
 
     protected:
-        xvfsa_params mParams;
-        xalloc*      mAllocator;
-        xvmem*       mVirtualMemory;
+        xvfsa_params m_params;
+        xalloc*      m_alloc;
+        xvmem*       m_vmem;
+
+		enum { Null = 0xffffffff }
 
         struct page_t
         {
 			// Smallest alloc size is '4 bytes'!
 			// Alloc size is aligned up on '4 bytes'
-			enum { Null = 0xffffffff }
 			inline page_t() : m_allocs(0), m_head(0) {}
 
 			void	init(void* page_addr, u32 page_size, u32 alloc_size)
@@ -76,6 +77,7 @@ namespace xcore
 				m_head = Null;
 			}
 
+            bool    empty() const { return m_allocs == 0; }
 			bool	full() const { return m_head == Null; }
 
 			void*	allocate(void* page_addr)
@@ -111,25 +113,71 @@ namespace xcore
             return page_index;
         }
 
+        void*   calc_page_address(u32 index) const
+        {
+            return (void*)((xbyte*)m_addr_base + (u64)m_page_size * index);
+        }
+
         // Every page has a freelist, alloc-count and can be in the 'pages not full' list or the
         // 'pages empty' list.
 
         // When a page is full we remove it from 'freelist_pages' and we get a new page which
         // still has a free list.
         page_t*    m_pages;
-        page_t*    m_page_to_alloc_from; // Current page we are allocating from
-        xmarklist	m_pages_not_full;
+        s32        m_page_to_alloc_from; // Current page we are allocating from
+        xbitlist  m_pages_not_full;
 
         // When deallocating and a page and 'm_allocs == 0' we should remove it from 'm_pages_not_full' and
         // add it here to 'm_pages_empty'
         s32        m_pages_empty_cnt;
-        marklist_t m_pages_empty;
+        xbitlist    m_pages_empty;
+
+        s32        m_pages_decommitted_cnt;
+        xbitlist    m_pages_decommitted;
 
     private:
         // Copy construction and assignment are forbidden
         xvfsallocator(const xvfsallocator&);
         xvfsallocator& operator=(const xvfsallocator&);
     };
+
+    void* xvfsallocator::allocate(u32& size)
+    {
+        if (m_page_to_alloc_from == Null)
+            return nullptr;
+
+        void* page_address = calc_page_address(m_page_to_alloc_from);
+        void* p = m_pages[m_page_to_alloc_from].allocate(page_address);
+
+        if (m_pages[m_page_to_alloc_from].full())
+        {
+            m_pages_not_full.clr(m_page_to_alloc_from);
+            if (!m_pages_not_full.find(m_page_to_alloc_from))
+            {
+                // Could not find an empty page, so we have to extend
+                if (!extend(page_address, m_page_to_alloc_from))
+                {
+                    // No more decommitted pages available, full!
+                    return nullptr;
+                }
+                m_pages_not_full.set(m_page_to_alloc_from);
+            }
+        }
+        return p;
+    }
+
+    void  xvfsallocator::deallocate(void* p)
+    {
+        s32 page_index = calc_page_index(p);
+        void* page_addr = calc_page_address(page_index);
+        m_pages[page_index].deallocate(p);
+        if (m_pages[page_index].empty())
+        {
+            m_pages_not_full.clr(page_index);
+        }
+    }
+
+
 
     xfsalloc* gCreateVFsAllocator(xalloc* a, xvmem* vmem, xvfsa_params const& params)
     {
