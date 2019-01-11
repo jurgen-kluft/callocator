@@ -24,6 +24,11 @@ namespace xcore
 
         This makes it the address of pages predictable and deallocation thus easy to find out which page to manipulate.
 
+        Example:
+            FSA address range = 512 MB
+            Page Size = 64 KB
+            Number of Pages = 8192
+
         @note	This allocator does not guarantee that two objects allocated sequentially are sequential in memory.
         **/
     class xvfsallocator : public xfsalloc
@@ -31,14 +36,11 @@ namespace xcore
     public:
         xvfsallocator();
 
-        xvfsallocator(xalloc* allocator, xvfsa_params const& params);
-        virtual ~xvfsallocator();
-
         virtual const char* name() const { return TARGET_FULL_DESCR_STR " Virtual Memory FSA"; }
 
         ///@name	Should be called when created with default constructor
         //			Parameters are the same as for constructor with parameters
-        void init();
+        void init(xalloc* a, xpage_alloc* page_allocator, xvfsa_params const& params);
 
         virtual void* allocate(u32& size);
         virtual void  deallocate(void* p);
@@ -47,15 +49,17 @@ namespace xcore
         XCORE_CLASS_PLACEMENT_NEW_DELETE
 
     protected:
-        bool extend(u32& page_index, void* page_address);
+        bool extend(u32& page_index, void*& page_address);
 
         virtual void release();
+        virtual ~xvfsallocator() {}
 
     protected:
         xvfsa_params m_params;
         xalloc*      m_alloc;
         xvpalloc*    m_page_allocator;
-        s32          m_page_allocating; // Current page we are allocating from
+        xpage_info*  m_page_current;
+        u32          m_page_current_index;
         xbitlist     m_pages_not_full;
 
     private:
@@ -64,18 +68,33 @@ namespace xcore
         xvfsallocator& operator=(const xvfsallocator&);
     };
 
+    xvfsallocator::xvfsallocator() : m_alloc(nullptr), m_page_allocator(nullptr), m_page_allocating(-1) {}
+
+    void xvfsallocator::init(xalloc* a, xpage_alloc* page_allocator, xvfsa_params const& params)
+    {
+        m_params             = params;
+        m_alloc              = a;
+        m_page_allocator     = page_allocator;
+        m_page_current       = nullptr;
+        m_page_current_index = 0xffffffff;
+
+        u32 const maxnumpages = m_params.get_address_range() / m_params.get_page_size();
+
+        m_pages_not_full.init(xheap(a), maxnumpages, true);
+    }
+
     void* xvfsallocator::allocate(u32& size)
     {
-        if (m_page_to_alloc_from == Null)
+        if (m_page_current == Null)
             return nullptr;
 
         void* page_address = calc_page_address(m_page_to_alloc_from);
         void* p            = m_pages[m_page_to_alloc_from].allocate(page_address);
 
-        if (m_pages[m_page_to_alloc_from].full())
+        if (m_page_current->full())
         {
-            m_pages_not_full.clr(m_page_to_alloc_from);
-            if (!m_pages_not_full.find(m_page_to_alloc_from))
+            m_pages_not_full.clr(m_page_current_index);
+            if (!m_pages_not_full.find(m_page_current_index))
             {
                 // Could not find an empty page, so we have to extend
                 if (!extend(page_address, m_page_to_alloc_from))
@@ -83,7 +102,7 @@ namespace xcore
                     // No more decommitted pages available, full!
                     return nullptr;
                 }
-                m_pages_not_full.set(m_page_to_alloc_from);
+                m_pages_not_full.clr(m_page_current_index);
             }
         }
         return p;
@@ -96,7 +115,7 @@ namespace xcore
         m_pages[page_index].deallocate(p);
         if (m_pages[page_index].empty())
         {
-            // The page we deallocated our item on is now empty
+            // The page we deallocated our item at is now empty
             m_pages_not_full.clr(page_index);
             m_pages_empty.set(page_index);
             m_pages_empty_cnt += 1;
@@ -108,11 +127,25 @@ namespace xcore
         }
     }
 
-    xfsalloc* gCreateVFsAllocator(xalloc* a, xvmem* vmem, xvfsa_params const& params)
+    bool xvfsallocator::extend(u32& page_index, void*& page_address)
     {
-        void*          mem       = a->allocate(sizeof(xvfsallocator), X_ALIGNMENT_DEFAULT);
-        xvfsallocator* allocator = new (mem) xvfsallocator(a, vmem, params);
-        allocator->init();
+        page_address = m_page_allocator->allocate(page_index);
+        return page_address != nullptr;
+    }
+
+    void xvfsallocator::release()
+    {
+        // Return all pages back to the page allocator
+
+        xheap heap(m_alloc);
+        heap.destruct(this);
+    }
+
+    xfsalloc* gCreateVFsAllocator(xalloc* a, xpage_alloc* page_allocator, xvfsa_params const& params)
+    {
+        xheap          heap(a);
+        xvfsallocator* allocator = heap.construct<xvfsallocator>();
+        allocator->init(a, page_allocator, params);
         return allocator;
     }
 

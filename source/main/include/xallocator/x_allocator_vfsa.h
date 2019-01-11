@@ -32,7 +32,7 @@ namespace xcore
 		u64			m_addr_range;
 	};
 
-	extern xfsalloc*		gCreateVFsAllocator(xalloc* main_allocator, xvmem* vmem, xvfsa_params const& params);
+	extern xfsalloc*		gCreateVFsAllocator(xalloc* main_allocator, xpage_alloc* page_allocator, xvfsa_params const& params);
 	
 };
 

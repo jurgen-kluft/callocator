@@ -15,8 +15,8 @@ namespace xcore
         virtual bool reserve(u64 address_range, u32 page_size, u32 attributes, void*& baseptr) = 0;
         virtual bool release(void* baseptr)                                                    = 0;
 
-        virtual bool commit(void* page_address, u32 page_count)   = 0;
-        virtual bool decommit(void* page_address, u32 page_count) = 0;
+        virtual bool commit(void* page_address, u32 page_size, u32 page_count)   = 0;
+        virtual bool decommit(void* page_address, u32 page_size, u32 page_count) = 0;
     };
 
     extern xvirtual_memory* gGetVirtualMemory();

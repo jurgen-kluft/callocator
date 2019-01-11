@@ -153,9 +153,6 @@ namespace xcore
             heap.deallocate(m_pages_free.m_hbitmap);
         }
 
-        xalloc* m_alloc;
-        xvmem*  m_vmem;
-
         void* calc_page_addr(u32 index) const { return (uptr)m_addr_base + index * m_page_size; }
 
         s32 calc_page_index(void* ptr) const
@@ -165,12 +162,14 @@ namespace xcore
             return page_index;
         }
 
-        void* m_addr_base;
-        u64   m_addr_range;
-        u32   m_page_size;
-        u32   m_page_battrs;
-        u32   m_page_pattrs;
-        u32   m_pages_comm_max;
+        xalloc* m_alloc;
+        xvmem*  m_vmem;
+        void*   m_addr_base;
+        u64     m_addr_range;
+        u32     m_page_size;
+        u32     m_page_battrs;
+        u32     m_page_pattrs;
+        u32     m_pages_comm_max;
 
         xvpage*  m_pages;
         s32      m_pages_used_cnt;
@@ -180,7 +179,26 @@ namespace xcore
         s32      m_pages_free_cnt;
         xbitlist m_pages_free; // Pages that are not committed and free
 
-        void init(xheap& heap, u64 address_range, u32 page_size, u32 page_battrs, u32 page_pattrs) {}
+        void init(xheap& heap, u64 address_range, u32 page_size, u32 page_battrs, u32 page_pattrs) 
+        {
+            m_addr_range = address_range;
+            m_page_size = page_size;
+            m_page_battrs = page_battrs;
+            m_page_pattrs = page_pattrs;
+            m_vmem->reserve(m_addr_range, m_page_size, m_page_battrs, m_addr_base);
+
+            u32 numpages = m_addr_range / m_page_size;
+            m_pages = (xvpage*)heap.allocate(numpages * sizeof(xvpage));
+
+            m_pages_comm_max  = 2;
+            m_pages_used_cnt  = 0;
+            m_pages_empty_cnt = 0;
+            m_pages_free_cnt  = 0;
+
+            m_pages_used.init(heap, numpages, true);
+            m_pages_empty.init(heap, numpages, true);
+            m_pages_free.init(heap, numpages, true);
+        }
     };
 
     xpage_alloc* gCreateVMemPageAllocator(xalloc* a, u64 address_range, u32 page_size, u32 page_battrs, u32 page_pattrs,

@@ -30,9 +30,12 @@ namespace xcore
 	public:
 		static u32	size_in_dwords(u32 maxbits);
 
-		void		init(u32* bits, u32 maxbits, u32 numdwords, bool invert);
+		void		init(u32* bits, u32 maxbits, u32 numdwords, bool setall, bool invert);
+		void		init(xheap& heap, u32 maxbits, bool setall, bool invert);
+
+		void		release(xheap& heap);
 		
-		void		reset();
+		void		reset(bool setall);
 
 		void		set(u32 bit);
 		void		clr(u32 bit);

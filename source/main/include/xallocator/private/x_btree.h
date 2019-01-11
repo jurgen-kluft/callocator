@@ -7,7 +7,7 @@
 
 namespace xcore
 {
-	namespace btree
+	namespace btrie
 	{	
 		struct index
 		{
@@ -30,24 +30,26 @@ namespace xcore
 			u32			m_index;
 		};
 
-		class allocator
+		class alloc
 		{
 		public:
-			virtual void*	allocate(index& index) = 0;
-			virtual void	deallocate(index index) = 0;
-			virtual void*	idx2ptr(index index) const = 0;
-			virtual index	ptr2idx(void* ptr) const = 0;
+			virtual void*	allocate(u32& index) = 0;
+			virtual void	deallocate(u32 index) = 0;
+			virtual void*	idx2ptr(u32 index) const = 0;
+			virtual u32		ptr2idx(void* ptr) const = 0;
+			virtual void	release() = 0;
 		};
+		alloc*		gCreateVMemBasedAllocator(xalloc* a, xvirtual_memory* vmem, u32 alloc_size, u64 addr_range, u32 page_size);
 
+		// alloc creation examples:
+		// gCreateVMemBasedAllocator(a, vmem, sizeof(myleaf) (32?), 1*xGB, 64*xKB);
+		// Maximum number of myleaf allocations = (2048 - 1) * 16384 = 33.538.048 = ~32 Million nodes
 
 		// Note: sizeof(BLeaf) == sizeof(BNode) !
 
 		struct leaf
 		{
-			u32			m_value;
-			index		m_prev;
-			index		m_next;
-			u32			m_flags;
+			u64			m_value;
 		};
 
 		struct node
@@ -64,6 +66,16 @@ namespace xcore
 		// 'value' spans the lower 26 bits
 		// masks  = { 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3 };
 		// shifts = { 24,   22,  20,  18,  16,  14,  12,  10,   8,   6,   4,   2,   0 };
+
+		// 65536 number of items
+		//  16 K nodes
+		//   4 K
+		//   1 K
+		// 256
+		//  64
+		//	16
+		//   4
+		// 21*1024 + 256 + 64 + 16 + 4 + 1 = 21845 nodes
 
 		class indexer
 		{
@@ -101,10 +113,10 @@ namespace xcore
 	{
 		void			init(btree::indexer* indexer, btree::allocator* node_allocator, btree::allocator* leaf_allocator);
 
-		bool			add(u32 value, btree::index& leaf_index);
-		bool			rem(u32 value);
+		bool			add(u64 value, btree::index& leaf_index);
+		bool			rem(u64 value);
 
-		bool			find(u32 value, btree::index& leaf_index) const;
+		bool			find(u64 value, btree::index& leaf_index) const;
 
 		btree::node		m_root;
 		btree::indexer*	m_idxr;
