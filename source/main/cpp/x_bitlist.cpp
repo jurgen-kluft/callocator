@@ -10,17 +10,17 @@ namespace xcore
     u32 xbitlist::size_in_dwords(u32 maxbits)
     {
         u32 numdwords = 0;
-        while (numbits > 0)
+        while (numbits > 1)
         {
             numdwords += ((numbits + 31) / 32) + 2;
-            numbits = numbits >> 5;
+            numbits = (numbits+31) >> 5;
         }
         return numdwords * 4;
     }
 
-    void xbitlist::init(u32* bits, u32 maxbits, u32 numdwords, bool invert)
+    void xbitlist::init(u32* bitlist, u32 maxbits, u32 numdwords, bool invert)
     {
-        m_level0    = bits;
+        m_level0    = bitlist;
         m_numdwords = numdwords;
         m_invert    = invert ? 0xffffffff : 0;
         m_level[0]  = 0;
@@ -30,23 +30,26 @@ namespace xcore
         u32  offset  = 0;
         u32* level   = level0;
         u32* prev    = level0;
-        while (numbits > 0)
+        while (numbits > 1)
         {
             level[1] = prev[0];
             level[0] = ((numbits + 31) / 32) + 2;
             prev     = level;
             level += level[0];
-            numbits = numbits >> 5;
+            numbits = (numbits+31) >> 5;
         }
         levelT = level - 3;
 
         reset();
     }
 
-    // 5000 bits = 625 bytes = 157 u32 = (32768 bits level 0)
+    // 5000 bits = 628 bytes = 157 u32 = (32768 bits level 0)
     // 157  bits =  20 bytes =   5 u32 = ( 1024 bits level 1)
-    //   5  bits =   1 byte  =   1 u32 = (   32 bits level 2)
-    // total = 625 + 20 + 1 = 646 bytes
+    //   5  bits =   4 byte  =   1 u32 = (   32 bits level 2)
+    // level 0, bits= 5000, dwords= 157, bytes= 628
+    // level 1, bits= 157, dwords= 5, bytes= 20
+    // level 2, bits= 5, dwords= 1, bytes= 4
+    // total = 628 + 20 + 4 = 652 bytes
 
     void xbitlist::reset() { xmemset(m_hbitmap, invert, m_numdwords * 4); }
 
