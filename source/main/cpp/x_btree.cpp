@@ -15,7 +15,7 @@ namespace xcore
                 Null16 = 0xffff,
             };
 
-			// Note: Keep bit 31 free! So only use bit 0-30 (31 bits)
+            // Note: Keep bit 31 free! So only use bit 0-30 (31 bits)
             inline u32 page_index(u32 index) const { return (index >> 13) & 0x1FFFF; }
             inline u32 item_index(u32 index) const { return (index >> 0) & 0x1FFF; }
             inline u32 to_index(u32 page_index, u32 item_index) { return (page_index << 13) | (item_index & 0x1FFF); }
@@ -154,9 +154,9 @@ namespace xcore
                 m_page_size            = page_size;
                 m_page_max_count       = addr_range / page_size;
                 m_page_max_alloc_count = (page_size / alloc_size) - 1;
-				xheap heap(a);
-				m_notfull_used_pages.init(heap, m_page_max_count, false, true);
-				m_notused_free_pages.init(heap, m_page_max_count, true, true);
+                xheap heap(a);
+                m_notfull_used_pages.init(heap, m_page_max_count, false, true);
+                m_notused_free_pages.init(heap, m_page_max_count, true, true);
             }
 
             virtual void release()
@@ -165,9 +165,9 @@ namespace xcore
                 // decommit all used pages
                 // release virtual memory
 
-				xheap heap(a);
-				m_notfull_used_pages.release(heap);
-				m_notused_free_pages.release(heap);
+                xheap heap(a);
+                m_notfull_used_pages.release(heap);
+                m_notused_free_pages.release(heap);
             }
 
             xalloc*          m_alloc;
@@ -190,12 +190,12 @@ namespace xcore
 
     } // namespace btree
 
-	void btree_t::init(btree::indexer* indexer, btree::allocator* node_allocator, btree::allocator* leaf_allocator)
-	{
-		m_idxr = indexer;
-		m_node_allocator = node_allocator;
-		m_leaf_allocator = leaf_allocator;
-	}
+    void btree_t::init(btree::indexer* indexer, btree::allocator* node_allocator, btree::allocator* leaf_allocator)
+    {
+        m_idxr           = indexer;
+        m_node_allocator = node_allocator;
+        m_leaf_allocator = leaf_allocator;
+    }
 
     bool btree_t::add(u32 value, btree::index& leaf_index)
     {
@@ -217,7 +217,7 @@ namespace xcore
             {
                 // Check for duplicate, see if this value is the value of this leaf
                 btree::leaf* leaf = (btree::leaf*)m_leaf_allocator->idx2ptr(childNodeIndex);
-                if (leaf->m_value == value)
+                if (m_idxr.equal(leaf->m_value, value))
                 {
                     leaf_index = childNodeIndex;
                     return false;
@@ -249,7 +249,7 @@ namespace xcore
         return false;
     }
 
-    bool BTree::remove(u32 value)
+    bool btree_t::remove(u32 value)
     {
         struct level_t
         {
@@ -278,7 +278,7 @@ namespace xcore
             else if (nodeIndex.is_leaf())
             {
                 btree::leaf* leaf = (btree::leaf*)m_leaf_allocator->idx2ptr(nodeIndex);
-                if (leaf->m_value == value)
+                if (m_idxr.equal(leaf->m_value, value))
                 {
                     // We should track the all parents
                     // Remove this leaf from node, if this results in node
@@ -313,7 +313,7 @@ namespace xcore
         return false;
     }
 
-    bool BTree::find(u32 value, btree::index& leaf_index) const
+    bool btree_t::find(u32 value, btree::index& leaf_index) const
     {
         s32          level      = 0;
         btree::node* parentNode = &m_root;
@@ -328,7 +328,7 @@ namespace xcore
             else if (childNodeIndex.is_leaf())
             {
                 btree::leaf* leaf = (btree::leaf*)m_leaf_allocator->idx2ptr(childNodeIndex);
-                if (leaf->m_value == value)
+                if (m_idxr.equal(leaf->m_value, value))
                 {
                     leaf_index = childNodeIndex;
                     return true;
@@ -346,5 +346,116 @@ namespace xcore
         leaf_index.reset();
         return false;
     }
+
+    struct history_t
+    {
+        inline history_t() {}
+
+        void set(s32 level, btree::node* n, s8 c)
+        {
+            m_node[level]  = n;
+            m_child[level] = c;
+        }
+
+        void get(s32 level, btree::node* n, s8& c)
+        {
+            n = m_node[level];
+            c = m_child[level];
+        }
+
+        btree::node* m_node[32];
+        s8           m_child[32];
+    };
+
+    // Find an entry 'less-or-equal' to 'value'
+    bool btree_t::lower_bound(u64 value, btree::index& leaf_index) const
+    {
+        // When traversing the tree to find a lower-bound we might fail.
+        // So we have to keep a traversal history so that we can traverse
+        // back up to find a branch that is actually going to give us a
+        // lower-bound.
+        history_t    path;
+        s32          level      = 0;
+        s32          state      = 0; // 0 = we are on target branch, -1 = we are on a lower-bound branch
+        btree::node* parentNode = &m_root;
+        do
+        {
+            s8 const     childIndex     = state == 0 ? m_idxr.get_index(value, level) : m_idxr.get_index(level);
+            btree::index childNodeIndex = parentNode->m_nodes[childIndex];
+
+            if (state == 0)
+            {
+                // Only track history when we are on the 'in-range' branch, because we
+                // might fail finding a lower-bound branch at one of the next levels.
+                path.push(level, parentNode, childIndex);
+            }
+
+            if (childNodeIndex.is_null())
+            {
+                if (childIndex > 0)
+                {
+                    s32 lowerChildIndex = childIndex;
+                    do
+                    {
+                        lowerChildIndex -= 1;
+                        parentNode->m_nodes[lowerChildIndex];
+                    } while (childNodeIndex.is_null() && lowerChildIndex >= 0);
+
+                    if (lowerChildIndex < childIndex)
+                    {
+                        // When we picked a node at this level that was not at the child-index
+                        // indicated by the 'indexer' we should from now on always try and take
+                        // the lowest index.
+                        state = -1;
+                    }
+                }
+                else
+                {
+                    // Travel up until we can traverse into a lower-bound branch
+                    while (state == 0 && path.get(level, parentNode, childIndex))
+                    {
+                        // Check lower branches
+                        while (childIndex > 0)
+                        {
+                            childIndex--;
+                            if (!parentNode->m_node[childIndex].is_null())
+                            {
+                                state = -1; // We are now on a lower-bound branch for sure
+                                break;
+                            }
+                        }
+                        level -= 1;
+                    }
+
+                    if (state == 0)
+                    {
+                        // There are no entries available that are less-or-equal to 'value'
+                        break;
+                    }
+                }
+            }
+            else if (childNodeIndex.is_leaf())
+            {
+                btree::leaf* leaf = (btree::leaf*)m_leaf_allocator->idx2ptr(childNodeIndex);
+                s32 const    c    = m_idxr.cmp(leaf->m_value, value);
+                if (c <= 0)
+                {
+                    leaf_index = childNodeIndex;
+                    return true;
+                }
+                break;
+            }
+            else if (childNodeIndex.is_node())
+            {
+                parentNode = (btree::node*)m_node_allocator->idx2ptr(childNodeIndex);
+                level++;
+            }
+        } while (path.m_level < m_idxr.max_levels());
+
+        leaf_index.reset();
+        return false;
+    }
+
+    bool btree_t::upper_bound(u64 value, btree::index& leaf_index) const { return false; }
 
 } // namespace xcore

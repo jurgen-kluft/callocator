@@ -13,7 +13,7 @@ namespace xcore
 
 	// Number of bits and how much memory they consume
 	// 32/1Kbit/32Kbit/1Mbit/32Mbit/1Gbit
-	//  4/  128/   4KB/128KB/   4MB/128MB (*2)
+	//  4/  128/   4KB/128KB/   4MB/128MB ( * ~1.5)
 
 	// Example:
 	// When you initialize this bitlist with maxbits = 512Kbit the

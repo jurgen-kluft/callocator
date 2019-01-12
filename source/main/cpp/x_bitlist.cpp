@@ -13,7 +13,7 @@ namespace xcore
         while (numbits > 1)
         {
             numdwords += ((numbits + 31) / 32) + 2;
-            numbits = (numbits+31) >> 5;
+            numbits = (numbits + 31) >> 5;
         }
         return numdwords * 4;
     }
@@ -36,22 +36,27 @@ namespace xcore
             level[0] = ((numbits + 31) / 32) + 2;
             prev     = level;
             level += level[0];
-            numbits = (numbits+31) >> 5;
+            numbits = (numbits + 31) >> 5;
         }
         levelT = level - 3;
 
         reset(setall);
     }
-	void xbitlist::init(xheap& heap, u32 maxbits, bool setall, bool invert)
+
+    void xbitlist::init(xheap& heap, u32 maxbits, bool setall, bool invert)
     {
-        u32 ndwords = size_in_dwords(maxbits);
+        u32  ndwords = size_in_dwords(maxbits);
         u32* bitlist = (u32*)heap.allocate(ndwords * 4, sizeof(u32));
         init(bitlist, maxbits, ndwords, setall, invert);
     }
 
-	void	xbitlist::release(xheap& heap)
+    void xbitlist::release(xheap& heap)
     {
         heap.deallocate(m_level0);
+        m_level0    = nullptr;
+        m_levelT    = nullptr;
+        m_numdwords = 0;
+        m_invert    = 0;
     }
 
     // 5000 bits = 628 bytes = 157 u32 = (32768 bits level 0)
@@ -62,15 +67,15 @@ namespace xcore
     // level 2, bits= 5, dwords= 1, bytes= 4
     // total = 628 + 20 + 4 = 652 bytes
 
-    void xbitlist::reset(bool setall) 
+    void xbitlist::reset(bool setall)
     {
         if (setall)
         {
-            xmemset(m_hbitmap, ~invert, m_numdwords * 4); 
+            xmemset(m_hbitmap, ~invert, m_numdwords * 4);
         }
         else
         {
-            xmemset(m_hbitmap, invert, m_numdwords * 4); 
+            xmemset(m_hbitmap, invert, m_numdwords * 4);
         }
     }
 

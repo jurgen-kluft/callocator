@@ -12,7 +12,7 @@ Let's say an APP has 640 GB of address space and it has the following behaviour:
 2. CPU and GPU allocations (different calls, different page settings, VirtualAlloc/XMemAlloc)
 3. Categories of GPU resources have different min/max size, alignment requirements, count and frequency
 
-## Fixed Size Allocator [Ok]
+### Fixed Size Allocator [Ok]
 
 Not too hard to make multi-thread safe using atomics where the only hard multi-threading problem is page commit/decommit.
 
@@ -67,7 +67,7 @@ struct FSA
 - Fast [+]
 - Difficult to detect memory corruption [-]
 
-## Large Size Allocator [Ok]
+### Large Size Allocator
 
 Features:
 
@@ -85,7 +85,7 @@ Pros and Cons:
 - Size rounded up to page size [-]
 - Mapping and unmapping kernel calls relatively slow [-]
 
-## Medium Size Allocator [WIP]
+### Medium Size Allocator [WIP]
 
 - All other sizes go here (4 KB < Size < 32 MB)
 - Non-contiguous virtual pages
@@ -96,7 +96,7 @@ Pros and Cons:
 - Space is tracked with external bookkeeping
 - Suitable for GPU memory
 
-## Clear Values (1337 speak)
+### Clear Values (1337 speak)
 
 - memset to byte value
   - Keep it memorable
@@ -107,33 +107,38 @@ Pros and Cons:
 - 0xA1 – memory ALlocated
 - 0xDE – memory DEallocated
 
-## Allocation management for `Medium Size Allocator`
+### Allocation management for `Medium Size Allocator`
 
-Address Table
+## Address Table
 
 - MemBlock = 32 MB
 - Min-Alloc-Size = 8 KB
 - Max-Alloc-Size < 32 MB
 - MemBlock / Min-Alloc-Size = 4096
-- Node = Prev/Next, 2 B + 2 B
-- Total memory is 8 KB
+- Coalesce needs a Node = Prev/Next, 4 B + 4 B
 
-Size Table
+```c++
+struct caolesce_node_t
+{
+    u32         m_addr;     // * 
+    u32         m_prev;
+    u32         m_next;
+#if defined X_ALLOCATOR_DEBUG
+    s32         m_file_line;
+    const char* m_file_name;
+    const char* m_func_name;
+#endif
+};
+```
+
+## Size Table (btree)
 
 - MinSize = 4 KB
 - MaxSize = 32 MB
-- Granularity = 1 KB
-- Num Entries = 32 K
-- Entry is NodeIdx, 4 B
-
-- Size-Array is 32 K * 4 B = 128 KB
-- Bit tree = 8/64/512/4096/32768 = 8 KB
-- Total Memory = 128 KB + 8 KB = 136 KB
-
-- Size-Tree
-- 4, 16, 64, 256, 1024, 4096, 16384, 65536, 262144
 
 You can have a `Medium Size Allocator` per thread under the condition that you keep the pointer/memory to that thread. If you need memory to pass around we can use a global 'Medium Size Allocator'.
+
+## Notes
 
 COALESCE HEAP REGION SIZE 1 = 768 MB
 COALESCE HEAP REGION SIZE 2 = 768 MB
@@ -146,7 +151,7 @@ Coalesce Heap Region Size = COALESCE HEAP REGION SIZE 2
 Coalesce Heap Min Size = 128 KB,
 Coalesce Heap Max Size = 1 MB
 
-## Notes
+### Notes
 
 PS4 = 994 GB address space
 <http://twvideo01.ubm-us.net/o1/vault/gdc2016/Presentations/MacDougall_Aaron_Building_A_Low.pdf>

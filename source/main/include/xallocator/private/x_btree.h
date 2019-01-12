@@ -7,7 +7,7 @@
 
 namespace xcore
 {
-	namespace btrie
+	namespace btree
 	{	
 		struct index
 		{
@@ -77,25 +77,103 @@ namespace xcore
 		//   4
 		// 21*1024 + 256 + 64 + 16 + 4 + 1 = 21845 nodes
 
+		// Note: Make sure you keep the mask/shift in order otherwise you will break the
+		//       presumption that all values are ordered.
+		//       Also all masks should connect and have no bit gaps, you may skip a range of
+		//       upper bits as long as you are sure that they do not change for the complete
+		//       set of values.
+		// Example:
+		// Let's say you have an address range of 32 GB with a alignment of 1024, this means
+		// that you can mask these bits: 0x#######7FFFFFC00. Since a virtual memory address
+		// can have bits set in ####### part you know that this doesn't matter.
+		
+		// -------------- 1st brute-force approach to compute the mask:
+		// uptr base_address = 0x07F0500800000000;
+		// u32 const num_pages = 8192;
+		// u32 const page_size = 65536;
+		// u32 const granularity = 1024;
+		// uptr end_address = base_address + num_pages * page_size;
+		// uptr address = base_address;
+		// uptr mask = 0;
+		// uptr fixed = 0xffffffffffffffff;
+		// while (address < end_address)
+		// {
+		//     mask = mask | address;
+		//     fixed = fixed & mask;
+		//     address += alignment;
+		// }
+		// 
+		// -------------- 2nd approach to getting the mask
+		// 
+		// uptr address_range = page_size * num_pages;
+		// u64 mask = address_range;
+		// mask = mask | (mask >> 1);
+		// mask = mask | (mask >> 2);
+		// mask = mask | (mask >> 4);
+		// mask = mask | (mask >> 8);
+		// mask = mask | (mask >> 16);
+		// mask = mask | (mask >> 32);
+		// mask = mask & ~(granularity - 1);
+		// 
+		// u32 maskbitcnt = xcountBits(mask);
+		// u32 numlevels = (maskbitcnt + 1) / 2;
+		// if ((maskbitcnt & 1) == 1)
+		// {
+		//     // Which way should we extend the mask to make the count 'even'
+		//     if ((mask & (1<<63)) == 0)
+		//     {
+		//         mask = mask | (mask << 1);
+		//     }
+		//     else
+		//     {
+		//         mask = mask | (mask >> 1);
+		//     }		
+		//     maskbitcnt += 1;
+		// }
+
 		class indexer
 		{
 			u8*			m_masks;
 			u8*			m_shifts;
-			s32			m_levels;
+			u64			m_mask;
+			s8			m_levels;
 		public:
-			void		initialize(s32 max_levels, u8* masks, u8* shifts)
+			void		initialize(s32 max_levels, u64 mask, u8* masks, u8* shifts)
 			{
-				m_levels = max_levels;
 				m_masks = masks;
 				m_shifts = shifts;
+				m_mask = mask;
+				m_levels = max_levels;
 			}
 
-			s32			max_levels() const { return m_levels; }
-			s32			get_index(u64 value, s32 level) const
+			s8			max_levels() const { return m_levels; }
+
+			// The indexer knows which bits are being 'indexed' so it can
+			// tell us if two values are equal from its perspective.
+			bool		equal(u64 lhs, u64 rhs) const
 			{
-				u64 const msk = (u64)m_masks[level];
+				return (lhs & m_mask) == (rhs & m_mask);
+			}
+			
+			s32			compare(u64 lhs, u64 rhs) const
+			{
+				lhs = lhs & m_mask;
+				rhs = rhs & m_mask;
+				if (lhs == rhs)
+					return 0;
+				return (lhs < rhs) ? -1 : 1;
+			}
+
+			s8			get_index(s32 level) const
+			{
+				return (s8)m_masks[level];
+			}
+
+			s8			get_index(u64 value, s32 level) const
+			{
+				s8 const msk = (s8)m_masks[level];
 				s32 const shr = (s32)m_shifts[level];
-				return (value >> shr) & msk;
+				return (s8)(value >> shr) & msk;
 			}
 		};
 	}
@@ -109,6 +187,9 @@ namespace xcore
 	// 
 	// We use an `indexer` here which is responsible for computing the index at every level
 	// of the tree for a given 'value'.
+	//
+	// Since this data-structure is 'sorted' we also provide a lower and upper bound find
+	// function.
 	struct btree_t
 	{
 		void			init(btree::indexer* indexer, btree::allocator* node_allocator, btree::allocator* leaf_allocator);
@@ -117,6 +198,8 @@ namespace xcore
 		bool			rem(u64 value);
 
 		bool			find(u64 value, btree::index& leaf_index) const;
+		bool			lower_bound(u64 value, btree::index& leaf_index) const;
+		bool			upper_bound(u64 value, btree::index& leaf_index) const;
 
 		btree::node		m_root;
 		btree::indexer*	m_idxr;

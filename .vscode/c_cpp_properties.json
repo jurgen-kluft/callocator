@@ -1,0 +1,25 @@
+{
+    "configurations": [
+        {
+            "name": "Mac",
+            "includePath": [
+                "Users/obnosis1/dev.go/src/github.com/jurgen-kluft/xbase/source/main/include",
+                "Users/obnosis1/dev.go/src/github.com/jurgen-kluft/xallocator/source/main/include",
+                "${workspaceRoot}"
+            ],
+            "defines": [
+                "TARGET_MAC_DEV_DEBUG"
+            ],
+            "macFrameworkPath": [
+                "/Library/Developer/CommandLineTools/SDKs/MacOSX10.14.sdk/System/Library/Frameworks"
+            ],
+            "compilerPath": "/usr/bin/clang",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "${default}",
+            "forcedInclude": [
+            ]
+        }
+    ],
+    "version": 4
+}
