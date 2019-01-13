@@ -378,42 +378,41 @@ namespace xcore
         s32          level      = 0;
         s32          state      = 0; // 0 = we are on target branch, -1 = we are on a lower-bound branch
         btree::node* parentNode = &m_root;
+        s8           childIndex;
+        btree::index childNodeIndex;
         do
         {
-            s8 const     childIndex     = state == 0 ? m_idxr.get_index(value, level) : m_idxr.get_index(level);
-            btree::index childNodeIndex = parentNode->m_nodes[childIndex];
-
             if (state == 0)
             {
+                childIndex     = m_idxr.get_index(value, level);
+                childNodeIndex = parentNode->m_nodes[childIndex];
                 // Only track history when we are on the 'in-range' branch, because we
                 // might fail finding a lower-bound branch at one of the next levels.
                 path.push(level, parentNode, childIndex);
-            }
+                level++;
 
-            if (childNodeIndex.is_null())
-            {
-                if (childIndex > 0)
+                if (childNodeIndex.is_leaf())
                 {
-                    s32 lowerChildIndex = childIndex;
-                    do
+                    btree::leaf* leaf = (btree::leaf*)m_leaf_allocator->idx2ptr(childNodeIndex);
+                    s32 const    c    = m_idxr.cmp(leaf->m_value, value);
+                    if (c <= 0)
                     {
-                        lowerChildIndex -= 1;
-                        parentNode->m_nodes[lowerChildIndex];
-                    } while (childNodeIndex.is_null() && lowerChildIndex >= 0);
-
-                    if (lowerChildIndex < childIndex)
-                    {
-                        // When we picked a node at this level that was not at the child-index
-                        // indicated by the 'indexer' we should from now on always try and take
-                        // the lowest index.
-                        state = -1;
+                        leaf_index = childNodeIndex;
+                        return true;
                     }
+                }
+
+                if (childNodeIndex.is_node())
+                {
+                    parentNode = (btree::node*)m_node_allocator->idx2ptr(childNodeIndex);
                 }
                 else
                 {
                     // Travel up until we can traverse into a lower-bound branch
-                    while (state == 0 && path.get(level, parentNode, childIndex))
+                    while (state == 0 && level > 0)
                     {
+                        level--;
+                        path.get(level, parentNode, childIndex);
                         // Check lower branches
                         while (childIndex > 0)
                         {
@@ -424,34 +423,43 @@ namespace xcore
                                 break;
                             }
                         }
-                        level -= 1;
                     }
-
                     if (state == 0)
                     {
-                        // There are no entries available that are less-or-equal to 'value'
-                        break;
+                        goto lower_bound_not_found;
                     }
                 }
             }
-            else if (childNodeIndex.is_leaf())
+            else
             {
-                btree::leaf* leaf = (btree::leaf*)m_leaf_allocator->idx2ptr(childNodeIndex);
-                s32 const    c    = m_idxr.cmp(leaf->m_value, value);
-                if (c <= 0)
+                do
+                {
+                    childNodeIndex = parentNode->m_nodes[childIndex];
+                    childIndex -= 1;
+                } while (childNodeIndex.is_null() && childIndex > 0);
+
+                if (childNodeIndex.is_null())
+                {
+                    goto lower_bound_not_found;
+                }
+
+                if (childNodeIndex.is_leaf())
                 {
                     leaf_index = childNodeIndex;
                     return true;
                 }
-                break;
-            }
-            else if (childNodeIndex.is_node())
-            {
+
+                // When we are on a lower-bound branch, we have to search a child index that is
+                // not null starting at the highest index.
+                childIndex = 3;
+
                 parentNode = (btree::node*)m_node_allocator->idx2ptr(childNodeIndex);
                 level++;
             }
-        } while (path.m_level < m_idxr.max_levels());
 
+        } while (level < m_idxr.max_levels());
+
+    lower_bound_not_found:
         leaf_index.reset();
         return false;
     }
