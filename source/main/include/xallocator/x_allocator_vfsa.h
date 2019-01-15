@@ -10,6 +10,8 @@
 
 namespace xcore
 {
+	class xfsalloc;
+
 	struct xvfsa_params
 	{
 		xvfsa_params()

@@ -1,12 +1,14 @@
 #include "xbase/x_target.h"
 #include "xbase/x_debug.h"
-#include "xbase/x_memory_std.h"
+#include "xbase/x_memory.h"
 #include "xbase/x_integer.h"
 #include "xbase/x_allocator.h"
 #include "xbase/x_tree.h"
 
 #include "xallocator/x_allocator_vfsa.h"
-#include "xallocator/private/x_marklist.h"
+#include "xallocator/x_fs_allocator.h"
+#include "xallocator/x_virtual_memory.h"
+#include "xallocator/private/x_bitlist.h"
 
 namespace xcore
 {
@@ -36,6 +38,8 @@ namespace xcore
     public:
         xvfsallocator();
 
+		enum { Null = 0xffffffff };
+
         virtual const char* name() const { return TARGET_FULL_DESCR_STR " Virtual Memory FSA"; }
 
         ///@name	Should be called when created with default constructor
@@ -57,7 +61,7 @@ namespace xcore
     protected:
         xvfsa_params m_params;
         xalloc*      m_alloc;
-        xvpalloc*    m_page_allocator;
+        xpage_alloc*    m_page_allocator;
         xpage_info*  m_page_current;
         u32          m_page_current_index;
         xbitlist     m_pages_not_full;
@@ -68,7 +72,7 @@ namespace xcore
         xvfsallocator& operator=(const xvfsallocator&);
     };
 
-    xvfsallocator::xvfsallocator() : m_alloc(nullptr), m_page_allocator(nullptr), m_page_allocating(-1) {}
+    xvfsallocator::xvfsallocator() : m_alloc(nullptr), m_page_allocator(nullptr), m_page_current(nullptr), m_page_current_index(-1) {}
 
     void xvfsallocator::init(xalloc* a, xpage_alloc* page_allocator, xvfsa_params const& params)
     {
@@ -80,14 +84,15 @@ namespace xcore
 
         u32 const maxnumpages = m_params.get_address_range() / m_params.get_page_size();
 
-        m_pages_not_full.init(xheap(a), maxnumpages, true);
+        m_pages_not_full.init(xheap(a), maxnumpages, false, true);
     }
 
     void* xvfsallocator::allocate(u32& size)
     {
-        if (m_page_current == Null)
+        if (m_page_current == nullptr)
             return nullptr;
 
+		/*
         void* page_address = calc_page_address(m_page_to_alloc_from);
         void* p            = m_pages[m_page_to_alloc_from].allocate(page_address);
 
@@ -106,10 +111,13 @@ namespace xcore
             }
         }
         return p;
+		*/
+		return nullptr;
     }
 
     void xvfsallocator::deallocate(void* p)
     {
+		/*
         s32   page_index = calc_page_index(p);
         void* page_addr  = calc_page_address(page_index);
         m_pages[page_index].deallocate(p);
@@ -125,6 +133,7 @@ namespace xcore
                 m_page_to_alloc_from = m_pages_empty.find();
             }
         }
+		*/
     }
 
     bool xvfsallocator::extend(u32& page_index, void*& page_address)

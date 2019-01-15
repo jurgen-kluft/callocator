@@ -27,7 +27,7 @@ namespace xcore
         virtual void* allocate(u32& size) = 0;
         virtual void  deallocate(void*)   = 0;
 
-        virtual bool info(void* ptr, void*& page_addr, xpage_info *& page_info) = 0;
+        virtual bool info(void* ptr, void*& page_addr, u32& page_index) = 0;
 
         virtual void release() = 0;
     };

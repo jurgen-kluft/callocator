@@ -5,6 +5,8 @@
 #pragma once 
 #endif
 
+#include "xbase/x_allocator.h"
+
 namespace xcore
 {
 	// this hierarchical bitlist has 2 modes set by 'invert'
@@ -30,6 +32,8 @@ namespace xcore
 	public:
 		static u32	size_in_dwords(u32 maxbits);
 
+		xbitlist();
+
 		void		init(u32* bits, u32 maxbits, u32 numdwords, bool setall, bool invert);
 		void		init(xheap& heap, u32 maxbits, bool setall, bool invert);
 
@@ -42,11 +46,11 @@ namespace xcore
 
 		bool		find(u32& bit) const;			// First 0 or 1
 
-		enum { AllBitsSet = 0xffffffff }
+		enum { AllBitsSet = 0xffffffff };
 
 		u32*		m_level0;
 		u32*		m_levelT;
-		u32			m_maxbits;
+		u32			m_ndwords;
 		s32			m_invert;
 	};
 };

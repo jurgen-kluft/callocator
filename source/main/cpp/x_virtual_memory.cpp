@@ -2,39 +2,40 @@
 #include "xbase/x_debug.h"
 #include "xbase/x_allocator.h"
 
+#include "xallocator/private/x_bitlist.h"
 #include "xallocator/x_virtual_memory.h"
 
 namespace xcore
 {
-    class xvmem_os : public xvmem
+    class xvmem_os : public xvirtual_memory
     {
     public:
-        virtual bool reserve(u64 address_range, u32 page_size, u32 attributes, void*& baseptr, void*& id);
-        virtual bool release(void* baseptr, void* id);
+        virtual bool reserve(u64 address_range, u32 page_size, u32 attributes, void*& baseptr);
+        virtual bool release(void* baseptr);
 
-        virtual bool commit(void* id, void* page_address, u32 page_count);
-        virtual bool decommit(void* id, void* page_address, u32 page_count);
+        virtual bool commit(void* page_address, u32 page_size, u32 page_count);
+        virtual bool decommit(void* page_address, u32 page_size, u32 page_count);
     };
 
 #if defined TARGET_MAC
 
-    bool xvmem_os::reserve(u64 address_range, u32 page_size, u32 attributes, void*& baseptr, void*& id) { return false; }
+    bool xvmem_os::reserve(u64 address_range, u32 page_size, u32 attributes, void*& baseptr) { return false; }
 
-    bool xvmem_os::release(void* baseptr, void* id) { return false; }
+    bool xvmem_os::release(void* baseptr) { return false; }
 
-    bool xvmem_os::commit(void* id, void* page_address, u32 page_count) { return false; }
+    bool xvmem_os::commit(void* page_address, u32 page_size, u32 page_count) { return false; }
 
-    bool xvmem_os::decommit(void* id, void* page_address, u32 page_count) { return false; }
+    bool xvmem_os::decommit(void* page_address, u32 page_size, u32 page_count) { return false; }
 
 #elif defined TARGET_PC
 
-    bool xvmem_os::reserve(u64 address_range, u32 page_size, u32 attributes, void*& baseptr, void*& id) { return false; }
+    bool xvmem_os::reserve(u64 address_range, u32 page_size, u32 attributes, void*& baseptr) { return false; }
 
-    bool xvmem_os::release(void* baseptr, void* id) { return false; }
+    bool xvmem_os::release(void* baseptr) { return false; }
 
-    bool xvmem_os::commit(void* id, void* page_address, u32 page_count) { return false; }
+    bool xvmem_os::commit(void* page_address, u32 page_size, u32 page_count) { return false; }
 
-    bool xvmem_os::decommit(void* id, void* page_address, u32 page_count) { return false; }
+    bool xvmem_os::decommit(void* page_address, u32 page_size, u32 page_count) { return false; }
 
 #else
 
@@ -42,7 +43,7 @@ namespace xcore
 
 #endif
 
-    xvmem* gGetVirtualMemory()
+    xvirtual_memory* gGetVirtualMemory()
     {
         static xvmem_os sVMem;
         return &sVMem;
@@ -88,7 +89,7 @@ namespace xcore
                     m_pages_empty_cnt -= 1;
                     m_pages_empty.clr(page_index);
                     ptr = calc_page_addr(page_index);
-                    m_vmem->commit(ptr, 1);
+                    m_vmem->commit(ptr, m_page_size, 1);
                     size = m_page_size;
                 }
             }
@@ -108,13 +109,13 @@ namespace xcore
             }
         }
 
-        virtual bool get_info(void* ptr, void*& page_addr, xvpage*& page_info)
+        virtual bool info(void* ptr, void*& page_addr, u32& page_index)
         {
-            if (ptr >= m_addr_base && ptr < ((uptr)m_addr_base + m_addr_range))
+            if (ptr >= m_addr_base && ptr < (void*)((uptr)m_addr_base + m_addr_range))
             {
-                s32 const pindex = calc_page_index(ptr);
+                u32 const pindex = calc_page_index(ptr);
                 page_addr        = calc_page_addr(pindex);
-                page_info        = &m_pages[page_index];
+                page_index = pindex;
                 return true;
             }
             return false;
@@ -129,7 +130,7 @@ namespace xcore
             while (m_pages_empty.find(page_index))
             {
                 void* page_addr = calc_page_addr(page_index);
-                m_vmem->decommit(page_addr, m_page_size);
+                m_vmem->decommit(page_addr, m_page_size, 1);
             }
             m_vmem->release(m_addr_base);
 
@@ -147,23 +148,25 @@ namespace xcore
             m_pages_used_cnt  = 0;
             m_pages_empty_cnt = 0;
             m_pages_free_cnt  = 0;
-            heap.deallocate(m_pages);
-            heap.deallocate(m_pages_used.m_hbitmap);
-            heap.deallocate(m_pages_empty.m_hbitmap);
-            heap.deallocate(m_pages_free.m_hbitmap);
+
+			m_pages_used.release(heap);
+			m_pages_empty.release(heap);
+			m_pages_free.release(heap);
         }
 
-        void* calc_page_addr(u32 index) const { return (uptr)m_addr_base + index * m_page_size; }
+        void* calc_page_addr(u32 index) const { return (void*)((uptr)m_addr_base + index * m_page_size); }
 
         s32 calc_page_index(void* ptr) const
         {
-            ASSERT(ptr >= m_addr_base && ptr < (m_addr_base + m_addr_range));
+            ASSERT(ptr >= m_addr_base && ptr < (void*)((uptr)m_addr_base + m_addr_range));
             s32 const page_index = (s32)(((uptr)ptr - (uptr)m_addr_base) / m_page_size);
             return page_index;
         }
 
+		XCORE_CLASS_PLACEMENT_NEW_DELETE
+
         xalloc* m_alloc;
-        xvmem*  m_vmem;
+        xvirtual_memory*  m_vmem;
         void*   m_addr_base;
         u64     m_addr_range;
         u32     m_page_size;
@@ -171,12 +174,11 @@ namespace xcore
         u32     m_page_pattrs;
         u32     m_pages_comm_max;
 
-        xvpage*  m_pages;
-        s32      m_pages_used_cnt;
+        u32      m_pages_used_cnt;
         xbitlist m_pages_used; // Pages that are committed and used
-        s32      m_pages_empty_cnt;
+        u32      m_pages_empty_cnt;
         xbitlist m_pages_empty; // Pages that are committed but free
-        s32      m_pages_free_cnt;
+        u32      m_pages_free_cnt;
         xbitlist m_pages_free; // Pages that are not committed and free
 
         void init(xheap& heap, u64 address_range, u32 page_size, u32 page_battrs, u32 page_pattrs) 
@@ -187,17 +189,16 @@ namespace xcore
             m_page_pattrs = page_pattrs;
             m_vmem->reserve(m_addr_range, m_page_size, m_page_battrs, m_addr_base);
 
-            u32 numpages = m_addr_range / m_page_size;
-            m_pages = (xvpage*)heap.allocate(numpages * sizeof(xvpage));
+            u32 numpages = (u32)(m_addr_range / m_page_size);
 
             m_pages_comm_max  = 2;
             m_pages_used_cnt  = 0;
             m_pages_empty_cnt = 0;
             m_pages_free_cnt  = 0;
 
-            m_pages_used.init(heap, numpages, true);
-            m_pages_empty.init(heap, numpages, true);
-            m_pages_free.init(heap, numpages, true);
+            m_pages_used.init(heap, numpages, false, true);
+            m_pages_empty.init(heap, numpages, false, true);
+            m_pages_free.init(heap, numpages, true, true);
         }
     };
 
