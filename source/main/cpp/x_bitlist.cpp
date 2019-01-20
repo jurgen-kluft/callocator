@@ -143,6 +143,15 @@ namespace xcore
         }
     }
 
+	bool xbitlist::is_set(u32 bit) const
+    {
+        u32 const* level = m_level0;
+        u32 dwordIndex = bit / 32;
+        u32 dwordBit = bit & 31;
+        ASSERT(dwordIndex < (level[0] - 2));
+        return level[2 + dwordIndex] & (1 << dwordBit);
+    }
+
     bool xbitlist::find(u32& bit) const
     {
         // Start at top level and find a '0' bit and move down

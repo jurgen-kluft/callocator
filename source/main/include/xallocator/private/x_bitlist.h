@@ -44,6 +44,7 @@ namespace xcore
 		void		set(u32 bit);
 		void		clr(u32 bit);
 
+		bool		is_set(u32 bit) const;
 		bool		find(u32& bit) const;			// First 0 or 1
 
 		enum { AllBitsSet = 0xffffffff };
