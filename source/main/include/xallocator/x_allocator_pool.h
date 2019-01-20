@@ -18,7 +18,7 @@ namespace xcore
 			: mElemSize(4)												// The size of the element
 			, mElemAlignment(4)											// Alignment of the element
 			, mMinNumberOfBlocks(1)										// Minimum number of blocks
-			, mMaxNumberOfBlocks(4096)									// Maximum number of blocks
+			, mMaxNumberOfBlocks(256)									// Maximum number of blocks
 			, mBlockAllocator(nullptr)									// Allocator to obtain blocks from
 
 		void		set_elem_size(u32 size);

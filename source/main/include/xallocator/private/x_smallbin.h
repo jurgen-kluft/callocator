@@ -23,6 +23,8 @@ namespace xcore
 		
 			void*			allocate	();
 			void			deallocate	(void* ptr);
+
+			bool			is_full() const;
 		
 		private:
 			void*			mBaseAddress;				// Base address of the memory we are managing

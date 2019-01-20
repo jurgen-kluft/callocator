@@ -18,10 +18,10 @@ namespace xcore
         return numdwords * 4;
     }
 
-    void xbitlist::init(u32* bitlist, u32 maxbits, u32 numdwords, bool setall, bool invert)
+    void xbitlist::init(u32* bitlist, u32 maxbits, bool setall, bool invert)
     {
         m_level0    = bitlist;
-        m_ndwords   = numdwords;
+		m_numbits   = maxbits;
         m_invert    = invert ? AllBitsSet : 0;
         m_level0[0] = 0;
 
@@ -47,7 +47,7 @@ namespace xcore
     {
         u32  ndwords = size_in_dwords(maxbits);
         u32* bitlist = (u32*)heap.allocate(ndwords * 4, sizeof(u32));
-        init(bitlist, maxbits, ndwords, setall, invert);
+        init(bitlist, maxbits, setall, invert);
     }
 
     void xbitlist::release(xheap& heap)
@@ -55,7 +55,7 @@ namespace xcore
         heap.deallocate(m_level0);
         m_level0  = nullptr;
         m_levelT  = nullptr;
-        m_ndwords = 0;
+        m_numbits = 0;
         m_invert  = 0;
     }
 
@@ -69,18 +69,33 @@ namespace xcore
 
     void xbitlist::reset(bool setall)
     {
-        if (setall)
+        s32 const invert = setall ? ~m_invert : m_invert;
+
+        u32* level = m_level0;
+        u32 numbits = m_numbits;
+        while (numbits > 1)
         {
-            x_memset(m_level0, ~m_invert, m_ndwords * 4);
-        }
-        else
-        {
-            x_memset(m_level0, m_invert, m_ndwords * 4);
+            u32 numdwords = ((numbits + 31) / 32);
+            x_memset(level, m_invert, numdwords * 4);
+            if (m_invert == 0)
+            {
+                u32 lastmask = (0xffffffff << ((numdwords * 32) - numbits));
+                level[numdwords - 1] = level[numdwords - 1] | lastmask;
+            }
+            else
+            {
+                u32 lastmask = (0xffffffff << ((numdwords * 32) - numbits));
+                level[numdwords - 1] = level[numdwords - 1] & ~lastmask;
+            }
+            numbits = (numbits + 31) >> 5;
+            level += numdwords;
         }
     }
 
     void xbitlist::set(u32 bit)
     {
+        ASSERT(bit < m_numbits);
+
         // set bit in level 0, then avalanche up if necessary
         u32* level = m_level0;
         while (level <= m_levelT)
@@ -113,6 +128,8 @@ namespace xcore
 
     void xbitlist::clr(u32 bit)
     {
+        ASSERT(bit < m_numbits);
+
         // clear bit in level 0, then avalanche up if necessary
         u32* level = m_level0;
         while (level <= m_levelT)
@@ -150,6 +167,15 @@ namespace xcore
         u32 dwordBit = bit & 31;
         ASSERT(dwordIndex < (level[0] - 2));
         return level[2 + dwordIndex] & (1 << dwordBit);
+    }
+
+	bool xbitlist::is_full() const
+    {
+        if (m_invert == 0)
+        {
+            return m_levelT[0] == 0xfffffffff;
+        }
+        return m_levelT[0] == 0;
     }
 
     bool xbitlist::find(u32& bit) const
