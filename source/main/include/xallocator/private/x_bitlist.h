@@ -34,7 +34,7 @@ namespace xcore
 
 		xbitlist();
 
-		void		init(u32* bits, u32 maxbits, u32 numdwords, bool setall, bool invert);
+		void		init(u32* bits, u32 maxbits, bool setall, bool invert);
 		void		init(xheap& heap, u32 maxbits, bool setall, bool invert);
 
 		void		release(xheap& heap);
@@ -45,13 +45,14 @@ namespace xcore
 		void		clr(u32 bit);
 
 		bool		is_set(u32 bit) const;
+		bool		is_full() const;
 		bool		find(u32& bit) const;			// First 0 or 1
 
 		enum { AllBitsSet = 0xffffffff };
 
 		u32*		m_level0;
 		u32*		m_levelT;
-		u32			m_ndwords;
+		u32			m_numbits;
 		s32			m_invert;
 	};
 };

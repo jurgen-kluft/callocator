@@ -47,5 +47,10 @@ namespace xcore
 			ASSERT(mBitList.is_set(i));
 			mBitList.clr(i);
 		}
+
+		bool		xsmallbin::is_full() const
+		{
+			return mBitList.is_full();
+		}
 	}
 }

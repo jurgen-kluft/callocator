@@ -71,24 +71,20 @@ namespace xcore
 			XCORE_CLASS_PLACEMENT_NEW_DELETE
 
 		protected:
-			void					reset(xbool inRestoreToInitialSize = xFALSE);
-			void					extend (u32 inBlockCount, u32 inBlockMaxCount);
+			void					reset();
+			void					extend();
 			virtual void			release ();
 
 		protected:
 			bool					mIsInitialized;
 			xalloc*					mAllocator;
 
-			struct block_t
-			{
-				void*	m_block;
-				u32*	m_freelist;
-			};
-
-			block_t					m
-
-			xranges32				mBlocks;
-			xranges32				mBlocksNotFull;
+			s32						mAllocCount;
+			s32						mNumBins;
+			xsmallbin*				mBins;
+			u32*					mBinsSorted;
+			xbitlist				mBinsNotFull;
+			xbitlist				mBinsEmpty;
 
 			xfsa_params				mParams;
 
@@ -101,7 +97,9 @@ namespace xcore
 		xallocator_imp::xallocator_imp()
 			: mIsInitialized(false)
 			, mAllocator(NULL)
-			, mBlocks()
+			, mAllocCount(0)
+			, mNumBins(0)
+			, mBins(nullptr)
 			, mParams()
 		{
 		}
@@ -109,7 +107,9 @@ namespace xcore
 		xallocator_imp::xallocator_imp(xalloc* allocator, xfsa_params const& params)
 			: mIsInitialized(false)
 			, mAllocator(allocator)
-			, mBlocks(allocator)
+			, mAllocCount(0)
+			, mNumBins(0)
+			, mBins(nullptr)
 			, mParams(params)
 		{
 			init();
@@ -117,7 +117,7 @@ namespace xcore
 
 		xallocator_imp::~xallocator_imp ()
 		{
-			ASSERT(mUsedItems==0);
+			
 		}
 
 		void xallocator_imp::init()
@@ -126,59 +126,36 @@ namespace xcore
 			ASSERT(mIsInitialized == false);
 
 			// Check input parameters	
-			ASSERT(mElemSize >= 4);
-			ASSERT(mBlockElemCount > 0);
-			ASSERT(mBlockInitialCount > 0);
+			ASSERT(mParams.mElemSize >= 4);
+			ASSERT(mParams.mBlockElemCount > 0);
+			ASSERT(mParams.mBlockInitialCount > 0);
 
-			// Save initial parameters
-			mElemAlignment     = mElemAlignment==0 ? X_ALIGNMENT_DEFAULT : mElemAlignment;
-			mElemSize          = xalignUp(mElemSize, mElemAlignment);			// Align element size to a multiple of element alignment
-
-			extend(mStaticBlocks, mBlockInitialCount, mBlockMaxCount);
+			extend();
 		}
 
-		void		xallocator_imp::reset(xbool inRestoreToInitialSize)
+		void		xallocator_imp::reset()
 		{
-			// Check if pool is empty
-			ASSERT(mUsedItems == 0);
 
-			if (inRestoreToInitialSize)
-			{
-				mDynamicBlocks.release(mAllocator);
-				mStaticBlocks.reset(mBlockElemCount, mElemSize);
-			}
 
-			mUsedItems = 0;
 		}
 
-		void*		xallocator_imp::allocate(xsize_t size, u32 alignment)
+		void*		xallocator_imp::allocate()
 		{
-			ASSERT((u32)size <= mElemSize);
+			void* ptr = nullptr;
 
-			void* p = mStaticBlocks.allocate();
-			if (p == NULL)
+			u32 binIndex;
+			if (mBinsNotFull.find(binIndex))
 			{
-				p = mDynamicBlocks.allocate();
-				if (p == NULL)
+				xsmallbin* bin = mBins[binIndex];
+				ptr = bin->allocate();
+				if (bin->is_full())
 				{
-					extend(mBlockGrowthCount, mBlockMaxCount);
-					p = mDynamicBlocks.allocate();
+					mBinsNotFull.set(binIndex);
+					extend();
 				}
 			}
-			mUsedItems += p!=NULL ? 1 : 0;
+
 			return p;
-		}
-
-		void*		xallocator_imp::reallocate(void* inObject, xsize_t size, u32 alignment)
-		{
-			ASSERT((u32)size <= mElemSize);
-			ASSERT(alignment <= mElemAlignment);
-
-			//TODO: We could reallocate from DynamicBlocks to StaticBlocks. That is if
-			//      the incoming object comes from DynamicBlocks, if so and we can
-			//      allocate from StaticBlocks we could reallocate it.
-
-			return inObject;
 		}
 
 		void		xallocator_imp::deallocate(void* inObject)
@@ -187,37 +164,36 @@ namespace xcore
 			if (inObject == NULL)
 				return;
 
-			// First check the StaticBlocks
-			s32 c = mStaticBlocks.deallocate(inObject);
-			if (c==0)
-				c = mDynamicBlocks.deallocate(inObject);
-			
-			ASSERTS(c==1, "Error: did not find that address in this pool allocator, are you sure you are deallocating with the right allocator?");
-			mUsedItems -= c;
+			// Figure out the smallbin, binary search since
+			// 'mBinsSorted' is sorted by address.	
+
+
 		}
 
-		void		xallocator_imp::extend(Blocks& blocks, u32 inBlockCount, u32 inBlockMaxCount) const
+		void		xallocator_imp::extend()
 		{
-			// In case of fixed pool it is legal to call extend with blockCount = 0
-			if (inBlockCount == 0)
-				return;
-
-			for (u32 i=0; i<inBlockCount; ++i)
+			u32 binIndex;
+			if (mBinsEmpty.find(binIndex))
 			{
-				if (blocks.size() >= inBlockMaxCount)
-					return;
-				xblock* new_block = xblock::create(mAllocator, mElemSize, mBlockElemCount, mElemAlignment);
-				blocks.mFree.push(new_block);
-				blocks.mSize += 1;
+				xfsalloc* binalloc = mParams.get_block_allocator();
+
+				u32 binSize;
+				void* base = binalloc->allocate(binSize);
+				xsmallbin* bin = &mBins[binIndex];
+				bin->init(base, binSize, mParams.mElemSize, mAllocator);
+				mNumBins += 1;
+
+				// In the mBinsSorted find the index where to insert this new bin
+
+				mBinsNotFull.set(binIndex);
 			}
 		}
 
 		void	xallocator_imp::release()
 		{
-			ASSERT(mUsedItems == 0);
+			ASSERT(mAllocCount == 0);
 
-			mDynamicBlocks.release(mAllocator);
-			mStaticBlocks.release(mAllocator);
+			// Release resources
 
 			mAllocator->deallocate(this);
 		}
@@ -227,7 +203,7 @@ namespace xcore
 	xalloc*		gCreatePoolAllocator(xalloc* allocator, xpool_params const& params)
 	{
 		void* mem = allocator->allocate(sizeof(xpool_allocator::xallocator_imp), X_ALIGNMENT_DEFAULT);
-		xpool_allocator::xallocator_imp* pool_allocator = new (mem) xpool_allocator::xallocator_imp(allocator, params.get_elem_size(), params.get_block_size(), params.get_block_initial_count(), params.get_block_growth_count(), params.get_block_max_count(), params.get_elem_alignment());
+		xpool_allocator::xallocator_imp* pool_allocator = new (mem) xpool_allocator::xallocator_imp(allocator, params);
 		pool_allocator->init();
 		return pool_allocator;
 	}
