@@ -27,17 +27,15 @@ namespace xcore
 	// total: 65536 + 2048 + 64 + 4 = 67652 + 32 = 67684
 	// note: The + 8 bytes is the extra information per level
 
-	class xbitlist
+	class xhibitset
 	{
 	public:
-		static u32	size_in_dwords(u32 maxbits);
-
-		xbitlist();
+    	inline		xhibitset() : m_level0(nullptr), m_levelT(nullptr), m_numbits(0), m_invert(0) {}
 
 		void		init(u32* bits, u32 maxbits, bool setall, bool invert);
-		void		init(xheap& heap, u32 maxbits, bool setall, bool invert);
+		void		init(xalloc* alloc, u32 maxbits, bool setall, bool invert);
 
-		void		release(xheap& heap);
+		void		release(xalloc* alloc);
 		
 		void		reset(bool setall);
 
@@ -48,10 +46,13 @@ namespace xcore
 		bool		is_full() const;
 		bool		find(u32& bit) const;			// First 0 or 1
 
+		static u32	size_in_dwords(u32 maxbits);
+
 		enum { AllBitsSet = 0xffffffff };
 
-		u32*		m_level0;
-		u32*		m_levelT;
+		// 7 levels maximum, this means a maximum of 7 * 5 = 2^35 = 34.359.738.368
+		u32*		m_levels[7];
+		u32			m_maxlevel;
 		u32			m_numbits;
 		s32			m_invert;
 	};
