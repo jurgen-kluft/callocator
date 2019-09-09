@@ -30,14 +30,18 @@ namespace xcore
 	class xhibitset
 	{
 	public:
-    	inline		xhibitset() : m_level0(nullptr), m_levelT(nullptr), m_numbits(0), m_invert(0) {}
+		enum EFind {
+			FIND_0 = 0,
+			FIND_1 = 1
+		};
+    	inline		xhibitset() : m_numbits(0), m_maxlevel(0), m_find(FIND_0) {}
 
-		void		init(u32* bits, u32 maxbits, bool setall, bool invert);
-		void		init(xalloc* alloc, u32 maxbits, bool setall, bool invert);
+		void		init(u32* bits, u32 maxbits, EFind find);
+		void		init(xalloc* alloc, u32 maxbits, EFind find);
 
 		void		release(xalloc* alloc);
 		
-		void		reset(bool setall);
+		void		reset();
 
 		void		set(u32 bit);
 		void		clr(u32 bit);
@@ -52,9 +56,9 @@ namespace xcore
 
 		// 7 levels maximum, this means a maximum of 7 * 5 = 2^35 = 34.359.738.368
 		u32*		m_levels[7];
-		u32			m_maxlevel;
 		u32			m_numbits;
-		s32			m_invert;
+		s16			m_maxlevel;
+		s16			m_find;
 	};
 };
 
