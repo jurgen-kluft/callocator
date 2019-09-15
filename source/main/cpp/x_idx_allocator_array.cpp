@@ -6,7 +6,7 @@
 
 namespace xcore
 {
-	class x_indexed_array_allocator : public x_iidx_allocator
+	class x_indexed_array_allocator : public xfsadexed
 	{
 	public:
 		x_indexed_array_allocator(xalloc* allocator) : mAllocator(allocator)	{ }
@@ -22,8 +22,6 @@ namespace xcore
 
 		virtual void		init();
 		virtual void		clear();
-
-		virtual const char*	name() const		{ return TARGET_FULL_DESCR_STR " [Allocator, Type=array,indexed]"; }
 
 		virtual u32			size() const		{ return mAllocCount; }
 		virtual u32			max_size() const	{ return mObjectArraySize; }
