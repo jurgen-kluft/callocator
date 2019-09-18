@@ -1,6 +1,3 @@
-//==============================================================================
-//  x_allocator_hext.h
-//==============================================================================
 #ifndef __X_ALLOCATOR_HEXT_H__
 #define __X_ALLOCATOR_HEXT_H__
 #include "xbase/x_target.h"
@@ -8,14 +5,10 @@
 #pragma once 
 #endif
 
-//==============================================================================
-// xCore namespace
-//==============================================================================
 namespace xcore
 {
 	/// Forward declares
 	class xalloc;
-
 
 	// WORK IN PROGRESS, NOT FINISHED!
 
