@@ -23,6 +23,8 @@ namespace xcore
 		- Entry is NodeIdx, 4 bytes
 		- Total memory is 8 MB
 
+		Note: The Address Table can be smaller if we also allow a linked-list at an entry
+
 		Size Table
 		- MinSize = 1 KB
 		- MaxSize = 32 MB
@@ -292,19 +294,13 @@ namespace xcore
 		class Allocator : public xalloc
 		{
 		public:
-			const char*		name() const;									///< The name of the allocator
-
 			void*			allocate(xsize_t size, u32 align);				///< Allocate memory with alignment
-			void*			reallocate(void* p, xsize_t size, u32 align);	///< Reallocate memory
 			void			deallocate(void* p);							///< Deallocate/Free memory
 
 			void			release();										///< Release/Destruct this allocator
 
 			void			Initialize(xalloc* allocator, void* mem_base, u32 mem_size, u32 min_alloc_size, u32 max_alloc_size);
 			void			Destroy();
-
-			void*			Allocate(u32 size);
-			void			Deallocate(void*);
 
 		private:
 			NodeIdx			FindSize(u32 size) const;
@@ -355,32 +351,10 @@ namespace xcore
 			LNode*			mAllocatedLNodes_Addr[cMaximumBlocks];
 		};
 
-		const char*		Allocator::name() const
-		{
-			return "h-ext allocator";
-		}
-
-		void*			Allocator::allocate(xsize_t size, u32 align)
-		{
-			size = (size + (mMinAllocSize - 1)) & ~(mMinAllocSize - 1);
-			return Allocate(size);
-		}
-
-		void*			Allocator::reallocate(void* p, xsize_t size, u32 align)
-		{
-			return NULL;
-		}
-
-		void			Allocator::deallocate(void* p)
-		{
-			Deallocate(p);
-		}
-
 		void			Allocator::release()
 		{
 			Destroy();
 		}
-
 
 		NodeIdx		Allocator::FindSize(u32 size) const
 		{
@@ -659,8 +633,10 @@ namespace xcore
 			}
 		}
 
-		void*	Allocator::Allocate(u32 size)
+		void*	Allocator::allocate(xsize_t _size, u32 _align)
 		{
+			u32 const size = (_size + (mMinAllocSize - 1)) & ~(mMinAllocSize - 1);
+
 			NodeIdx curr = FindSize(size);
 			if (curr.IsNull() == false)
 			{
@@ -700,7 +676,7 @@ namespace xcore
 			return NULL;
 		}
 
-		void	Allocator::Deallocate(void* p)
+		void	Allocator::deallocate(void* p)
 		{
 			u32 address = (u32)((u8*)p - (u8*)mMemBase);
 			NodeIdx curr = FindAddr(address);
