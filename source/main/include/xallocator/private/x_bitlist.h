@@ -1,5 +1,5 @@
-#ifndef __X_ALLOCATOR_BITLIST_H__
-#define __X_ALLOCATOR_BITLIST_H__
+#ifndef __X_HIERARCHICAL_BITSET_H__
+#define __X_HIERARCHICAL_BITSET_H__
 #include "xbase/x_target.h"
 #ifdef USE_PRAGMA_ONCE 
 #pragma once 
@@ -34,7 +34,7 @@ namespace xcore
 			FIND_0 = 0,
 			FIND_1 = 1
 		};
-    	inline		xhibitset() : m_numbits(0), m_maxlevel(0), m_find(FIND_0) {}
+		inline		xhibitset() : m_numbits(0), m_maxlevel(0), m_find(FIND_0) {}
 
 		void		init(u32* bits, u32 maxbits, EFind find);
 		void		init(xalloc* alloc, u32 maxbits, EFind find);
@@ -48,7 +48,10 @@ namespace xcore
 
 		bool		is_set(u32 bit) const;
 		bool		is_full() const;
-		bool		find(u32& bit) const;			// First 0 or 1
+
+		bool		find(u32& bit) const;				// First 0 or 1
+		bool		upper(u32 pivot, u32& bit) const;	// First 0 or 1 equal to or great than @pivot
+		bool		lower(u32 pivot, u32& bit) const;	// First 0 or 1 equal to or lesser than @pivot
 
 		static u32	size_in_dwords(u32 maxbits);
 
@@ -62,4 +65,4 @@ namespace xcore
 	};
 };
 
-#endif	/// __X_ALLOCATOR_BITLIST_H__
+#endif	/// __X_HIERARCHICAL_BITSET_H__

@@ -191,4 +191,18 @@ namespace xcore
         return true;
     }
 
+    bool xhibitset::upper(u32 pivot, u32& bit) const
+    {
+        // TODO:
+        ASSERTS(false, "To be implemented!");
+        return false;
+    }
+
+    bool xhibitset::lower(u32 pivot, u32& bit) const
+    {
+        // TODO:
+        ASSERTS(false, "To be implemented!");
+        return false;
+    }
+
 }; // namespace xcore
