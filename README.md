@@ -3,8 +3,8 @@
 A library containing many different allocators using a simple allocator interface:
 
 ```c++
-virtual void* allocate(xsize_t size, u32 align) = 0;  ///< Allocate memory with alignment
-virtual void deallocate(void* p) = 0;                 ///< Deallocate/Free memory
+virtual void* allocate(u32 size, u32 align) = 0;  ///< Allocate memory with alignment
+virtual u32 void deallocate(void* p) = 0;         ///< Deallocate/Free memory
 ```
 
 Some allocators in this package:
