@@ -1,5 +1,5 @@
 #include "xbase/x_target.h"
-#include "xbase/x_memory_std.h"
+#include "xbase/x_memory.h"
 #include "xbase/x_limits.h"
 #include "xbase/x_integer.h"
 #include "xbase/x_allocator.h"
@@ -65,4 +65,4 @@ namespace xcore
         x_allocator_forward* forwardRingAllocator = new (memForAllocator) x_allocator_forward((xbyte*)mem, memsize, allocator);
         return forwardRingAllocator;
     }
-};
+}; // namespace xcore
