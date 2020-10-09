@@ -21,10 +21,10 @@ namespace xcore
         virtual const char* name() const { return TARGET_FULL_DESCR_STR "[Allocator, Type=Forward]"; }
 
         void         initialize(void* beginAddress, u32 size);
-        virtual void release();
+        virtual void v_release();
 
-        virtual void* allocate(xsize_t size, u32 alignment);
-        virtual void  deallocate(void* ptr);
+        virtual void* v_allocate(u32 size, u32 alignment);
+        virtual u32   v_deallocate(void* ptr);
 
         XCORE_CLASS_PLACEMENT_NEW_DELETE
 
@@ -44,19 +44,19 @@ namespace xcore
 
     x_allocator_forward::~x_allocator_forward() { release(); }
 
-    void x_allocator_forward::release()
+    void x_allocator_forward::v_release()
     {
         mAllocator->deallocate(mMemBegin);
         mAllocator->deallocate(this);
     }
 
-    void* x_allocator_forward::allocate(xsize_t size, u32 alignment)
+    void* x_allocator_forward::v_allocate(u32 size, u32 alignment)
     {
         ASSERT(size < X_U32_MAX);
         return mForwardAllocator.allocate((u32)size, alignment);
     }
 
-    void x_allocator_forward::deallocate(void* ptr) { return mForwardAllocator.deallocate(ptr); }
+    u32 x_allocator_forward::v_deallocate(void* ptr) { return mForwardAllocator.deallocate(ptr); }
 
     xalloc* gCreateForwardAllocator(xalloc* allocator, u32 memsize)
     {

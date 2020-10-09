@@ -281,10 +281,10 @@ namespace xcore
             return c->getSize();
         }
 
-        void xallocator::deallocate(void* p)
+        u32 xallocator::deallocate(void* p)
         {
             if (p == NULL)
-                return;
+                return 0;
 
             // Deallocate will mark a chunk as is_used = 0
             // Then we will follow prev and next to see if we can coalesce.
@@ -305,6 +305,7 @@ namespace xcore
                 // Coalesce (unite) chunks can only happen when:
                 // - neighbor chunk differs in index by 1
                 // - neighbor chunk is a free chunk
+                u32 const size = c->getSize();
 
                 // First mark this chunk as free
                 c->merge(mHead); // After this call 'c' is invalid!
@@ -324,6 +325,8 @@ namespace xcore
 
                     mBegin->setNext(mHead);
                 }
+
+				return size;
             }
         }
 

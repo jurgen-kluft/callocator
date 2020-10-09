@@ -1,5 +1,4 @@
 #include "xbase/x_allocator.h"
-#include "xbase/x_idx_allocator.h"
 #include "xbase/x_integer.h"
 #include "xallocator/private/x_freelist.h"
 
@@ -24,8 +23,8 @@ UNITTEST_SUITE_BEGIN(x_freelist)
         UNITTEST_TEST(alloc)
         {
 			xfreelist_t list;
+			list.init_with_alloc(gSystemAllocator, 4, 4, 100);
 
-			list.alloc(gSystemAllocator, 4, 4, 100);
 			for (s32 i = 0; i < list.size(); ++i)
 			{
 				s32* elem = (s32*)list.ptr_of(i);

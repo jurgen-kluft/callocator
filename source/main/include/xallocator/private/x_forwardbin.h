@@ -32,7 +32,7 @@ namespace xcore
 
 			xbyte*				allocate(u32 size, u32 alignment);
 			u32					get_size(void* p) const;
-			void				deallocate(void* p);
+			u32  				deallocate(void* p);
 
 		private:
 			xbyte*				mMemBegin;

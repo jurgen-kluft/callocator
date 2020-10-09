@@ -3,7 +3,7 @@
 #include "xbase/x_memory.h"
 #include "xbase/x_allocator.h"
 
-#include "xallocator/x_allocator_dl.h"
+#include "xallocator/x_allocator_dlmalloc.h"
 
 #ifdef TARGET_PS3
 #pragma diag_suppress = no_corresponding_delete
@@ -109,7 +109,7 @@ namespace xcore
         void*  __allocN(msize_t n_elements, msize_t element_size);                    ///< Elements allocation
         void** __allocIC(msize_t n_elements, msize_t element_size, void** chunks);    ///< Independent continues with equal sized elements
         void** __allocICO(msize_t n_elements, msize_t* element_sizes, void** chunks); ///< Independent continues with different size specified for every element
-        void   __free(void* ptr);
+        u32    __free(void* ptr);
 
         u32 __usable_size(void* mem);
 
@@ -2182,7 +2182,7 @@ compilers.
         }
     }
 
-    void xmem_heap_base::__free(void* mem)
+    u32 xmem_heap_base::__free(void* mem)
     {
         /*
             Consolidate freed chunks with preceding or succeeding bordering
@@ -2193,13 +2193,14 @@ compilers.
         if (mem != 0)
         {
             mchunkptr p = mem2chunk(mem);
+			u32 const size = (is_inuse(p)) ? chunksize(p) - overhead_for(p) : 0;
 
 #if FOOTERS
             mstate fm = get_mstate_for(p);
             if (!ok_magic(fm))
             {
                 USAGE_ERROR_ACTION(fm, p);
-                return;
+                return 0;
             }
 #else  /* FOOTERS */
             mstate fm = mState;
@@ -2301,7 +2302,9 @@ compilers.
             postaction:
                 POSTACTION(fm);
             }
+			return size;
         }
+        return 0;
     }
 
     void* xmem_heap_base::__allocN(msize_t n_elements, msize_t elem_size)
@@ -2452,15 +2455,13 @@ compilers.
         xmem_heap mDlMallocHeap;
 
     public:
-        virtual const char* name() const { return TARGET_FULL_DESCR_STR " [Allocator, Type=dlmalloc]"; }
-
         void init(void* mem, s32 mem_size)
         {
             mDlMallocHeap.__initialize();
             mDlMallocHeap.__manage(mem, mem_size);
         }
 
-        virtual void* allocate(xsize_t size, u32 alignment)
+        virtual void* v_allocate(u32 size, u32 alignment)
         {
             if (alignment <= X_MEMALIGN)
                 return mDlMallocHeap.__alloc((msize_t)size);
@@ -2468,21 +2469,14 @@ compilers.
             return mDlMallocHeap.__allocA(alignment, (msize_t)size);
         }
 
-        virtual void* reallocate(void* ptr, xsize_t size, u32 alignment)
-        {
-            if (alignment <= X_MEMALIGN)
-                return mDlMallocHeap.__allocR(ptr, alignment, (msize_t)size);
-
-            return mDlMallocHeap.__allocR(ptr, alignment, (msize_t)size);
-        }
-
-        virtual void deallocate(void* ptr)
+        virtual u32 v_deallocate(void* ptr)
         {
             if (ptr != NULL)
-                mDlMallocHeap.__free(ptr);
+                return mDlMallocHeap.__free(ptr);
+            return 0;
         }
 
-        virtual void release() { mDlMallocHeap.__destroy(); }
+        virtual void v_release() { mDlMallocHeap.__destroy(); }
 
         void* operator new(xsize_t num_bytes) { return NULL; }
         void* operator new(xsize_t num_bytes, void* mem) { return mem; }

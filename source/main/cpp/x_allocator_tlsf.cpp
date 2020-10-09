@@ -4,6 +4,8 @@
 #include "xbase/x_integer.h"
 #include "xbase/x_memory.h"
 #include "xbase/x_allocator.h"
+#include "xbase/x_printf.h"
+#include "xbase/x_runes.h"
 
 #include "xallocator/x_allocator_tlsf.h"
 
@@ -218,7 +220,7 @@ namespace xcore
     void* tlsf_malloc(tlsf_t tlsf, size_t bytes);
     void* tlsf_memalign(tlsf_t tlsf, size_t align, size_t bytes);
     void* tlsf_realloc(tlsf_t tlsf, void* ptr, size_t size);
-    void  tlsf_free(tlsf_t tlsf, void* ptr);
+    size_t tlsf_free(tlsf_t tlsf, void* ptr);
 
     /* Returns internal block size, not original request size */
     size_t tlsf_block_size(void* ptr);
@@ -1116,7 +1118,7 @@ namespace xcore
         return block_prepare_used(control, block, adjust);
     }
 
-    void tlsf_free(tlsf_t tlsf, void* ptr)
+    size_t tlsf_free(tlsf_t tlsf, void* ptr)
     {
         /* Don't attempt to free a NULL pointer. */
         if (ptr)
@@ -1124,10 +1126,12 @@ namespace xcore
             control_t*      control = tlsf_cast(control_t*, tlsf);
             block_header_t* block   = block_from_ptr(ptr);
             tlsf_assert(!block_is_free(block) && "block already marked as free");
+            const size_t cursize = block_size(block);
             block_mark_as_free(block);
             block = block_merge_prev(control, block);
             block = block_merge_next(control, block);
             block_insert(control, block);
+			return cursize;
         }
     }
 
@@ -1212,33 +1216,21 @@ namespace xcore
 
         void init(void* mem, s32 mem_size) { mPool = tlsf_create_with_pool(mem, mem_size); }
 
-        virtual void* allocate(xsize_t size, u32 alignment)
+        virtual void* v_allocate(u32 size, u32 alignment)
         {
             if (alignment <= 8)
                 return tlsf_malloc(mPool, size);
             return tlsf_memalign(mPool, alignment, size);
         }
 
-        virtual void* reallocate(void* ptr, xsize_t size, u32 alignment)
-        {
-            if (alignment <= 8)
-            {
-                return tlsf_realloc(mPool, ptr, size);
-            }
-            else
-            {
-                // Do a malloc,copy,free
-                return NULL;
-            }
-        }
-
-        virtual void deallocate(void* ptr)
+        virtual u32 v_deallocate(void* ptr)
         {
             if (ptr != NULL)
-                tlsf_free(mPool, ptr);
+                return (u32)tlsf_free(mPool, ptr);
+			return 0;
         }
 
-        virtual void release()
+        virtual void v_release()
         {
             tlsf_destroy(mPool);
             mPool     = NULL;

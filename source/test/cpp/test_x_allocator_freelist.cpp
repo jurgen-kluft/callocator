@@ -1,7 +1,6 @@
 #include "xbase/x_allocator.h"
-#include "xbase/x_idx_allocator.h"
 #include "xbase/x_integer.h"
-#include "xallocator/x_allocator_freelist.h"
+#include "xallocator/x_fsadexed_array.h"
 
 #include "xunittest/xunittest.h"
 
@@ -52,18 +51,14 @@ UNITTEST_SUITE_BEGIN(x_allocator_freelist)
         UNITTEST_TEST(alloc3_free3)
         {
 			u32 const alignment = 2048;
-			xalloc* alloc = gCreateFreeListAllocator(gSystemAllocator, alignment, alignment, 128);
+			xfsadexed* alloc = gCreateFreeListAllocator(gSystemAllocator, alignment, alignment, 128);
 
-			void* mem1 = alloc->allocate( 512,    8);
+			void* mem1 = alloc->allocate();
 			CHECK_TRUE(gIsAligned(mem1, alignment));
-
-			void* mem2 = alloc->allocate(1024,   16);
-			
-			void* mem3 = alloc->allocate( 512,   32);
-
-			void* mem4 = alloc->allocate(1024, 1024);
-
-			void* mem5 = alloc->allocate( 256,   32);
+			void* mem2 = alloc->allocate();
+			void* mem3 = alloc->allocate();
+			void* mem4 = alloc->allocate();
+			void* mem5 = alloc->allocate();
 			gFill(mem5, 256, 5);
 			gFill(mem3, 512, 3);
 			gFill(mem4, 1024, 4);
@@ -76,15 +71,15 @@ UNITTEST_SUITE_BEGIN(x_allocator_freelist)
 
 			alloc->deallocate(mem4);
 
-			void* mem6 = alloc->allocate( 8,    8);
-			void* mem7 = alloc->allocate(16, 1024);
-			void* mem8 = alloc->allocate(32, 2048);
+			void* mem6 = alloc->allocate();
+			void* mem7 = alloc->allocate();
+			void* mem8 = alloc->allocate();
 
 			alloc->deallocate(mem1);
 			alloc->deallocate(mem3);
 			alloc->deallocate(mem2);
 
-			void* mem9 = alloc->allocate(16, 8);
+			void* mem9 = alloc->allocate();
 
 			alloc->deallocate(mem7);
 			alloc->deallocate(mem5);
@@ -98,18 +93,15 @@ UNITTEST_SUITE_BEGIN(x_allocator_freelist)
         UNITTEST_TEST(alloc3_free3_idx)
         {
 			u32 const alignment = 2048;
-			xalloc* alloc = gCreateFreeListIdxAllocator(gSystemAllocator, alignment, alignment, 128);
+            xfsadexed* alloc     = gCreateFreeListIdxAllocator(gSystemAllocator, alignment, alignment, 128);
 
-			void* mem1 = alloc->allocate( 512,    8);
+			void* mem1 = alloc->allocate();
 			CHECK_TRUE(gIsAligned(mem1, alignment));
+			void* mem2 = alloc->allocate();
+			void* mem3 = alloc->allocate();
+			void* mem4 = alloc->allocate();
 
-			void* mem2 = alloc->allocate(1024,   16);
-			
-			void* mem3 = alloc->allocate( 512,   32);
-
-			void* mem4 = alloc->allocate(1024, 1024);
-
-			void* mem5 = alloc->allocate( 256,   32);
+			void* mem5 = alloc->allocate();
 			gFill(mem5, 256, 5);
 			gFill(mem3, 512, 3);
 			gFill(mem4, 1024, 4);
@@ -122,15 +114,15 @@ UNITTEST_SUITE_BEGIN(x_allocator_freelist)
 
 			alloc->deallocate(mem4);
 
-			void* mem6 = alloc->allocate( 8,    8);
-			void* mem7 = alloc->allocate(16, 1024);
-			void* mem8 = alloc->allocate(32, 2048);
+			void* mem6 = alloc->allocate();
+			void* mem7 = alloc->allocate();
+			void* mem8 = alloc->allocate();
 
 			alloc->deallocate(mem1);
 			alloc->deallocate(mem3);
 			alloc->deallocate(mem2);
 
-			void* mem9 = alloc->allocate(16, 8);
+			void* mem9 = alloc->allocate();
 
 			alloc->deallocate(mem7);
 			alloc->deallocate(mem5);
