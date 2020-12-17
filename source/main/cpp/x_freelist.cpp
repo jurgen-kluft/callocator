@@ -48,7 +48,7 @@ namespace xcore
         init_list();
     }
 
-    void xfreelist_t::init_with_alloc(xalloc* allocator, u32 elem_size, u32 elem_alignment, s32 count)
+    void xfreelist_t::init_with_alloc(alloc_t* allocator, u32 elem_size, u32 elem_alignment, s32 count)
     {
         // Check parameters
         ASSERT(mElemSize >= sizeof(void*));

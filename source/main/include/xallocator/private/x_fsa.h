@@ -7,7 +7,7 @@
 
 namespace xcore
 {
-    namespace xfsa
+    namespace fsa_t
     {
         // Note: There are contraints with a page:
         //       - 0xffff is the Null index
@@ -74,7 +74,7 @@ namespace xcore
             u16 m_head;   // The head of the free list (item = page-address + m_head)
         };
 
-    }; // namespace xfsa
+    }; // namespace fsa_t
 
 }; // namespace xcore
 

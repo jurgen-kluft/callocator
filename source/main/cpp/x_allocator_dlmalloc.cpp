@@ -1033,9 +1033,9 @@ namespace xcore
     //			stats.mCurrentInuseSize = used;
     //			stats.mCurrentSystemSize = fp;
     //			stats.mMaxSystemSize = maxfp;
-    // 			xconsole::writeLine("max system bytes = %10lu", x_va_list((u32)(maxfp)));
-    // 			xconsole::writeLine("system bytes     = %10lu", x_va_list((u32)(fp)));
-    // 			xconsole::writeLine("in use bytes     = %10lu", x_va_list((u32)(used)));
+    // 			console_t::writeLine("max system bytes = %10lu", va_list_t((u32)(maxfp)));
+    // 			console_t::writeLine("system bytes     = %10lu", va_list_t((u32)(fp)));
+    // 			console_t::writeLine("in use bytes     = %10lu", va_list_t((u32)(used)));
     //
     //			POSTACTION(m);
     //		}
@@ -2450,7 +2450,7 @@ compilers.
         return chunksize(chunkPtr);
     }
 
-    class x_allocator_dlmalloc : public xalloc
+    class x_allocator_dlmalloc : public alloc_t
     {
         xmem_heap mDlMallocHeap;
 
@@ -2484,7 +2484,7 @@ compilers.
         void  operator delete(void* pMem, void*) {}
     };
 
-    xalloc* gCreateDlAllocator(void* mem, u32 memsize)
+    alloc_t* gCreateDlAllocator(void* mem, u32 memsize)
     {
         x_allocator_dlmalloc* allocator = new (mem) x_allocator_dlmalloc();
 

@@ -8,15 +8,15 @@
 namespace xcore
 {
 	/// Forward declares
-	class xalloc;
-    class xfsadexed;
+	class alloc_t;
+    class fsadexed_t;
 
 	/// Free list allocator
-    extern xfsadexed* gCreateFreeListAllocator(xalloc* allocator, u32 inSizeOfElement, u32 inElementAlignment, u32 inNumElements);
-    extern xfsadexed* gCreateFreeListAllocator(xalloc* allocator, void* inElementArray, u32 inSizeOfElement, u32 inElementAlignment, u32 inMaxNumElements);
+    extern fsadexed_t* gCreateFreeListAllocator(alloc_t* allocator, u32 inSizeOfElement, u32 inElementAlignment, u32 inNumElements);
+    extern fsadexed_t* gCreateFreeListAllocator(alloc_t* allocator, void* inElementArray, u32 inSizeOfElement, u32 inElementAlignment, u32 inMaxNumElements);
 
-	extern xfsadexed* gCreateFreeListIdxAllocator(xalloc* allocator, u32 inSizeOfElement, u32 inElementAlignment, u32 inNumElements);
-    extern xfsadexed* gCreateFreeListIdxAllocator(xalloc* allocator, void* inElementArray, u32 inSizeOfElement, u32 inElementAlignment, u32 inMaxNumElements);
+	extern fsadexed_t* gCreateFreeListIdxAllocator(alloc_t* allocator, u32 inSizeOfElement, u32 inElementAlignment, u32 inNumElements);
+    extern fsadexed_t* gCreateFreeListIdxAllocator(alloc_t* allocator, void* inElementArray, u32 inSizeOfElement, u32 inElementAlignment, u32 inMaxNumElements);
 };
 
 

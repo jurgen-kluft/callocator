@@ -20,7 +20,7 @@ namespace xcore
 
         @note	This allocator does not guarantee that two objects allocated sequentially are sequential in memory.
         **/
-        class xallocator_imp : public xfsadexed
+        class xallocator_imp : public fsadexed_t
         {
         public:
             xallocator_imp();
@@ -28,8 +28,8 @@ namespace xcore
             // @inElemSize			This determines the size in bytes of an element
             // @inElemAlignment		Alignment of the start of each pool (can be 0, which creates fixed size memory pool)
             // @inBlockElemCnt		This determines the number of elements that are part of a block
-            xallocator_imp(xalloc* allocator, u32 inElemSize, u32 inElemAlignment, u32 inBlockElemCnt);
-            xallocator_imp(xalloc* allocator, void* mem_block, u32 inElemSize, u32 inElemAlignment, u32 inBlockElemCnt);
+            xallocator_imp(alloc_t* allocator, u32 inElemSize, u32 inElemAlignment, u32 inBlockElemCnt);
+            xallocator_imp(alloc_t* allocator, void* mem_block, u32 inElemSize, u32 inElemAlignment, u32 inBlockElemCnt);
             virtual ~xallocator_imp();
 
             virtual const char* name() const { return TARGET_FULL_DESCR_STR " [Allocator, Type=freelist]"; }
@@ -47,13 +47,13 @@ namespace xcore
             virtual void* v_idx2ptr(u32 idx) const;
             virtual void  v_release();
 
-            xalloc*      allocator() const { return (xalloc*)mAllocator; }
+            alloc_t*      allocator() const { return (alloc_t*)mAllocator; }
 
             ///@name	Placement new/delete
             XCORE_CLASS_PLACEMENT_NEW_DELETE
 
         protected:
-            xalloc*     mAllocator;
+            alloc_t*     mAllocator;
             void*       mElementArray;
             xfreelist_t mFreeList;
             u32         mElemSize;
@@ -67,13 +67,13 @@ namespace xcore
 
         xallocator_imp::xallocator_imp() : mAllocator(NULL), mElementArray(NULL), mFreeList(), mAllocCount(0) {}
 
-        xallocator_imp::xallocator_imp(xalloc* allocator, u32 inElemSize, u32 inElemAlignment, u32 inMaxNumElements) : mAllocator(allocator), mElementArray(NULL), mFreeList(), mAllocCount(0)
+        xallocator_imp::xallocator_imp(alloc_t* allocator, u32 inElemSize, u32 inElemAlignment, u32 inMaxNumElements) : mAllocator(allocator), mElementArray(NULL), mFreeList(), mAllocCount(0)
         {
             mElemSize = inElemSize;
             mFreeList.init_with_alloc(allocator, inElemSize, inElemAlignment, inMaxNumElements);
         }
 
-        xallocator_imp::xallocator_imp(xalloc* allocator, void* inElementArray, u32 inElemSize, u32 inElemAlignment, u32 inMaxNumElements) : mAllocator(allocator), mElementArray(inElementArray), mFreeList(), mAllocCount(0)
+        xallocator_imp::xallocator_imp(alloc_t* allocator, void* inElementArray, u32 inElemSize, u32 inElemAlignment, u32 inMaxNumElements) : mAllocator(allocator), mElementArray(inElementArray), mFreeList(), mAllocCount(0)
         {
             mElemSize = inElemSize;
             mFreeList.init_with_array((xcore::xbyte*)inElementArray, inMaxNumElements * inElemSize, inElemSize, inElemAlignment);
@@ -133,15 +133,15 @@ namespace xcore
             mAllocator->deallocate(this);
         }
 
-        class xiallocator_imp : public xfsadexed
+        class xiallocator_imp : public fsadexed_t
         {
-            xalloc*        mOurAllocator;
+            alloc_t*        mOurAllocator;
             xallocator_imp mAllocator;
 
         public:
             xiallocator_imp();
-            xiallocator_imp(xalloc* allocator, u32 inElemSize, u32 inElemAlignment, u32 inBlockElemCnt);
-            xiallocator_imp(xalloc* allocator, void* mem_block, u32 inElemSize, u32 inElemAlignment, u32 inBlockElemCnt);
+            xiallocator_imp(alloc_t* allocator, u32 inElemSize, u32 inElemAlignment, u32 inBlockElemCnt);
+            xiallocator_imp(alloc_t* allocator, void* mem_block, u32 inElemSize, u32 inElemAlignment, u32 inBlockElemCnt);
 
             virtual const char* name() const { return TARGET_FULL_DESCR_STR " [Allocator, Type=freelist,indexed]"; }
 
@@ -188,13 +188,13 @@ namespace xcore
 
         xiallocator_imp::xiallocator_imp() : mOurAllocator(NULL) {}
 
-        xiallocator_imp::xiallocator_imp(xalloc* allocator, u32 inElemSize, u32 inElemAlignment, u32 inBlockElemCnt) : mOurAllocator(allocator), mAllocator(allocator, inElemSize, inElemAlignment, inBlockElemCnt) {}
+        xiallocator_imp::xiallocator_imp(alloc_t* allocator, u32 inElemSize, u32 inElemAlignment, u32 inBlockElemCnt) : mOurAllocator(allocator), mAllocator(allocator, inElemSize, inElemAlignment, inBlockElemCnt) {}
 
-        xiallocator_imp::xiallocator_imp(xalloc* allocator, void* inElementArray, u32 inElemSize, u32 inElemAlignment, u32 inBlockElemCnt) : mOurAllocator(allocator), mAllocator(allocator, inElementArray, inElemSize, inElemAlignment, inBlockElemCnt) {}
+        xiallocator_imp::xiallocator_imp(alloc_t* allocator, void* inElementArray, u32 inElemSize, u32 inElemAlignment, u32 inBlockElemCnt) : mOurAllocator(allocator), mAllocator(allocator, inElementArray, inElemSize, inElemAlignment, inBlockElemCnt) {}
 
     } // namespace xfreelist_allocator
 
-    xfsadexed* gCreateFreeListAllocator(xalloc* allocator, u32 inSizeOfElement, u32 inElementAlignment, u32 inNumElements)
+    fsadexed_t* gCreateFreeListAllocator(alloc_t* allocator, u32 inSizeOfElement, u32 inElementAlignment, u32 inNumElements)
     {
         void*                                mem        = allocator->allocate(sizeof(xfreelist_allocator::xallocator_imp), X_ALIGNMENT_DEFAULT);
         xfreelist_allocator::xallocator_imp* _allocator = new (mem) xfreelist_allocator::xallocator_imp(allocator, inSizeOfElement, inElementAlignment, inNumElements);
@@ -202,7 +202,7 @@ namespace xcore
         return _allocator;
     }
 
-    xfsadexed* gCreateFreeListAllocator(xalloc* allocator, void* inElementArray, u32 inSizeOfElement, u32 inElementAlignment, u32 inNumElements)
+    fsadexed_t* gCreateFreeListAllocator(alloc_t* allocator, void* inElementArray, u32 inSizeOfElement, u32 inElementAlignment, u32 inNumElements)
     {
         void*                                mem        = allocator->allocate(sizeof(xfreelist_allocator::xallocator_imp), X_ALIGNMENT_DEFAULT);
         xfreelist_allocator::xallocator_imp* _allocator = new (mem) xfreelist_allocator::xallocator_imp(allocator, inElementArray, inSizeOfElement, inElementAlignment, inNumElements);
@@ -210,7 +210,7 @@ namespace xcore
         return _allocator;
     }
 
-    xfsadexed* gCreateFreeListIdxAllocator(xalloc* allocator, u32 inSizeOfElement, u32 inElementAlignment, u32 inNumElements)
+    fsadexed_t* gCreateFreeListIdxAllocator(alloc_t* allocator, u32 inSizeOfElement, u32 inElementAlignment, u32 inNumElements)
     {
         void*                                 mem        = allocator->allocate(sizeof(xfreelist_allocator::xiallocator_imp), X_ALIGNMENT_DEFAULT);
         xfreelist_allocator::xiallocator_imp* _allocator = new (mem) xfreelist_allocator::xiallocator_imp(allocator, inSizeOfElement, inElementAlignment, inNumElements);
@@ -218,7 +218,7 @@ namespace xcore
         return _allocator;
     }
 
-    xfsadexed* gCreateFreeListIdxAllocator(xalloc* allocator, void* inElementArray, u32 inSizeOfElement, u32 inElementAlignment, u32 inNumElements)
+    fsadexed_t* gCreateFreeListIdxAllocator(alloc_t* allocator, void* inElementArray, u32 inSizeOfElement, u32 inElementAlignment, u32 inNumElements)
     {
         void*                                 mem        = allocator->allocate(sizeof(xfreelist_allocator::xiallocator_imp), X_ALIGNMENT_DEFAULT);
         xfreelist_allocator::xiallocator_imp* _allocator = new (mem) xfreelist_allocator::xiallocator_imp(allocator, inElementArray, inSizeOfElement, inElementAlignment, inNumElements);

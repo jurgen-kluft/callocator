@@ -16,7 +16,7 @@ namespace xcore
 			virtual s32	compare(u32 lhs, u32 rhs, u32 tag) const = 0;
 		};
 
-		void		init(u32 tag, xrange_compare* cmp, xalloc* allocator);
+		void		init(u32 tag, xrange_compare* cmp, alloc_t* allocator);
 
 		s32			size() const;
 
@@ -28,7 +28,7 @@ namespace xcore
 		bool		find(void* ptr, u32& handle);
 
 		comparer*	m_cmp;
-		xalloc* 	m_alloc;
+		alloc_t* 	m_alloc;
 		node32*		m_root;
 		u32			m_tag;
 		s32			m_size;

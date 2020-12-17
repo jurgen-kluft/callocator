@@ -6,7 +6,7 @@
 
 using namespace xcore;
 
-extern xcore::xalloc* gSystemAllocator;
+extern xcore::alloc_t* gSystemAllocator;
 
 UNITTEST_SUITE_BEGIN(x_fsadexed_array)
 {
@@ -28,7 +28,7 @@ UNITTEST_SUITE_BEGIN(x_fsadexed_array)
 		UNITTEST_TEST(array)
 		{
 			u32 size = 64;
-			xfsadexed* allocator = gCreateFreeListIdxAllocator(gSystemAllocator, gSystemAllocator, sizeof(object), 8, size);
+			fsadexed_t* allocator = gCreateFreeListIdxAllocator(gSystemAllocator, gSystemAllocator, sizeof(object), 8, size);
 
 			for (u32 i=0; i<size; ++i)
 			{

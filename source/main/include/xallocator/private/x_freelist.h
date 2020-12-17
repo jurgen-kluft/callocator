@@ -14,7 +14,7 @@ namespace xcore
 		const s32			NULL_INDEX = -1;
 
 		void				init_with_array(xbyte* array, u32 array_size, u32 elem_size, u32 elem_alignment);
-		void				init_with_alloc(xalloc* allocator, u32 elem_size, u32 elem_alignment, s32 size);
+		void				init_with_alloc(alloc_t* allocator, u32 elem_size, u32 elem_alignment, s32 size);
 		void				init_list();
 		void				release();
 
@@ -48,7 +48,7 @@ namespace xcore
 
 	private:
 
-		xalloc *			mAllocator;
+		alloc_t *			mAllocator;
 		u32					mElemSize;
 		u32					mElemAlignment;
 		u32 				mUsed;

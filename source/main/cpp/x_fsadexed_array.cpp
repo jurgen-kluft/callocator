@@ -5,13 +5,13 @@
 
 namespace xcore
 {
-    class x_fsadexed_allocator : public xfsadexed
+    class x_fsadexed_allocator : public fsadexed_t
     {
     public:
-        x_fsadexed_allocator(xalloc* allocator) : mAllocator(allocator) {}
+        x_fsadexed_allocator(alloc_t* allocator) : mAllocator(allocator) {}
 
         void initialize(void* object_array, u32 size_of_object, u32 object_alignment, u32 size);
-        void initialize(xalloc* allocator, u32 size_of_object, u32 object_alignment, u32 size);
+        void initialize(alloc_t* allocator, u32 size_of_object, u32 object_alignment, u32 size);
 
         XCORE_CLASS_PLACEMENT_NEW_DELETE
 
@@ -35,10 +35,10 @@ namespace xcore
         virtual void v_release();
 
     private:
-        xalloc* mAllocator;
+        alloc_t* mAllocator;
         u32*    mFreeObjectList;
         u32     mAllocCount;
-        xalloc* mObjectArrayAllocator;
+        alloc_t* mObjectArrayAllocator;
         u32     mObjectArraySize;
         xbyte*  mObjectArray;
         xbyte*  mObjectArrayEnd;
@@ -46,7 +46,7 @@ namespace xcore
         u32     mAlignOfObject;
     };
 
-    xfsadexed* gCreateArrayIdxAllocator(xalloc* allocator, xalloc* object_array_allocator, u32 size_of_object, u32 object_alignment, u32 size)
+    fsadexed_t* gCreateArrayIdxAllocator(alloc_t* allocator, alloc_t* object_array_allocator, u32 size_of_object, u32 object_alignment, u32 size)
     {
         void*                 mem             = allocator->allocate(sizeof(x_fsadexed_allocator), 4);
         x_fsadexed_allocator* array_allocator = new (mem) x_fsadexed_allocator(allocator);
@@ -54,7 +54,7 @@ namespace xcore
         return array_allocator;
     }
 
-    xfsadexed* gCreateArrayIdxAllocator(xalloc* allocator, void* object_array, u32 size_of_object, u32 object_alignment, u32 size)
+    fsadexed_t* gCreateArrayIdxAllocator(alloc_t* allocator, void* object_array, u32 size_of_object, u32 object_alignment, u32 size)
     {
         void*                      mem             = allocator->allocate(sizeof(x_fsadexed_allocator), 4);
         x_fsadexed_allocator* array_allocator = new (mem) x_fsadexed_allocator(allocator);
@@ -87,7 +87,7 @@ namespace xcore
         mObjectArrayEnd       = mObjectArray + (mObjectArraySize * mSizeOfObject);
     }
 
-    void x_fsadexed_allocator::initialize(xalloc* allocator, u32 size_of_object, u32 object_alignment, u32 size)
+    void x_fsadexed_allocator::initialize(alloc_t* allocator, u32 size_of_object, u32 object_alignment, u32 size)
     {
         mFreeObjectList       = NULL;
         mAllocCount           = 0;

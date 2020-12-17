@@ -877,7 +877,7 @@ namespace xcore
     static void default_walker(void* ptr, size_t size, int used, void* user)
     {
         (void)user;
-        xcore::ascii::printf(ascii::crunes("\t%p %s size: %x (%p)\n"), x_va(ptr), x_va(used ? "used" : "free"), x_va((unsigned int)size), x_va(block_from_ptr(ptr)));
+        xcore::ascii::printf(ascii::crunes("\t%p %s size: %x (%p)\n"), va_t(ptr), va_t(used ? "used" : "free"), va_t((unsigned int)size), va_t(block_from_ptr(ptr)));
     }
 
     void tlsf_walk_pool(pool_t pool, tlsf_walker walker, void* user)
@@ -943,16 +943,16 @@ namespace xcore
 
         if (((ptrdiff_t)mem % ALIGN_SIZE) != 0)
         {
-            ascii::printf(ascii::crunes("tlsf_add_pool: Memory must be aligned by %u bytes.\n"), x_va((unsigned int)ALIGN_SIZE));
+            ascii::printf(ascii::crunes("tlsf_add_pool: Memory must be aligned by %u bytes.\n"), va_t((unsigned int)ALIGN_SIZE));
             return 0;
         }
 
         if (pool_bytes < block_size_min || pool_bytes > block_size_max)
         {
 #if defined(TLSF_64BIT)
-            ascii::printf(ascii::crunes("tlsf_add_pool: Memory size must be between 0x%x and 0x%x00 bytes.\n"), x_va((unsigned int)(pool_overhead + block_size_min)), x_va((unsigned int)((pool_overhead + block_size_max) / 256)));
+            ascii::printf(ascii::crunes("tlsf_add_pool: Memory size must be between 0x%x and 0x%x00 bytes.\n"), va_t((unsigned int)(pool_overhead + block_size_min)), va_t((unsigned int)((pool_overhead + block_size_max) / 256)));
 #else
-            ascii::printf(ascii::crunes("tlsf_add_pool: Memory size must be between %u and %u bytes.\n"), x_va((unsigned int)(pool_overhead + block_size_min)), x_va((unsigned int)(pool_overhead + block_size_max)));
+            ascii::printf(ascii::crunes("tlsf_add_pool: Memory size must be between %u and %u bytes.\n"), va_t((unsigned int)(pool_overhead + block_size_min)), va_t((unsigned int)(pool_overhead + block_size_max)));
 #endif
             return 0;
         }
@@ -1018,7 +1018,7 @@ namespace xcore
 
         if (rv)
         {
-            ascii::printf(ascii::crunes("tlsf_create: %x ffs/fls tests failed!\n"), x_va(rv));
+            ascii::printf(ascii::crunes("tlsf_create: %x ffs/fls tests failed!\n"), va_t(rv));
         }
         return rv;
     }
@@ -1035,7 +1035,7 @@ namespace xcore
 
         if (((tlsfptr_t)mem % ALIGN_SIZE) != 0)
         {
-            ascii::printf(ascii::crunes("tlsf_create: Memory must be aligned to %u bytes.\n"), x_va((unsigned int)ALIGN_SIZE));
+            ascii::printf(ascii::crunes("tlsf_create: Memory must be aligned to %u bytes.\n"), va_t((unsigned int)ALIGN_SIZE));
             return 0;
         }
 
@@ -1206,7 +1206,7 @@ namespace xcore
         return p;
     }
 
-    class x_allocator_tlsf : public xalloc
+    class x_allocator_tlsf : public alloc_t
     {
         void*   mPool;
         xsize_t mPoolSize;
@@ -1246,7 +1246,7 @@ namespace xcore
         virtual ~x_allocator_tlsf() {}
     };
 
-    xalloc* gCreateTlsfAllocator(void* mem, u32 memsize)
+    alloc_t* gCreateTlsfAllocator(void* mem, u32 memsize)
     {
         x_allocator_tlsf* allocator = new (mem) x_allocator_tlsf();
 

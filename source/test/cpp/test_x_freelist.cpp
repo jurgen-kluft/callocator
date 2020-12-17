@@ -6,7 +6,7 @@
 
 using namespace xcore;
 
-extern xalloc* gSystemAllocator;
+extern alloc_t* gSystemAllocator;
 
 UNITTEST_SUITE_BEGIN(x_freelist)
 {
