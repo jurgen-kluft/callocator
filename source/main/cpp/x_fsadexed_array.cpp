@@ -36,14 +36,14 @@ namespace xcore
 
     private:
         alloc_t* mAllocator;
-        u32*    mFreeObjectList;
-        u32     mAllocCount;
+        u32*     mFreeObjectList;
+        u32      mAllocCount;
         alloc_t* mObjectArrayAllocator;
-        u32     mObjectArraySize;
-        xbyte*  mObjectArray;
-        xbyte*  mObjectArrayEnd;
-        u32     mSizeOfObject;
-        u32     mAlignOfObject;
+        u32      mObjectArraySize;
+        xbyte*   mObjectArray;
+        xbyte*   mObjectArrayEnd;
+        u32      mSizeOfObject;
+        u32      mAlignOfObject;
     };
 
     fsadexed_t* gCreateArrayIdxAllocator(alloc_t* allocator, alloc_t* object_array_allocator, u32 size_of_object, u32 object_alignment, u32 size)
@@ -56,7 +56,7 @@ namespace xcore
 
     fsadexed_t* gCreateArrayIdxAllocator(alloc_t* allocator, void* object_array, u32 size_of_object, u32 object_alignment, u32 size)
     {
-        void*                      mem             = allocator->allocate(sizeof(x_fsadexed_allocator), 4);
+        void*                 mem             = allocator->allocate(sizeof(x_fsadexed_allocator), 4);
         x_fsadexed_allocator* array_allocator = new (mem) x_fsadexed_allocator(allocator);
         array_allocator->initialize(object_array, size_of_object, object_alignment, size);
         return array_allocator;
@@ -76,7 +76,7 @@ namespace xcore
 
     void x_fsadexed_allocator::initialize(void* object_array, u32 size_of_object, u32 object_alignment, u32 size)
     {
-        object_alignment = xalignUp(object_alignment, 4);
+        object_alignment = xalignUp(object_alignment, (u32)4);
 
         mFreeObjectList       = NULL;
         mAllocCount           = 0;
@@ -95,7 +95,7 @@ namespace xcore
         mObjectArrayAllocator = allocator;
         mObjectArraySize      = size;
 
-        mAlignOfObject = xalignUp(object_alignment, 4);
+        mAlignOfObject = xalignUp(object_alignment, (u32)4);
         mSizeOfObject  = xalignUp(size_of_object, mAlignOfObject);
     }
 

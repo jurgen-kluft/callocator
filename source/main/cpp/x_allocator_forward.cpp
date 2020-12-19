@@ -29,7 +29,7 @@ namespace xcore
         XCORE_CLASS_PLACEMENT_NEW_DELETE
 
     private:
-        alloc_t*                 mAllocator;
+        alloc_t*                mAllocator;
         u32                     mTotalSize;
         xbyte*                  mMemBegin;
         xforwardbin::xallocator mForwardAllocator;

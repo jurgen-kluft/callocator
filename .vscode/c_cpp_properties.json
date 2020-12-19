@@ -3,8 +3,8 @@
         {
             "name": "Mac",
             "includePath": [
-                "Users/obnosis1/dev.go/src/github.com/jurgen-kluft/xbase/source/main/include",
-                "Users/obnosis1/dev.go/src/github.com/jurgen-kluft/xallocator/source/main/include",
+                "/Users/obnosis1/dev.go/src/github.com/jurgen-kluft/xbase/source/main/include",
+                "/Users/obnosis1/dev.go/src/github.com/jurgen-kluft/xallocator/source/main/include",
                 "${workspaceRoot}"
             ],
             "defines": [

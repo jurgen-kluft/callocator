@@ -198,6 +198,8 @@ namespace xcore
 
 #if defined(TARGET_PC)
 #define malloc_getpagesize 65536
+#elif defined(TARGET_MAC)
+#define malloc_getpagesize 65536
 #elif defined(TARGET_WII)
 #define malloc_getpagesize 65536
 #elif defined(TARGET_PSP)
@@ -2192,8 +2194,8 @@ compilers.
 
         if (mem != 0)
         {
-            mchunkptr p = mem2chunk(mem);
-			u32 const size = (is_inuse(p)) ? chunksize(p) - overhead_for(p) : 0;
+            mchunkptr p    = mem2chunk(mem);
+            u32 const size = (is_inuse(p)) ? chunksize(p) - overhead_for(p) : 0;
 
 #if FOOTERS
             mstate fm = get_mstate_for(p);
@@ -2302,7 +2304,7 @@ compilers.
             postaction:
                 POSTACTION(fm);
             }
-			return size;
+            return size;
         }
         return 0;
     }

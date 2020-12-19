@@ -47,13 +47,13 @@ namespace xcore
             virtual void* v_idx2ptr(u32 idx) const;
             virtual void  v_release();
 
-            alloc_t*      allocator() const { return (alloc_t*)mAllocator; }
+            alloc_t* allocator() const { return (alloc_t*)mAllocator; }
 
             ///@name	Placement new/delete
             XCORE_CLASS_PLACEMENT_NEW_DELETE
 
         protected:
-            alloc_t*     mAllocator;
+            alloc_t*    mAllocator;
             void*       mElementArray;
             xfreelist_t mFreeList;
             u32         mElemSize;
@@ -115,7 +115,7 @@ namespace xcore
                 return 0;
             mFreeList.free((xfreelist_t::xitem_t*)inObject);
             --mAllocCount;
-			return mElemSize;
+            return mElemSize;
         }
 
         u32 xallocator_imp::v_ptr2idx(void* p) const
@@ -135,7 +135,7 @@ namespace xcore
 
         class xiallocator_imp : public fsadexed_t
         {
-            alloc_t*        mOurAllocator;
+            alloc_t*       mOurAllocator;
             xallocator_imp mAllocator;
 
         public:
@@ -176,7 +176,7 @@ namespace xcore
                 return p;
             }
 
-            virtual u32 v_ptr2idx(void * p) const
+            virtual u32 v_ptr2idx(void* p) const
             {
                 u32 idx = mAllocator.ptr2idx(p);
                 return idx;

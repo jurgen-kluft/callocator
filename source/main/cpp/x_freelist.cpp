@@ -22,7 +22,7 @@ namespace xcore
     private:
         u32 mIndex;
     };
-	
+
     xfreelist_t::xfreelist_t() : mAllocator(NULL), mElemSize(0), mElemAlignment(0), mUsed(0), mSize(0), mElementArray(0), mFreeList(NULL) {}
 
     void xfreelist_t::init_with_array(xbyte* array, u32 array_size, u32 elem_size, u32 elem_alignment)
@@ -40,8 +40,8 @@ namespace xcore
 
         // Clamp/Guard parameters
         mElemAlignment = mElemAlignment == 0 ? X_ALIGNMENT_DEFAULT : mElemAlignment;
-        mElemAlignment = xalignUp(mElemAlignment, sizeof(void*)); // Align element alignment to the size of a pointer
-        mElemSize      = xalignUp(mElemSize, sizeof(void*));      // Align element size to the size of a pointer
+        mElemAlignment = xalignUp(mElemAlignment, (u32)sizeof(void*)); // Align element alignment to the size of a pointer
+        mElemSize      = xalignUp(mElemSize, (u32)sizeof(void*));      // Align element size to the size of a pointer
         mElemSize      = xalignUp(mElemSize, mElemAlignment);     // Align element size to a multiple of element alignment
         mSize          = (array_size / mElemSize);
 
@@ -64,8 +64,8 @@ namespace xcore
 
         // Clamp/Guard parameters
         mElemAlignment = mElemAlignment == 0 ? X_ALIGNMENT_DEFAULT : mElemAlignment;
-        mElemAlignment = xalignUp(mElemAlignment, sizeof(void*)); // Align element alignment to the size of a pointer
-        mElemSize      = xalignUp(mElemSize, sizeof(void*));      // Align element size to the size of a pointer
+        mElemAlignment = xalignUp(mElemAlignment, (u32)sizeof(void*)); // Align element alignment to the size of a pointer
+        mElemSize      = xalignUp(mElemSize, (u32)sizeof(void*));      // Align element size to the size of a pointer
         mElemSize      = xalignUp(mElemSize, mElemAlignment);     // Align element size to a multiple of element alignment
 
         // Initialize the element array
@@ -115,6 +115,5 @@ namespace xcore
         mFreeList = item;
         --mUsed;
     }
-
 
 }; // namespace xcore

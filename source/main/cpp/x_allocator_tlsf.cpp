@@ -19,6 +19,13 @@
 #define tlsf_decl static
 #endif
 
+#ifdef TARGET_64BIT
+typedef xcore::u64 size_t;
+typedef xcore::u64 ptrdiff_t;
+#else
+typedef xcore::u32 size_t;
+typedef xcore::u32 ptrdiff_t;
+#endif
 /*
 ** Architecture-specific bit manipulation routines.
 **
@@ -217,9 +224,9 @@ namespace xcore
     void   tlsf_remove_pool(tlsf_t tlsf, pool_t pool);
 
     /* malloc/memalign/realloc/free replacements. */
-    void* tlsf_malloc(tlsf_t tlsf, size_t bytes);
-    void* tlsf_memalign(tlsf_t tlsf, size_t align, size_t bytes);
-    void* tlsf_realloc(tlsf_t tlsf, void* ptr, size_t size);
+    void*  tlsf_malloc(tlsf_t tlsf, size_t bytes);
+    void*  tlsf_memalign(tlsf_t tlsf, size_t align, size_t bytes);
+    void*  tlsf_realloc(tlsf_t tlsf, void* ptr, size_t size);
     size_t tlsf_free(tlsf_t tlsf, void* ptr);
 
     /* Returns internal block size, not original request size */
@@ -877,7 +884,8 @@ namespace xcore
     static void default_walker(void* ptr, size_t size, int used, void* user)
     {
         (void)user;
-        xcore::ascii::printf(ascii::crunes("\t%p %s size: %x (%p)\n"), va_t(ptr), va_t(used ? "used" : "free"), va_t((unsigned int)size), va_t(block_from_ptr(ptr)));
+        crunes_t format("\t%p %s size: %x (%p)\n");
+        printf(format, va_t(ptr), va_t(used ? "used" : "free"), va_t((unsigned int)size), va_t(block_from_ptr(ptr)));
     }
 
     void tlsf_walk_pool(pool_t pool, tlsf_walker walker, void* user)
@@ -943,16 +951,19 @@ namespace xcore
 
         if (((ptrdiff_t)mem % ALIGN_SIZE) != 0)
         {
-            ascii::printf(ascii::crunes("tlsf_add_pool: Memory must be aligned by %u bytes.\n"), va_t((unsigned int)ALIGN_SIZE));
+            crunes_t format("tlsf_add_pool: Memory must be aligned by %u bytes.\n");
+            printf(format, va_t((unsigned int)ALIGN_SIZE));
             return 0;
         }
 
         if (pool_bytes < block_size_min || pool_bytes > block_size_max)
         {
 #if defined(TLSF_64BIT)
-            ascii::printf(ascii::crunes("tlsf_add_pool: Memory size must be between 0x%x and 0x%x00 bytes.\n"), va_t((unsigned int)(pool_overhead + block_size_min)), va_t((unsigned int)((pool_overhead + block_size_max) / 256)));
+            crunes_t format("tlsf_add_pool: Memory size must be between 0x%x and 0x%x00 bytes.\n");
+            printf(format, va_t((unsigned int)(pool_overhead + block_size_min)), va_t((unsigned int)((pool_overhead + block_size_max) / 256)));
 #else
-            ascii::printf(ascii::crunes("tlsf_add_pool: Memory size must be between %u and %u bytes.\n"), va_t((unsigned int)(pool_overhead + block_size_min)), va_t((unsigned int)(pool_overhead + block_size_max)));
+            crunes_t format("tlsf_add_pool: Memory size must be between %u and %u bytes.\n");
+            printf(format, va_t((unsigned int)(pool_overhead + block_size_min)), va_t((unsigned int)(pool_overhead + block_size_max)));
 #endif
             return 0;
         }
@@ -1035,7 +1046,8 @@ namespace xcore
 
         if (((tlsfptr_t)mem % ALIGN_SIZE) != 0)
         {
-            ascii::printf(ascii::crunes("tlsf_create: Memory must be aligned to %u bytes.\n"), va_t((unsigned int)ALIGN_SIZE));
+            crunes_t format("tlsf_create: Memory must be aligned to %u bytes.\n");
+            printf(format, va_t((unsigned int)ALIGN_SIZE));
             return 0;
         }
 
@@ -1131,7 +1143,7 @@ namespace xcore
             block = block_merge_prev(control, block);
             block = block_merge_next(control, block);
             block_insert(control, block);
-			return cursize;
+            return cursize;
         }
     }
 
@@ -1227,7 +1239,7 @@ namespace xcore
         {
             if (ptr != NULL)
                 return (u32)tlsf_free(mPool, ptr);
-			return 0;
+            return 0;
         }
 
         virtual void v_release()
