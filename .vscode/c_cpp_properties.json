@@ -4,6 +4,7 @@
             "name": "Mac",
             "includePath": [
                 "/Users/obnosis1/dev.go/src/github.com/jurgen-kluft/xbase/source/main/include",
+                "/Users/obnosis1/dev.go/src/github.com/jurgen-kluft/xunittest/source/main/include",
                 "/Users/obnosis1/dev.go/src/github.com/jurgen-kluft/xallocator/source/main/include",
                 "${workspaceRoot}"
             ],
@@ -11,7 +12,7 @@
                 "TARGET_MAC_DEV_DEBUG"
             ],
             "macFrameworkPath": [
-                "/Library/Developer/CommandLineTools/SDKs/MacOSX10.14.sdk/System/Library/Frameworks"
+                "/Library/Developer/CommandLineTools/SDKs/MacOSX10.15.sdk/System/Library/Frameworks"
             ],
             "compilerPath": "/usr/bin/clang",
             "cStandard": "c11",
