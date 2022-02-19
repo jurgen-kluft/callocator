@@ -19,7 +19,6 @@ tags
 !*.build
 
 !*.go
-!*.lua
 
 !*.cs
 !*.csproj
