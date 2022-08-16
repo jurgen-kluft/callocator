@@ -6,7 +6,7 @@
 
 #include "xallocator/private/x_forwardbin.h"
 
-namespace xcore
+namespace ncore
 {
     namespace xforwardbin
     {
@@ -97,7 +97,7 @@ namespace xcore
         //==============================================================================
         //==============================================================================
 
-        xallocator::xallocator() : mMemBegin(NULL), mMemEnd(NULL), mHead(NULL), mNumAllocations(0) {}
+        xallocator::xallocator() : mMemBegin(nullptr), mMemEnd(nullptr), mHead(nullptr), mNumAllocations(0) {}
 
         inline static void gIsValidChunk(chunk const* begin, chunk const* end, chunk const* c) { ASSERT(c->isValid() && c->inRange(begin, end)); }
 
@@ -108,10 +108,10 @@ namespace xcore
             // that we are trying to avoid by doing this.
 
             mBegin = (chunk*)mMemBegin;
-            mEnd   = (chunk*)((xbyte*)mMemEnd - sizeof(chunk));
-            mHead  = (chunk*)((xbyte*)mMemBegin + sizeof(chunk));
+            mEnd   = (chunk*)((u8*)mMemEnd - sizeof(chunk));
+            mHead  = (chunk*)((u8*)mMemBegin + sizeof(chunk));
 
-            u32 const free_mem_size = (u32)((xbyte*)mEnd - ((xbyte*)mHead + sizeof(chunk)));
+            u32 const free_mem_size = (u32)((u8*)mEnd - ((u8*)mHead + sizeof(chunk)));
 
             mBegin->initialize(mEnd, mHead, 0, chunk::CHUNK_MAGIC_BEGIN);
             mHead->initialize(mBegin, mEnd, free_mem_size, chunk::CHUNK_MAGIC_HEAD);
@@ -124,7 +124,7 @@ namespace xcore
             mNumAllocations = 0;
         }
 
-        void xallocator::init(xbyte* mem_begin, xbyte* mem_end)
+        void xallocator::init(u8* mem_begin, u8* mem_end)
         {
             mMemBegin = mem_begin;
             mMemEnd   = mem_end;
@@ -146,12 +146,12 @@ namespace xcore
             chunk* next = c->getNext();
             chunk* prev = c->getPrev();
 
-            xbyte* cc = (xbyte*)c;
+            u8* cc = (u8*)c;
             c         = (chunk*)(cc + num_bytes_to_move);
             if (move == FORWARD)
             {
-                xbyte* dst = cc + num_bytes_to_move + sizeof(chunk);
-                xbyte* src = cc + sizeof(chunk);
+                u8* dst = cc + num_bytes_to_move + sizeof(chunk);
+                u8* src = cc + sizeof(chunk);
                 while (src != cc)
                     *--dst = *--src;
                 c->subSize(num_bytes_to_move);
@@ -159,8 +159,8 @@ namespace xcore
             }
             else if (move == BACKWARD)
             {
-                xbyte* dst = cc - num_bytes_to_move;
-                xbyte* src = cc;
+                u8* dst = cc - num_bytes_to_move;
+                u8* src = cc;
                 while (dst != cc)
                     *dst++ = *src++;
                 c->addSize(num_bytes_to_move);
@@ -178,24 +178,24 @@ namespace xcore
             return c;
         }
 
-        inline static u32 gAlignPtr(xbyte* ptr, u32 alignment, xbyte*& outPtr)
+        inline static u32 gAlignPtr(u8* ptr, u32 alignment, u8*& outPtr)
         {
-            u32 const diff = (alignment - ((uptr)ptr & (alignment - 1))) & (alignment - 1);
+            u32 const diff = (alignment - ((ptr_t)ptr & (alignment - 1))) & (alignment - 1);
             outPtr         = ptr + diff;
             return diff;
         }
 
-        xbyte* xallocator::allocate(u32 size, u32 alignment)
+        u8* xallocator::allocate(u32 size, u32 alignment)
         {
             // do we have to align up ?
             size = xalignUp(size, (u32)4);
 
-            xbyte* alloc_address = NULL;
+            u8* alloc_address = nullptr;
             while (true)
             {
                 if (size < mHead->getSize())
                 {
-                    u32 const diff = gAlignPtr((xbyte*)mHead + sizeof(chunk), alignment, alloc_address);
+                    u32 const diff = gAlignPtr((u8*)mHead + sizeof(chunk), alignment, alloc_address);
 
                     // Check if we still can fulfill this request after alignment
                     if (((diff + sizeof(chunk)) < mHead->getSize()) && size <= (mHead->getSize() - (diff + sizeof(chunk))))
@@ -203,10 +203,10 @@ namespace xcore
                         // Move chunk structure up with @diff bytes. This will also fix the chunk
                         // data so that the linking and sizes are correct.
                         chunk* c = move_chunk(mBegin, mEnd, mHead, diff, FORWARD);
-                        mHead    = NULL;
+                        mHead    = nullptr;
 
                         // Construct the new head after the allocated chunk
-                        chunk* head = (chunk*)((xbyte*)alloc_address + size);
+                        chunk* head = (chunk*)((u8*)alloc_address + size);
                         head->initialize(c, c->getNext(), c->getSize() - size - sizeof(chunk), chunk::CHUNK_MAGIC_HEAD);
                         gIsValidChunk(mBegin, mEnd, head);
 
@@ -220,7 +220,7 @@ namespace xcore
                     }
                     else
                     {
-                        alloc_address = NULL;
+                        alloc_address = nullptr;
                     }
                     break;
                 }
@@ -238,11 +238,11 @@ namespace xcore
                     {
                         // Alignment might still pose a risk in fulfilling this request
                         chunk*    head = mBegin + 1;
-                        u32 const diff = gAlignPtr((xbyte*)head + sizeof(chunk), alignment, alloc_address);
+                        u32 const diff = gAlignPtr((u8*)head + sizeof(chunk), alignment, alloc_address);
                         if ((diff + sizeof(chunk)) < mBegin->getSize() && size <= (mBegin->getSize() - (diff + sizeof(chunk))))
                         {
                             // Move head by 'diff' number of bytes
-                            head = (chunk*)((xbyte*)head + diff);
+                            head = (chunk*)((u8*)head + diff);
 
                             // Configure 'head' and set size of mBegin to '0'
                             head->initialize(mBegin, mBegin->getNext(), mBegin->getSize() - (diff + sizeof(chunk)), chunk::CHUNK_MAGIC_HEAD);
@@ -256,7 +256,7 @@ namespace xcore
                             mHead = head;
 
                             // --> Stay in the while loop
-                            alloc_address = NULL;
+                            alloc_address = nullptr;
                         }
                     }
                     else
@@ -276,14 +276,14 @@ namespace xcore
 
         u32 xallocator::get_size(void* p) const
         {
-            chunk const* c = (chunk const*)((xbyte*)p - sizeof(chunk));
+            chunk const* c = (chunk const*)((u8*)p - sizeof(chunk));
             ASSERT(c->isValid());
             return c->getSize();
         }
 
         u32 xallocator::deallocate(void* p)
         {
-            if (p == NULL)
+            if (p == nullptr)
                 return 0;
 
             // Deallocate will mark a chunk as is_used = 0
@@ -299,7 +299,7 @@ namespace xcore
             //}
             // else
             {
-                chunk* c = (chunk*)((uptr)p - sizeof(chunk));
+                chunk* c = (chunk*)((ptr_t)p - sizeof(chunk));
                 gIsValidChunk(mBegin, mEnd, c);
 
                 // Coalesce (unite) chunks can only happen when:
@@ -309,7 +309,7 @@ namespace xcore
 
                 // First mark this chunk as free
                 c->merge(mHead); // After this call 'c' is invalid!
-                c = NULL;
+                c = nullptr;
 
                 // Do check if the previous chunk of Head is Begin.
                 // If so check if Begin has some size(), if so merge
@@ -331,4 +331,4 @@ namespace xcore
         }
 
     } // namespace xforwardbin
-};    // namespace xcore
+};    // namespace ncore

@@ -4,7 +4,7 @@
 #ifdef USE_PRAGMA_ONCE
 #pragma once
 #endif
-namespace xcore
+namespace ncore
 {
     /// Forward declares
     class alloc_t;
@@ -12,6 +12,6 @@ namespace xcore
     /// A custom allocator; Doug Lea malloc
     extern alloc_t* gCreateDlAllocator(void* mem, u32 memsize);
 
-}; // namespace xcore
+}; // namespace ncore
 
 #endif /// __X_DL_ALLOCATOR_H__

@@ -4,9 +4,9 @@
 
 #include "xunittest/xunittest.h"
 
-using namespace xcore;
+using namespace ncore;
 
-extern xcore::alloc_t* gSystemAllocator;
+extern ncore::alloc_t* gSystemAllocator;
 
 UNITTEST_SUITE_BEGIN(x_fsadexed_array)
 {

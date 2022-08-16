@@ -20,11 +20,11 @@
 #endif
 
 #ifdef TARGET_64BIT
-typedef xcore::u64 size_t;
-typedef xcore::u64 ptrdiff_t;
+typedef ncore::u64 size_t;
+typedef ncore::u64 ptrdiff_t;
 #else
-typedef xcore::u32 size_t;
-typedef xcore::u32 ptrdiff_t;
+typedef ncore::u32 size_t;
+typedef ncore::u32 ptrdiff_t;
 #endif
 /*
 ** Architecture-specific bit manipulation routines.
@@ -205,7 +205,7 @@ tlsf_decl int tlsf_fls_sizet(size_t size)
 
 #undef tlsf_decl
 
-namespace xcore
+namespace ncore
 {
 
     /* tlsf_t: a TLSF structure. Can contain 1 to N pools. */
@@ -1132,7 +1132,7 @@ namespace xcore
 
     size_t tlsf_free(tlsf_t tlsf, void* ptr)
     {
-        /* Don't attempt to free a NULL pointer. */
+        /* Don't attempt to free a nullptr pointer. */
         if (ptr)
         {
             control_t*      control = tlsf_cast(control_t*, tlsf);
@@ -1170,7 +1170,7 @@ namespace xcore
         {
             tlsf_free(tlsf, ptr);
         }
-        /* Requests with NULL pointers are treated as malloc. */
+        /* Requests with nullptr pointers are treated as malloc. */
         else if (!ptr)
         {
             p = tlsf_malloc(tlsf, size);
@@ -1221,7 +1221,7 @@ namespace xcore
     class x_allocator_tlsf : public alloc_t
     {
         void*   mPool;
-        xsize_t mPoolSize;
+        uint_t mPoolSize;
 
     public:
         virtual const char* name() const { return TARGET_FULL_DESCR_STR " TLSF allocator"; }
@@ -1237,7 +1237,7 @@ namespace xcore
 
         virtual u32 v_deallocate(void* ptr)
         {
-            if (ptr != NULL)
+            if (ptr != nullptr)
                 return (u32)tlsf_free(mPool, ptr);
             return 0;
         }
@@ -1245,12 +1245,12 @@ namespace xcore
         virtual void v_release()
         {
             tlsf_destroy(mPool);
-            mPool     = NULL;
+            mPool     = nullptr;
             mPoolSize = 0;
         }
 
-        void* operator new(xsize_t num_bytes) { return NULL; }
-        void* operator new(xsize_t num_bytes, void* mem) { return mem; }
+        void* operator new(uint_t num_bytes) { return nullptr; }
+        void* operator new(uint_t num_bytes, void* mem) { return mem; }
         void  operator delete(void* pMem) {}
         void  operator delete(void* pMem, void*) {}
 
@@ -1269,4 +1269,4 @@ namespace xcore
         return allocator;
     }
 
-}; // namespace xcore
+}; // namespace ncore

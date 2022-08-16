@@ -4,7 +4,7 @@
 #ifdef USE_PRAGMA_ONCE 
 #pragma once 
 #endif
-namespace xcore
+namespace ncore
 {
 	/// Forward declares
 	class alloc_t;

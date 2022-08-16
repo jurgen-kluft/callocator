@@ -4,7 +4,7 @@
 
 #include "xunittest/xunittest.h"
 
-using namespace xcore;
+using namespace ncore;
 
 extern alloc_t* gSystemAllocator;
 

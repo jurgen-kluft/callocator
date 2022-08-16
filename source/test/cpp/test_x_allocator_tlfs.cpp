@@ -3,7 +3,7 @@
 
 #include "xunittest/xunittest.h"
 
-using namespace xcore;
+using namespace ncore;
 
 extern alloc_t* gSystemAllocator;
 
@@ -28,7 +28,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_tlfs)
 		{
 			gCustomAllocator->release();
 			gSystemAllocator->deallocate(gBlock);
-			gBlock = NULL;
+			gBlock = nullptr;
 			gBlockSize = 0;
 		}
 

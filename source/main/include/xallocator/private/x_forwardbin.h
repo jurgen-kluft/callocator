@@ -11,7 +11,7 @@
 //==============================================================================
 // xCore namespace
 //==============================================================================
-namespace xcore
+namespace ncore
 {
 	namespace xforwardbin
 	{
@@ -27,16 +27,16 @@ namespace xcore
 		{
 								xallocator();
 
-			void				init(xbyte* mem_begin, xbyte* mem_end);
+			void				init(u8* mem_begin, u8* mem_end);
 			void				reset();
 
-			xbyte*				allocate(u32 size, u32 alignment);
+			u8*				allocate(u32 size, u32 alignment);
 			u32					get_size(void* p) const;
 			u32  				deallocate(void* p);
 
 		private:
-			xbyte*				mMemBegin;
-			xbyte*				mMemEnd;
+			u8*				mMemBegin;
+			u8*				mMemEnd;
 			chunk*				mBegin;
 			chunk*				mEnd;
 			chunk*				mHead;

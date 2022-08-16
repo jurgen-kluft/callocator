@@ -5,7 +5,7 @@
 #pragma once
 #endif
 
-namespace xcore
+namespace ncore
 {
     /// Forward declares
     class alloc_t;
@@ -13,6 +13,6 @@ namespace xcore
     /// A custom allocator; 'Two-Level Segregate Fit' allocator
     extern alloc_t* gCreateTlsfAllocator(void* mem, u32 memsize);
 
-}; // namespace xcore
+}; // namespace ncore
 
 #endif /// __X_TLSF_ALLOCATOR_H__

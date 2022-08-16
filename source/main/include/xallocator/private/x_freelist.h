@@ -5,7 +5,7 @@
 #pragma once 
 #endif
 
-namespace xcore
+namespace ncore
 {
 	struct xfreelist_t
 	{
@@ -13,7 +13,7 @@ namespace xcore
 
 		const s32			NULL_INDEX = -1;
 
-		void				init_with_array(xbyte* array, u32 array_size, u32 elem_size, u32 elem_alignment);
+		void				init_with_array(u8* array, u32 array_size, u32 elem_size, u32 elem_alignment);
 		void				init_with_alloc(alloc_t* allocator, u32 elem_size, u32 elem_alignment, s32 size);
 		void				init_list();
 		void				release();
@@ -30,14 +30,14 @@ namespace xcore
 		inline xitem_t*		ptr_of(s32 index) const
 		{
 			if (index == NULL_INDEX)
-				return NULL;
+				return nullptr;
 			return (xitem_t*)(mElementArray + (index * mElemSize));
 		}
 		inline s32			idx_of(xitem_t const* element) const
 		{
-			if (element == NULL)
+			if (element == nullptr)
 				return NULL_INDEX;
-			s32 idx = ((s32)((xbyte const*)element - (xbyte const*)mElementArray)) / (s32)mElemSize;
+			s32 idx = ((s32)((u8 const*)element - (u8 const*)mElementArray)) / (s32)mElemSize;
 			if (idx >= 0 && idx < mSize)
 				return idx;
 			return NULL_INDEX;
@@ -53,7 +53,7 @@ namespace xcore
 		u32					mElemAlignment;
 		u32 				mUsed;
 		u32 				mSize;
-		xbyte*				mElementArray;
+		u8*				mElementArray;
 		xitem_t*			mFreeList;
 	};
 

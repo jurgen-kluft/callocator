@@ -4,7 +4,7 @@
 
 #include "xunittest/xunittest.h"
 
-using namespace xcore;
+using namespace ncore;
 
 extern alloc_t* gSystemAllocator;
 
@@ -24,24 +24,24 @@ UNITTEST_SUITE_BEGIN(x_allocator_freelist)
 		{
 			// We only need the lower bits, so 32 or 64 bits is not an issue here
 			u32 bits = (u32)p;
-			return xcore::xisAligned(bits, alignment);
+			return ncore::xisAligned(bits, alignment);
 		}
 
-		static void gFill(void* p, u32 size, xbyte v)
+		static void gFill(void* p, u32 size, u8 v)
 		{
-			xbyte* dst = (xbyte*)p;
-			xbyte* end = (xbyte*)p + size;
+			u8* dst = (u8*)p;
+			u8* end = (u8*)p + size;
 			while (dst < end)
 				*dst++ = v;
 		}
 
-		static bool gTest(void* p, u32 size, xbyte v)
+		static bool gTest(void* p, u32 size, u8 v)
 		{
-			xbyte const* dst = (xbyte*)p;
-			xbyte const* end = (xbyte*)p + size;
+			u8 const* dst = (u8*)p;
+			u8 const* end = (u8*)p + size;
 			while (dst < end)
 			{
-				xbyte const b = *dst++;
+				u8 const b = *dst++;
 				if (b != v)
 					return false;
 			}

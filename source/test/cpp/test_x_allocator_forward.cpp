@@ -3,7 +3,7 @@
 
 #include "xunittest/xunittest.h"
 
-using namespace xcore;
+using namespace ncore;
 
 extern alloc_t* gSystemAllocator;
 
@@ -38,34 +38,34 @@ UNITTEST_SUITE_BEGIN(x_allocator_forward)
 				CHECK_NOT_NULL(mem4);
 				CHECK_NOT_NULL(mem5);
 
-				gCustomAllocator->deallocate(mem4); mem4=NULL;
+				gCustomAllocator->deallocate(mem4); mem4=nullptr;
 
 				void* mem6 = gCustomAllocator->allocate(8, 8);
 				CHECK_NOT_NULL(mem6);
-				gCustomAllocator->deallocate(mem6); mem6=NULL;
+				gCustomAllocator->deallocate(mem6); mem6=nullptr;
 
 				void* mem7 = gCustomAllocator->allocate(2048, 256);
 				void* mem8 = gCustomAllocator->allocate(1024, 256);
 				CHECK_NOT_NULL(mem7);
 				CHECK_NOT_NULL(mem8);
 
-				gCustomAllocator->deallocate(mem1); mem1=NULL;
-				gCustomAllocator->deallocate(mem3); mem3=NULL;
-				gCustomAllocator->deallocate(mem2); mem2=NULL;
+				gCustomAllocator->deallocate(mem1); mem1=nullptr;
+				gCustomAllocator->deallocate(mem3); mem3=nullptr;
+				gCustomAllocator->deallocate(mem2); mem2=nullptr;
 
 				void* mem9 = gCustomAllocator->allocate(16, 8);
 				CHECK_NOT_NULL(mem9);
 
-				gCustomAllocator->deallocate(mem7); mem7=NULL;
-				gCustomAllocator->deallocate(mem5); mem5=NULL;
+				gCustomAllocator->deallocate(mem7); mem7=nullptr;
+				gCustomAllocator->deallocate(mem5); mem5=nullptr;
 
 				// This should wrap around
 				void* mema = gCustomAllocator->allocate(2048, 8);
 				CHECK_NOT_NULL(mema);
 
-				gCustomAllocator->deallocate(mem9); mem9=NULL;
-				gCustomAllocator->deallocate(mem8); mem8=NULL;
-				gCustomAllocator->deallocate(mema); mema=NULL;
+				gCustomAllocator->deallocate(mem9); mem9=nullptr;
+				gCustomAllocator->deallocate(mem8); mem8=nullptr;
+				gCustomAllocator->deallocate(mema); mema=nullptr;
 			}
 
 			gCustomAllocator->release();

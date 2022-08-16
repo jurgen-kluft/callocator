@@ -5,7 +5,7 @@
 #pragma once
 #endif
 
-namespace xcore
+namespace ncore
 {
     namespace fsa_t
     {
@@ -56,7 +56,7 @@ namespace xcore
             void* allocate(void* page_addr, u32 alloc_size)
             {
                 ASSERT(full() == false);
-                u16* node = (u16*)((xbyte*)page_addr + m_head*alloc_size);
+                u16* node = (u16*)((u8*)page_addr + m_head*alloc_size);
                 m_head    = node[0];
                 m_allocs += 1;
                 return (void*)node;
@@ -67,7 +67,7 @@ namespace xcore
             {
                 u16* node = (u16*)alloc_addr;
                 node[0]   = m_head;
-                m_head    = (u16)(((uptr)alloc_addr - (uptr)page_addr) / alloc_size);
+                m_head    = (u16)(((ptr_t)alloc_addr - (ptr_t)page_addr) / alloc_size);
             }
 
             u16 m_allocs; // Number of allocations done on this page
@@ -76,6 +76,6 @@ namespace xcore
 
     }; // namespace fsa_t
 
-}; // namespace xcore
+}; // namespace ncore
 
 #endif /// __X_FSA_H__

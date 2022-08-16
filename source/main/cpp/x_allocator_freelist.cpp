@@ -6,7 +6,7 @@
 
 #include "xallocator/private/x_freelist.h"
 
-namespace xcore
+namespace ncore
 {
     namespace xfreelist_allocator
     {
@@ -65,9 +65,9 @@ namespace xcore
             xallocator_imp& operator=(const xallocator_imp&);
         };
 
-        xallocator_imp::xallocator_imp() : mAllocator(NULL), mElementArray(NULL), mFreeList(), mAllocCount(0) {}
+        xallocator_imp::xallocator_imp() : mAllocator(nullptr), mElementArray(nullptr), mFreeList(), mAllocCount(0) {}
 
-        xallocator_imp::xallocator_imp(alloc_t* allocator, u32 inElemSize, u32 inElemAlignment, u32 inMaxNumElements) : mAllocator(allocator), mElementArray(NULL), mFreeList(), mAllocCount(0)
+        xallocator_imp::xallocator_imp(alloc_t* allocator, u32 inElemSize, u32 inElemAlignment, u32 inMaxNumElements) : mAllocator(allocator), mElementArray(nullptr), mFreeList(), mAllocCount(0)
         {
             mElemSize = inElemSize;
             mFreeList.init_with_alloc(allocator, inElemSize, inElemAlignment, inMaxNumElements);
@@ -76,7 +76,7 @@ namespace xcore
         xallocator_imp::xallocator_imp(alloc_t* allocator, void* inElementArray, u32 inElemSize, u32 inElemAlignment, u32 inMaxNumElements) : mAllocator(allocator), mElementArray(inElementArray), mFreeList(), mAllocCount(0)
         {
             mElemSize = inElemSize;
-            mFreeList.init_with_array((xcore::xbyte*)inElementArray, inMaxNumElements * inElemSize, inElemSize, inElemAlignment);
+            mFreeList.init_with_array((ncore::u8*)inElementArray, inMaxNumElements * inElemSize, inElemSize, inElemAlignment);
         }
 
         xallocator_imp::~xallocator_imp() { ASSERT(mAllocCount == 0); }
@@ -102,8 +102,8 @@ namespace xcore
         void* xallocator_imp::v_allocate()
         {
             ASSERT((u32)mElemSize <= mFreeList.getElemSize());
-            void* p = mFreeList.alloc(); // Will return NULL if no more memory available
-            if (p != NULL)
+            void* p = mFreeList.alloc(); // Will return nullptr if no more memory available
+            if (p != nullptr)
                 ++mAllocCount;
             return p;
         }
@@ -111,7 +111,7 @@ namespace xcore
         u32 xallocator_imp::v_deallocate(void* inObject)
         {
             // Check input parameters
-            if (inObject == NULL)
+            if (inObject == nullptr)
                 return 0;
             mFreeList.free((xfreelist_t::xitem_t*)inObject);
             --mAllocCount;
@@ -121,7 +121,7 @@ namespace xcore
         u32 xallocator_imp::v_ptr2idx(void* p) const
         {
             // Check input parameters
-            ASSERT(p != NULL);
+            ASSERT(p != nullptr);
             return mFreeList.idx_of((xfreelist_t::xitem_t*)p);
         }
 
@@ -186,7 +186,7 @@ namespace xcore
             XCORE_CLASS_PLACEMENT_NEW_DELETE
         };
 
-        xiallocator_imp::xiallocator_imp() : mOurAllocator(NULL) {}
+        xiallocator_imp::xiallocator_imp() : mOurAllocator(nullptr) {}
 
         xiallocator_imp::xiallocator_imp(alloc_t* allocator, u32 inElemSize, u32 inElemAlignment, u32 inBlockElemCnt) : mOurAllocator(allocator), mAllocator(allocator, inElemSize, inElemAlignment, inBlockElemCnt) {}
 
@@ -225,4 +225,4 @@ namespace xcore
         _allocator->init();
         return _allocator;
     }
-}; // namespace xcore
+}; // namespace ncore

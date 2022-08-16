@@ -879,7 +879,7 @@ void* tlsf_memalign(tlsf_pool tlsf, size_t align, size_t size)
 
 void tlsf_free(tlsf_pool tlsf, void* ptr)
 {
-	/* Don't attempt to free a NULL pointer. */
+	/* Don't attempt to free a nullptr pointer. */
 	if (ptr)
 	{
 		pool_t* pool = tlsf_cast(pool_t*, tlsf);
@@ -914,7 +914,7 @@ void* tlsf_realloc(tlsf_pool tlsf, void* ptr, size_t size)
 	{
 		tlsf_free(tlsf, ptr);
 	}
-	/* Requests with NULL pointers are treated as malloc. */
+	/* Requests with nullptr pointers are treated as malloc. */
 	else if (!ptr)
 	{
 		p = tlsf_malloc(tlsf, size);

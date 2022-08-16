@@ -6,7 +6,7 @@
 
 #include "xallocator/private/x_freelist.h"
 
-namespace xcore
+namespace ncore
 {
     /**
     @brief      Fixed size type, element
@@ -23,9 +23,9 @@ namespace xcore
         u32 mIndex;
     };
 
-    xfreelist_t::xfreelist_t() : mAllocator(NULL), mElemSize(0), mElemAlignment(0), mUsed(0), mSize(0), mElementArray(0), mFreeList(NULL) {}
+    xfreelist_t::xfreelist_t() : mAllocator(nullptr), mElemSize(0), mElemAlignment(0), mUsed(0), mSize(0), mElementArray(0), mFreeList(nullptr) {}
 
-    void xfreelist_t::init_with_array(xbyte* array, u32 array_size, u32 elem_size, u32 elem_alignment)
+    void xfreelist_t::init_with_array(u8* array, u32 array_size, u32 elem_size, u32 elem_alignment)
     {
         // Check parameters
         ASSERT(mElemSize >= sizeof(void*));
@@ -69,7 +69,7 @@ namespace xcore
         mElemSize      = xalignUp(mElemSize, mElemAlignment);     // Align element size to a multiple of element alignment
 
         // Initialize the element array
-        mElementArray = (xbyte*)allocator->allocate(mElemSize * mSize, mElemAlignment);
+        mElementArray = (u8*)allocator->allocate(mElemSize * mSize, mElemAlignment);
 
         init_list();
     }
@@ -95,13 +95,13 @@ namespace xcore
             e->setNext(this, n);
         }
         xitem_t* last = ptr_of(size() - 1);
-        last->setNext(this, NULL);
+        last->setNext(this, nullptr);
     }
 
     xfreelist_t::xitem_t* xfreelist_t::alloc()
     {
         xitem_t* current = mFreeList;
-        if (current != NULL)
+        if (current != nullptr)
         {
             mFreeList = current->getNext(this);
             mUsed++;
@@ -116,4 +116,4 @@ namespace xcore
         --mUsed;
     }
 
-}; // namespace xcore
+}; // namespace ncore

@@ -3,7 +3,7 @@
 #include "xbase/x_allocator.h"
 #include "xbase/x_memory.h"
 
-namespace xcore
+namespace ncore
 {
     class x_fsadexed_allocator : public fsadexed_t
     {
@@ -40,8 +40,8 @@ namespace xcore
         u32      mAllocCount;
         alloc_t* mObjectArrayAllocator;
         u32      mObjectArraySize;
-        xbyte*   mObjectArray;
-        xbyte*   mObjectArrayEnd;
+        u8*   mObjectArray;
+        u8*   mObjectArrayEnd;
         u32      mSizeOfObject;
         u32      mAlignOfObject;
     };
@@ -78,20 +78,20 @@ namespace xcore
     {
         object_alignment = xalignUp(object_alignment, (u32)4);
 
-        mFreeObjectList       = NULL;
+        mFreeObjectList       = nullptr;
         mAllocCount           = 0;
-        mObjectArrayAllocator = NULL;
+        mObjectArrayAllocator = nullptr;
         mObjectArraySize      = size;
         mSizeOfObject         = xalignUp(size_of_object, object_alignment);
-        mObjectArray          = (xbyte*)object_array;
+        mObjectArray          = (u8*)object_array;
         mObjectArrayEnd       = mObjectArray + (mObjectArraySize * mSizeOfObject);
     }
 
     void x_fsadexed_allocator::initialize(alloc_t* allocator, u32 size_of_object, u32 object_alignment, u32 size)
     {
-        mFreeObjectList       = NULL;
+        mFreeObjectList       = nullptr;
         mAllocCount           = 0;
-        mObjectArray          = NULL;
+        mObjectArray          = nullptr;
         mObjectArrayAllocator = allocator;
         mObjectArraySize      = size;
 
@@ -103,9 +103,9 @@ namespace xcore
     {
         clear();
 
-        if (mObjectArray == NULL)
+        if (mObjectArray == nullptr)
         {
-            mObjectArray    = (xbyte*)mObjectArrayAllocator->allocate(mSizeOfObject * mObjectArraySize, mAlignOfObject);
+            mObjectArray    = (u8*)mObjectArrayAllocator->allocate(mSizeOfObject * mObjectArraySize, mAlignOfObject);
             mObjectArrayEnd = mObjectArray + (mObjectArraySize * mSizeOfObject);
         }
         init_freelist();
@@ -114,36 +114,36 @@ namespace xcore
     void x_fsadexed_allocator::clear()
     {
         ASSERT(mAllocCount == 0);
-        if (mObjectArrayAllocator != NULL)
+        if (mObjectArrayAllocator != nullptr)
         {
-            if (mObjectArray != NULL)
+            if (mObjectArray != nullptr)
             {
                 mObjectArrayAllocator->deallocate(mObjectArray);
-                mObjectArray    = NULL;
-                mObjectArrayEnd = NULL;
+                mObjectArray    = nullptr;
+                mObjectArrayEnd = nullptr;
             }
         }
 
-        mFreeObjectList = NULL;
+        mFreeObjectList = nullptr;
     }
 
     void* x_fsadexed_allocator::v_allocate()
     {
         void* p = nullptr;
-        if (mFreeObjectList == NULL)
+        if (mFreeObjectList == nullptr)
         {
-            p = NULL;
+            p = nullptr;
             return p;
         }
 
-        u32 idx = (u32)((uptr)mFreeObjectList - (uptr)mObjectArray) / mSizeOfObject;
+        u32 idx = (u32)((ptr_t)mFreeObjectList - (ptr_t)mObjectArray) / mSizeOfObject;
         p       = (void*)mFreeObjectList;
 
         u32 next_object = *mFreeObjectList;
         if (next_object != NILL_IDX)
-            mFreeObjectList = (u32*)((uptr)mObjectArray + (next_object * mSizeOfObject));
+            mFreeObjectList = (u32*)((ptr_t)mObjectArray + (next_object * mSizeOfObject));
         else
-            mFreeObjectList = NULL;
+            mFreeObjectList = nullptr;
 
         ++mAllocCount;
         return p;
@@ -165,18 +165,18 @@ namespace xcore
     void* x_fsadexed_allocator::v_idx2ptr(u32 idx) const
     {
         if (idx == NILL_IDX)
-            return NULL;
-        ASSERT(mObjectArray != NULL && idx < mObjectArraySize);
-        void* p = (void*)((uptr)mObjectArray + (mSizeOfObject * idx));
+            return nullptr;
+        ASSERT(mObjectArray != nullptr && idx < mObjectArraySize);
+        void* p = (void*)((ptr_t)mObjectArray + (mSizeOfObject * idx));
         return p;
     }
 
     u32 x_fsadexed_allocator::v_ptr2idx(void* p) const
     {
-        ASSERT(mObjectArray != NULL && mObjectArrayEnd != NULL);
-        if ((xbyte*)p >= mObjectArray && (xbyte*)p < mObjectArrayEnd)
+        ASSERT(mObjectArray != nullptr && mObjectArrayEnd != nullptr);
+        if ((u8*)p >= mObjectArray && (u8*)p < mObjectArrayEnd)
         {
-            u32 idx = (u32)((uptr)p - (uptr)mObjectArray) / mSizeOfObject;
+            u32 idx = (u32)((ptr_t)p - (ptr_t)mObjectArray) / mSizeOfObject;
             return idx;
         }
         else
@@ -191,4 +191,4 @@ namespace xcore
         this->~x_fsadexed_allocator();
         mAllocator->deallocate(this);
     }
-} // namespace xcore
+} // namespace ncore
