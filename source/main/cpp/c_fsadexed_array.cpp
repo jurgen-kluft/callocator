@@ -1,7 +1,7 @@
-#include "xbase/x_target.h"
-#include "xbase/x_integer.h"
-#include "xbase/x_allocator.h"
-#include "xbase/x_memory.h"
+#include "cbase/c_target.h"
+#include "cbase/c_integer.h"
+#include "cbase/c_allocator.h"
+#include "cbase/c_memory.h"
 
 namespace ncore
 {

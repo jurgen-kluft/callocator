@@ -1,10 +1,9 @@
 package xallocator
 
 import (
+	"github.com/jurgen-kluft/ccode/denv"
 	"github.com/jurgen-kluft/xbase/package"
-	"github.com/jurgen-kluft/xcode/denv"
 	"github.com/jurgen-kluft/xentry/package"
-	"github.com/jurgen-kluft/xunittest/package"
 )
 
 // GetPackage returns the package object of 'xallocator'

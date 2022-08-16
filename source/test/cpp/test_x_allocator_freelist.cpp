@@ -1,8 +1,8 @@
-#include "xbase/x_allocator.h"
-#include "xbase/x_integer.h"
-#include "xallocator/x_fsadexed_array.h"
+#include "cbase/c_allocator.h"
+#include "cbase/c_integer.h"
+#include "callocator/c_fsadexed_array.h"
 
-#include "xunittest/xunittest.h"
+#include "cunittest/xunittest.h"
 
 using namespace ncore;
 

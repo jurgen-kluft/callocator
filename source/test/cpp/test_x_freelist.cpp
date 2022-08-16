@@ -1,8 +1,8 @@
-#include "xbase/x_allocator.h"
-#include "xbase/x_integer.h"
-#include "xallocator/private/x_freelist.h"
+#include "cbase/c_allocator.h"
+#include "cbase/c_integer.h"
+#include "callocator/private/c_freelist.h"
 
-#include "xunittest/xunittest.h"
+#include "cunittest/xunittest.h"
 
 using namespace ncore;
 

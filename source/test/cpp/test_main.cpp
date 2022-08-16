@@ -1,10 +1,10 @@
-#include "xbase/x_base.h"
-#include "xbase/x_allocator.h"
-#include "xbase/x_console.h"
-#include "xbase/x_context.h"
+#include "cbase/c_base.h"
+#include "cbase/c_allocator.h"
+#include "cbase/c_console.h"
+#include "cbase/c_context.h"
 
-#include "xunittest/xunittest.h"
-#include "xunittest/private/ut_ReportAssert.h"
+#include "cunittest/xunittest.h"
+#include "cunittest/private/ut_ReportAssert.h"
 
 UNITTEST_SUITE_LIST(xAllocatorUnitTest);
 UNITTEST_SUITE_DECLARE(xAllocatorUnitTest, x_freelist);
