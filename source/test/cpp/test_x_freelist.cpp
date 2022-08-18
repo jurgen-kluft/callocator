@@ -2,7 +2,7 @@
 #include "cbase/c_integer.h"
 #include "callocator/private/c_freelist.h"
 
-#include "cunittest/xunittest.h"
+#include "cunittest/cunittest.h"
 
 using namespace ncore;
 

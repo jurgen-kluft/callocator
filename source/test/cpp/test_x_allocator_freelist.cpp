@@ -2,7 +2,7 @@
 #include "cbase/c_integer.h"
 #include "callocator/c_fsadexed_array.h"
 
-#include "cunittest/xunittest.h"
+#include "cunittest/cunittest.h"
 
 using namespace ncore;
 
