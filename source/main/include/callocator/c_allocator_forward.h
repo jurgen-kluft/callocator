@@ -1,5 +1,5 @@
-#ifndef __X_FORWARD_ALLOCATOR_H__
-#define __X_FORWARD_ALLOCATOR_H__
+#ifndef __C_FORWARD_ALLOCATOR_H__
+#define __C_FORWARD_ALLOCATOR_H__
 #include "cbase/c_target.h"
 #ifdef USE_PRAGMA_ONCE 
 #pragma once 
@@ -17,5 +17,5 @@ namespace ncore
 
 };
 
-#endif	/// __X_FORWARD_ALLOCATOR_H__
+#endif	/// __C_FORWARD_ALLOCATOR_H__
 

@@ -1,8 +1,8 @@
 //==============================================================================
 //  x_forwardbin.h
 //==============================================================================
-#ifndef __X_ALLOCATOR_FORWARD_BIN_H__
-#define __X_ALLOCATOR_FORWARD_BIN_H__
+#ifndef __C_ALLOCATOR_FORWARD_BIN_H__
+#define __C_ALLOCATOR_FORWARD_BIN_H__
 #include "cbase/c_target.h"
 #ifdef USE_PRAGMA_ONCE 
 #pragma once 
@@ -46,5 +46,5 @@ namespace ncore
 };
 
 
-#endif	/// __X_ALLOCATOR_FORWARD_BIN_H__
+#endif	/// __C_ALLOCATOR_FORWARD_BIN_H__
 

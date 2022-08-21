@@ -1,5 +1,5 @@
-#ifndef __X_ALLOCATOR_RANGES_H__
-#define __X_ALLOCATOR_RANGES_H__
+#ifndef __C_ALLOCATOR_RANGES_H__
+#define __C_ALLOCATOR_RANGES_H__
 #include "cbase/c_target.h"
 #ifdef USE_PRAGMA_ONCE 
 #pragma once 
@@ -35,4 +35,4 @@ namespace ncore
 	};
 };
 
-#endif	/// __X_SORTED_RANGES_H__
+#endif	/// __C_SORTED_RANGES_H__
