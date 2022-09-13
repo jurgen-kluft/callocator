@@ -1196,7 +1196,7 @@ namespace ncore
                 if (p)
                 {
                     const size_t minsize = tlsf_min(cursize, size);
-                    x_memcpy(p, ptr, (u32)minsize);
+                    nmem::memcpy(p, ptr, (u32)minsize);
                     tlsf_free(tlsf, ptr);
                 }
             }

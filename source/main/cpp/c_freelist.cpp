@@ -39,7 +39,7 @@ namespace ncore
         mUsed          = 0;
 
         // Clamp/Guard parameters
-        mElemAlignment = mElemAlignment == 0 ? X_ALIGNMENT_DEFAULT : mElemAlignment;
+        mElemAlignment = mElemAlignment == 0 ? D_ALIGNMENT_DEFAULT : mElemAlignment;
         mElemAlignment = xalignUp(mElemAlignment, (u32)sizeof(void*)); // Align element alignment to the size of a pointer
         mElemSize      = xalignUp(mElemSize, (u32)sizeof(void*));      // Align element size to the size of a pointer
         mElemSize      = xalignUp(mElemSize, mElemAlignment);     // Align element size to a multiple of element alignment
@@ -63,7 +63,7 @@ namespace ncore
         mElemAlignment = elem_alignment;
 
         // Clamp/Guard parameters
-        mElemAlignment = mElemAlignment == 0 ? X_ALIGNMENT_DEFAULT : mElemAlignment;
+        mElemAlignment = mElemAlignment == 0 ? D_ALIGNMENT_DEFAULT : mElemAlignment;
         mElemAlignment = xalignUp(mElemAlignment, (u32)sizeof(void*)); // Align element alignment to the size of a pointer
         mElemSize      = xalignUp(mElemSize, (u32)sizeof(void*));      // Align element size to the size of a pointer
         mElemSize      = xalignUp(mElemSize, mElemAlignment);     // Align element size to a multiple of element alignment

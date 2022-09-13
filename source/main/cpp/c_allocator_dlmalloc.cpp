@@ -1757,7 +1757,7 @@ compilers.
                 if (newmem != 0)
                 {
                     msize_t oc = oldsize - overhead_for(oldp);
-                    x_memcpy(newmem, oldmem, (oc < bytes) ? oc : bytes);
+                    nmem::memcpy(newmem, oldmem, (oc < bytes) ? oc : bytes);
                     __free(oldmem);
                 }
             }

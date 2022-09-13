@@ -196,7 +196,7 @@ namespace ncore
 
     fsadexed_t* gCreateFreeListAllocator(alloc_t* allocator, u32 inSizeOfElement, u32 inElementAlignment, u32 inNumElements)
     {
-        void*                                mem        = allocator->allocate(sizeof(xfreelist_allocator::xallocator_imp), X_ALIGNMENT_DEFAULT);
+        void*                                mem        = allocator->allocate(sizeof(xfreelist_allocator::xallocator_imp), D_ALIGNMENT_DEFAULT);
         xfreelist_allocator::xallocator_imp* _allocator = new (mem) xfreelist_allocator::xallocator_imp(allocator, inSizeOfElement, inElementAlignment, inNumElements);
         _allocator->init();
         return _allocator;
@@ -204,7 +204,7 @@ namespace ncore
 
     fsadexed_t* gCreateFreeListAllocator(alloc_t* allocator, void* inElementArray, u32 inSizeOfElement, u32 inElementAlignment, u32 inNumElements)
     {
-        void*                                mem        = allocator->allocate(sizeof(xfreelist_allocator::xallocator_imp), X_ALIGNMENT_DEFAULT);
+        void*                                mem        = allocator->allocate(sizeof(xfreelist_allocator::xallocator_imp), D_ALIGNMENT_DEFAULT);
         xfreelist_allocator::xallocator_imp* _allocator = new (mem) xfreelist_allocator::xallocator_imp(allocator, inElementArray, inSizeOfElement, inElementAlignment, inNumElements);
         _allocator->init();
         return _allocator;
@@ -212,7 +212,7 @@ namespace ncore
 
     fsadexed_t* gCreateFreeListIdxAllocator(alloc_t* allocator, u32 inSizeOfElement, u32 inElementAlignment, u32 inNumElements)
     {
-        void*                                 mem        = allocator->allocate(sizeof(xfreelist_allocator::xiallocator_imp), X_ALIGNMENT_DEFAULT);
+        void*                                 mem        = allocator->allocate(sizeof(xfreelist_allocator::xiallocator_imp), D_ALIGNMENT_DEFAULT);
         xfreelist_allocator::xiallocator_imp* _allocator = new (mem) xfreelist_allocator::xiallocator_imp(allocator, inSizeOfElement, inElementAlignment, inNumElements);
         _allocator->init();
         return _allocator;
@@ -220,7 +220,7 @@ namespace ncore
 
     fsadexed_t* gCreateFreeListIdxAllocator(alloc_t* allocator, void* inElementArray, u32 inSizeOfElement, u32 inElementAlignment, u32 inNumElements)
     {
-        void*                                 mem        = allocator->allocate(sizeof(xfreelist_allocator::xiallocator_imp), X_ALIGNMENT_DEFAULT);
+        void*                                 mem        = allocator->allocate(sizeof(xfreelist_allocator::xiallocator_imp), D_ALIGNMENT_DEFAULT);
         xfreelist_allocator::xiallocator_imp* _allocator = new (mem) xfreelist_allocator::xiallocator_imp(allocator, inElementArray, inSizeOfElement, inElementAlignment, inNumElements);
         _allocator->init();
         return _allocator;
