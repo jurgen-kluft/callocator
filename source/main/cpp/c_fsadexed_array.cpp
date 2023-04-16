@@ -13,7 +13,7 @@ namespace ncore
         void initialize(void* object_array, u32 size_of_object, u32 object_alignment, u32 size);
         void initialize(alloc_t* allocator, u32 size_of_object, u32 object_alignment, u32 size);
 
-        XCORE_CLASS_PLACEMENT_NEW_DELETE
+        DCORE_CLASS_PLACEMENT_NEW_DELETE
 
     protected:
         enum

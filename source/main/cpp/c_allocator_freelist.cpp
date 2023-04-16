@@ -50,7 +50,7 @@ namespace ncore
             alloc_t* allocator() const { return (alloc_t*)mAllocator; }
 
             ///@name	Placement new/delete
-            XCORE_CLASS_PLACEMENT_NEW_DELETE
+            DCORE_CLASS_PLACEMENT_NEW_DELETE
 
         protected:
             alloc_t*    mAllocator;
@@ -183,7 +183,7 @@ namespace ncore
             }
 
             ///@name	Placement new/delete
-            XCORE_CLASS_PLACEMENT_NEW_DELETE
+            DCORE_CLASS_PLACEMENT_NEW_DELETE
         };
 
         xiallocator_imp::xiallocator_imp() : mOurAllocator(nullptr) {}

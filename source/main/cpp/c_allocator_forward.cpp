@@ -26,7 +26,7 @@ namespace ncore
         virtual void* v_allocate(u32 size, u32 alignment);
         virtual u32   v_deallocate(void* ptr);
 
-        XCORE_CLASS_PLACEMENT_NEW_DELETE
+        DCORE_CLASS_PLACEMENT_NEW_DELETE
 
     private:
         alloc_t*                mAllocator;
@@ -52,7 +52,7 @@ namespace ncore
 
     void* x_allocator_forward::v_allocate(u32 size, u32 alignment)
     {
-        ASSERT(size < X_U32_MAX);
+        ASSERT(size < D_U32_MAX);
         return mForwardAllocator.allocate((u32)size, alignment);
     }
 
