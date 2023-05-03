@@ -3,78 +3,17 @@
         {
             "name": "Mac",
             "includePath": [
-                "/usr/include",
-                "/usr/local/include",
-                "${workspaceRoot}"
+                "${workspaceFolder}/source/main/include",
+                "${workspaceFolder}/source/test/include",
+                "${workspaceFolder}/../cbase/source/main/include",
+                "${workspaceFolder}/../cunittest/source/main/include"
             ],
-            "defines": [],
-            "intelliSenseMode": "clang-x64",
-            "browse": {
-                "path": [
-                    "/usr/include",
-                    "/usr/local/include",
-                    "${workspaceRoot}"
-                ],
-                "limitSymbolsToIncludedHeaders": true,
-                "databaseFilename": ""
-            },
-            "macFrameworkPath": [
-                "/System/Library/Frameworks",
-                "/Library/Frameworks"
-            ]
-        },
-        {
-            "name": "Linux",
-            "includePath": [
-                "/usr/include",
-                "/usr/local/include",
-                "${workspaceRoot}"
-            ],
-            "defines": [],
-            "intelliSenseMode": "clang-x64",
-            "browse": {
-                "path": [
-                    "/usr/include",
-                    "/usr/local/include",
-                    "${workspaceRoot}"
-                ],
-                "limitSymbolsToIncludedHeaders": true,
-                "databaseFilename": ""
-            }
-        },
-        {
-            "name": "Windows 10 x64",
-            "includePath": [
-                "C:/Program Files (x86)/Microsoft Visual Studio/2017/Professional/VC/Tools/MSVC/14.16.27023/include/*",
-                "C:/Program Files (x86)/Microsoft Visual Studio/2017/Professional/VC/Tools/MSVC/14.16.27023/atlmfc/include/*",
-                "C:/Program Files (x86)/Windows Kits/10/Include/10.0.16299.0/um",
-                "C:/Program Files (x86)/Windows Kits/10/Include/10.0.16299.0/ucrt",
-                "C:/Program Files (x86)/Windows Kits/10/Include/10.0.16299.0/shared",
-                "C:/Program Files (x86)/Windows Kits/10/Include/10.0.16299.0/winrt",
-                "${workspaceRoot}",
-                "${workspaceRoot}/../cbase/source/main/include",
-                "${workspaceRoot}/source/main/include"
-            ],
-            "defines": [
-                "_DEBUG",
-                "UNICODE"
-            ],
-            "intelliSenseMode": "msvc-x64",
-            "browse": {
-                "path": [
-                    "C:/Program Files (x86)/Microsoft Visual Studio/2017/Professional/VC/Tools/MSVC/14.16.27023/include/*",
-                    "C:/Program Files (x86)/Microsoft Visual Studio/2017/Professional/VC/Tools/MSVC/14.16.27023/atlmfc/include/*",
-                    "C:/Program Files (x86)/Windows Kits/10/Include/10.0.16299.0/um",
-                    "C:/Program Files (x86)/Windows Kits/10/Include/10.0.16299.0/ucrt",
-                    "C:/Program Files (x86)/Windows Kits/10/Include/10.0.16299.0/shared",
-                    "C:/Program Files (x86)/Windows Kits/10/Include/10.0.16299.0/winrt",
-                    "${workspaceRoot}",
-                    "${workspaceRoot}/../cbase/source/main/include",
-                    "${workspaceRoot}/source/main/include"
-                ],
-                "limitSymbolsToIncludedHeaders": true,
-                "databaseFilename": ""
-            }
+            "defines": [ "TARGET_MAC", "TARGET_DEBUG", "TARGET_DEV"],
+            "macFrameworkPath": [],
+            "compilerPath": "/usr/bin/clang",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "macos-clang-arm64"
         }
     ],
     "version": 4

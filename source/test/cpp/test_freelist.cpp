@@ -1,17 +1,18 @@
 #include "cbase/c_allocator.h"
 #include "cbase/c_integer.h"
 #include "callocator/private/c_freelist.h"
+#include "callocator/test_allocator.h"
 
 #include "cunittest/cunittest.h"
 
 using namespace ncore;
 
-extern alloc_t* gSystemAllocator;
-
 UNITTEST_SUITE_BEGIN(x_freelist)
 {
     UNITTEST_FIXTURE(main)
     {
+		UNITTEST_ALLOCATOR;
+
         UNITTEST_FIXTURE_SETUP()
 		{
 		}
@@ -22,8 +23,8 @@ UNITTEST_SUITE_BEGIN(x_freelist)
 
         UNITTEST_TEST(alloc)
         {
-			xfreelist_t list;
-			list.init_with_alloc(gSystemAllocator, 4, 4, 100);
+			freelist_t list;
+			list.init_with_alloc(Allocator, 4, 4, 100);
 
 			for (s32 i = 0; i < list.size(); ++i)
 			{

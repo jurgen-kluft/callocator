@@ -13,19 +13,19 @@ namespace ncore
     @desc       It implements linked list behavior for free elements in the block.
                 Works on 32-bit systems since we use indexing here instead of pointers.
     **/
-    struct xfreelist_t::xitem_t
+    struct freelist_t::item_t
     {
-        xfreelist_t::xitem_t* getNext(xfreelist_t const* info) { return info->ptr_of(mIndex); }
-        void                  setNext(xfreelist_t const* info, xfreelist_t::xitem_t* next) { mIndex = info->idx_of(next); }
-        void*                 getObject() { return (void*)this; }
+        freelist_t::item_t* getNext(freelist_t const* info) { return info->ptr_of(mIndex); }
+        void                setNext(freelist_t const* info, freelist_t::item_t* next) { mIndex = info->idx_of(next); }
+        void*               getObject() { return (void*)this; }
 
     private:
         u32 mIndex;
     };
 
-    xfreelist_t::xfreelist_t() : mAllocator(nullptr), mElemSize(0), mElemAlignment(0), mUsed(0), mSize(0), mElementArray(0), mFreeList(nullptr) {}
+    freelist_t::freelist_t() : mAllocator(nullptr), mElemSize(0), mElemAlignment(0), mUsed(0), mSize(0), mElementArray(0), mFreeList(nullptr) {}
 
-    void xfreelist_t::init_with_array(u8* array, u32 array_size, u32 elem_size, u32 elem_alignment)
+    void freelist_t::init_with_array(u8* array, u32 array_size, u32 elem_size, u32 elem_alignment)
     {
         // Check parameters
         ASSERT(mElemSize >= sizeof(void*));
@@ -40,15 +40,15 @@ namespace ncore
 
         // Clamp/Guard parameters
         mElemAlignment = mElemAlignment == 0 ? D_ALIGNMENT_DEFAULT : mElemAlignment;
-        mElemAlignment = xalignUp(mElemAlignment, (u32)sizeof(void*)); // Align element alignment to the size of a pointer
-        mElemSize      = xalignUp(mElemSize, (u32)sizeof(void*));      // Align element size to the size of a pointer
-        mElemSize      = xalignUp(mElemSize, mElemAlignment);     // Align element size to a multiple of element alignment
+        mElemAlignment = math::alignUp(mElemAlignment, (u32)sizeof(void*)); // Align element alignment to the size of a pointer
+        mElemSize      = math::alignUp(mElemSize, (u32)sizeof(void*));      // Align element size to the size of a pointer
+        mElemSize      = math::alignUp(mElemSize, mElemAlignment);          // Align element size to a multiple of element alignment
         mSize          = (array_size / mElemSize);
 
         init_list();
     }
 
-    void xfreelist_t::init_with_alloc(alloc_t* allocator, u32 elem_size, u32 elem_alignment, s32 count)
+    void freelist_t::init_with_alloc(alloc_t* allocator, u32 elem_size, u32 elem_alignment, s32 count)
     {
         // Check parameters
         ASSERT(mElemSize >= sizeof(void*));
@@ -64,9 +64,9 @@ namespace ncore
 
         // Clamp/Guard parameters
         mElemAlignment = mElemAlignment == 0 ? D_ALIGNMENT_DEFAULT : mElemAlignment;
-        mElemAlignment = xalignUp(mElemAlignment, (u32)sizeof(void*)); // Align element alignment to the size of a pointer
-        mElemSize      = xalignUp(mElemSize, (u32)sizeof(void*));      // Align element size to the size of a pointer
-        mElemSize      = xalignUp(mElemSize, mElemAlignment);     // Align element size to a multiple of element alignment
+        mElemAlignment = math::alignUp(mElemAlignment, (u32)sizeof(void*)); // Align element alignment to the size of a pointer
+        mElemSize      = math::alignUp(mElemSize, (u32)sizeof(void*));      // Align element size to the size of a pointer
+        mElemSize      = math::alignUp(mElemSize, mElemAlignment);          // Align element size to a multiple of element alignment
 
         // Initialize the element array
         mElementArray = (u8*)allocator->allocate(mElemSize * mSize, mElemAlignment);
@@ -74,7 +74,7 @@ namespace ncore
         init_list();
     }
 
-    void xfreelist_t::release()
+    void freelist_t::release()
     {
         if (mAllocator != nullptr)
         {
@@ -84,23 +84,23 @@ namespace ncore
         }
     }
 
-    void xfreelist_t::init_list()
+    void freelist_t::init_list()
     {
         mUsed     = 0;
         mFreeList = ptr_of(0);
         for (s32 i = 1; i < size(); ++i)
         {
-            xitem_t* e = ptr_of(i - 1);
-            xitem_t* n = ptr_of(i);
+            item_t* e = ptr_of(i - 1);
+            item_t* n = ptr_of(i);
             e->setNext(this, n);
         }
-        xitem_t* last = ptr_of(size() - 1);
+        item_t* last = ptr_of(size() - 1);
         last->setNext(this, nullptr);
     }
 
-    xfreelist_t::xitem_t* xfreelist_t::alloc()
+    freelist_t::item_t* freelist_t::alloc()
     {
-        xitem_t* current = mFreeList;
+        item_t* current = mFreeList;
         if (current != nullptr)
         {
             mFreeList = current->getNext(this);
@@ -109,7 +109,7 @@ namespace ncore
         return current;
     }
 
-    void xfreelist_t::free(xitem_t* item)
+    void freelist_t::free(item_t* item)
     {
         item->setNext(this, mFreeList);
         mFreeList = item;

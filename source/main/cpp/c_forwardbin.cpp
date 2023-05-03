@@ -188,7 +188,7 @@ namespace ncore
         u8* xallocator::allocate(u32 size, u32 alignment)
         {
             // do we have to align up ?
-            size = xalignUp(size, (u32)4);
+            size = math::alignUp(size, (u32)4);
 
             u8* alloc_address = nullptr;
             while (true)

@@ -4,15 +4,8 @@
 #include "cbase/c_context.h"
 
 #include "cunittest/cunittest.h"
-#include "cunittest/private/ut_ReportAssert.h"
 
-UNITTEST_SUITE_LIST(cUnitTest);
-UNITTEST_SUITE_DECLARE(cUnitTest, x_freelist);
-//UNITTEST_SUITE_DECLARE(cUnitTest, x_allocator_dlmalloc);	// Doesn't work on 64-bit systems
-UNITTEST_SUITE_DECLARE(cUnitTest, x_allocator_tlfs);
-UNITTEST_SUITE_DECLARE(cUnitTest, x_allocator_freelist);
-UNITTEST_SUITE_DECLARE(cUnitTest, x_allocator_forward);
-UNITTEST_SUITE_DECLARE(cUnitTest, x_fsadexed_array);
+UNITTEST_SUITE_LIST
 
 namespace ncore
 {
@@ -24,7 +17,7 @@ namespace ncore
 
         virtual bool handle_assert(u32& flags, const char* fileName, s32 lineNumber, const char* exprString, const char* messageString)
         {
-            UnitTest::reportAssert(exprString, fileName, lineNumber);
+            UnitTest::ReportAssert(exprString, fileName, lineNumber);
             NumberOfAsserts++;
             return false;
         }

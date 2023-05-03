@@ -1,17 +1,17 @@
 #include "cbase/c_allocator.h"
 #include "callocator/c_allocator_tlsf.h"
+#include "callocator/test_allocator.h"
 
 #include "cunittest/cunittest.h"
 
 using namespace ncore;
-
-extern alloc_t* gSystemAllocator;
 
 
 UNITTEST_SUITE_BEGIN(x_allocator_tlfs)
 {
     UNITTEST_FIXTURE(main)
     {
+		UNITTEST_ALLOCATOR;
 
 		void*			gBlock;
 		s32				gBlockSize;
@@ -20,14 +20,14 @@ UNITTEST_SUITE_BEGIN(x_allocator_tlfs)
         UNITTEST_FIXTURE_SETUP()
 		{
 			gBlockSize = 4 * 1024 * 1024;
-			gBlock = gSystemAllocator->allocate(gBlockSize, 8);
+			gBlock = Allocator->allocate(gBlockSize, 8);
 			gCustomAllocator = gCreateTlsfAllocator(gBlock, gBlockSize);
 		}
 
         UNITTEST_FIXTURE_TEARDOWN()
 		{
 			gCustomAllocator->release();
-			gSystemAllocator->deallocate(gBlock);
+			Allocator->deallocate(gBlock);
 			gBlock = nullptr;
 			gBlockSize = 0;
 		}

@@ -1,17 +1,19 @@
 #include "cbase/c_target.h"
 #include "cbase/c_allocator.h"
-#include "callocator/c_fsadexed_array.h"
+#include "callocator/c_allocator_dlmalloc.h"
+#include "callocator/c_allocator_freelist.h"
+#include "callocator/test_allocator.h"
 
 #include "cunittest/cunittest.h"
 
 using namespace ncore;
 
-extern ncore::alloc_t* gSystemAllocator;
-
 UNITTEST_SUITE_BEGIN(x_fsadexed_array)
 {
 	UNITTEST_FIXTURE(main)
 	{
+		UNITTEST_ALLOCATOR;
+		
 		UNITTEST_FIXTURE_SETUP()
 		{
 		}
@@ -28,7 +30,7 @@ UNITTEST_SUITE_BEGIN(x_fsadexed_array)
 		UNITTEST_TEST(array)
 		{
 			u32 size = 64;
-			fsadexed_t* allocator = gCreateFreeListIdxAllocator(gSystemAllocator, gSystemAllocator, sizeof(object), 8, size);
+			fsadexed_t* allocator = gCreateFreeListIdxAllocator(Allocator, sizeof(object), 8, size);
 
 			for (u32 i=0; i<size; ++i)
 			{

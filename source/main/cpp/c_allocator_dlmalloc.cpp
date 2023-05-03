@@ -11,7 +11,7 @@
 
 namespace ncore
 {
-    typedef u32 msize_t; ///< Described below */
+    typedef uint_t msize_t; ///< Described below */
 
     struct malloc_chunk
     {
@@ -654,7 +654,7 @@ namespace ncore
 
     s32 xmem_heap_base::__init_mparams()
     {
-        x_memset(&mParams, 0, sizeof(malloc_params));
+        nmem::memset(&mParams, 0, sizeof(malloc_params));
         {
             msize_t magic;
             msize_t psize;
@@ -1493,7 +1493,7 @@ compilers.
         mSysAlloc = nullptr;
         mSysFree  = nullptr;
 
-        x_memset(&mStateData, 0, sizeof(malloc_state));
+        nmem::memset(&mStateData, 0, sizeof(malloc_state));
         mState = &mStateData;
 
         __init_mparams();
@@ -1508,7 +1508,7 @@ compilers.
     /* mstate, give block of memory*/
     void xmem_heap::__manage(void* block, msize_t nb)
     {
-        x_memset(block, 0, nb);
+        nmem::memset(block, 0, nb);
 
         mstate m = mState;
 
@@ -1943,7 +1943,7 @@ compilers.
 
         if (opts & 0x2)
         { /* optionally clear the elements */
-            x_memset((msize_t*)mem, 0, remainder_size - SIZE_T_SIZE - array_size);
+            nmem::memset((msize_t*)mem, 0, remainder_size - SIZE_T_SIZE - array_size);
         }
 
         /* If not provided, allocate the pointer array as final part of chunk */
@@ -2327,7 +2327,7 @@ compilers.
         }
         mem = __alloc(req);
         if (mem != 0 && calloc_must_clear(mem2chunk(mem)))
-            x_memset(mem, 0, req);
+            nmem::memset(mem, 0, req);
         return mem;
     }
 
@@ -2465,7 +2465,7 @@ compilers.
 
         virtual void* v_allocate(u32 size, u32 alignment)
         {
-            if (alignment <= X_MEMALIGN)
+            if (alignment <= MEMALIGN)
                 return mDlMallocHeap.__alloc((msize_t)size);
 
             return mDlMallocHeap.__allocA(alignment, (msize_t)size);
@@ -2490,7 +2490,7 @@ compilers.
     {
         x_allocator_dlmalloc* allocator = new (mem) x_allocator_dlmalloc();
 
-        s32 allocator_class_size = xceilpo2(sizeof(x_allocator_dlmalloc));
+        s32 allocator_class_size = math::ceilpo2(sizeof(x_allocator_dlmalloc));
         mem                      = (void*)((u8*)mem + allocator_class_size);
 
         allocator->init(mem, memsize - allocator_class_size);

@@ -1,17 +1,18 @@
 #include "cbase/c_allocator.h"
 #include "cbase/c_integer.h"
 #include "callocator/c_fsadexed_array.h"
+#include "callocator/test_allocator.h"
 
 #include "cunittest/cunittest.h"
 
 using namespace ncore;
 
-extern alloc_t* gSystemAllocator;
-
 UNITTEST_SUITE_BEGIN(x_allocator_freelist)
 {
     UNITTEST_FIXTURE(main)
     {
+		UNITTEST_ALLOCATOR;
+
         UNITTEST_FIXTURE_SETUP()
 		{
 		}
@@ -23,8 +24,8 @@ UNITTEST_SUITE_BEGIN(x_allocator_freelist)
 		static bool gIsAligned(void* p, u32 alignment)
 		{
 			// We only need the lower bits, so 32 or 64 bits is not an issue here
-			u32 bits = (u32)p;
-			return ncore::xisAligned(bits, alignment);
+			uint_t bits = (uint_t)p;
+			return ncore::math::isAligned(bits, alignment);
 		}
 
 		static void gFill(void* p, u32 size, u8 v)
@@ -51,7 +52,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_freelist)
         UNITTEST_TEST(alloc3_free3)
         {
 			u32 const alignment = 2048;
-			fsadexed_t* alloc = gCreateFreeListAllocator(gSystemAllocator, alignment, alignment, 128);
+			fsadexed_t* alloc = gCreateFreeListAllocator(Allocator, alignment, alignment, 128);
 
 			void* mem1 = alloc->allocate();
 			CHECK_TRUE(gIsAligned(mem1, alignment));
@@ -93,7 +94,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_freelist)
         UNITTEST_TEST(alloc3_free3_idx)
         {
 			u32 const alignment = 2048;
-            fsadexed_t* alloc     = gCreateFreeListIdxAllocator(gSystemAllocator, alignment, alignment, 128);
+            fsadexed_t* alloc     = gCreateFreeListIdxAllocator(Allocator, alignment, alignment, 128);
 
 			void* mem1 = alloc->allocate();
 			CHECK_TRUE(gIsAligned(mem1, alignment));

@@ -5,10 +5,10 @@
 
 namespace ncore
 {
-    class x_fsadexed_allocator : public fsadexed_t
+    class fsadexed_allocator : public fsadexed_t
     {
     public:
-        x_fsadexed_allocator(alloc_t* allocator) : mAllocator(allocator) {}
+        fsadexed_allocator(alloc_t* allocator) : mAllocator(allocator) {}
 
         void initialize(void* object_array, u32 size_of_object, u32 object_alignment, u32 size);
         void initialize(alloc_t* allocator, u32 size_of_object, u32 object_alignment, u32 size);
@@ -48,21 +48,21 @@ namespace ncore
 
     fsadexed_t* gCreateArrayIdxAllocator(alloc_t* allocator, alloc_t* object_array_allocator, u32 size_of_object, u32 object_alignment, u32 size)
     {
-        void*                 mem             = allocator->allocate(sizeof(x_fsadexed_allocator), 4);
-        x_fsadexed_allocator* array_allocator = new (mem) x_fsadexed_allocator(allocator);
+        void*                 mem             = allocator->allocate(sizeof(fsadexed_allocator), 4);
+        fsadexed_allocator* array_allocator = new (mem) fsadexed_allocator(allocator);
         array_allocator->initialize(object_array_allocator, size_of_object, object_alignment, size);
         return array_allocator;
     }
 
     fsadexed_t* gCreateArrayIdxAllocator(alloc_t* allocator, void* object_array, u32 size_of_object, u32 object_alignment, u32 size)
     {
-        void*                 mem             = allocator->allocate(sizeof(x_fsadexed_allocator), 4);
-        x_fsadexed_allocator* array_allocator = new (mem) x_fsadexed_allocator(allocator);
+        void*                 mem             = allocator->allocate(sizeof(fsadexed_allocator), 4);
+        fsadexed_allocator* array_allocator = new (mem) fsadexed_allocator(allocator);
         array_allocator->initialize(object_array, size_of_object, object_alignment, size);
         return array_allocator;
     }
 
-    void x_fsadexed_allocator::init_freelist()
+    void fsadexed_allocator::init_freelist()
     {
         u32* object_array = (u32*)mObjectArray;
         for (u32 i = 1; i < mObjectArraySize; ++i)
@@ -74,20 +74,20 @@ namespace ncore
         mFreeObjectList = (u32*)mObjectArray;
     }
 
-    void x_fsadexed_allocator::initialize(void* object_array, u32 size_of_object, u32 object_alignment, u32 size)
+    void fsadexed_allocator::initialize(void* object_array, u32 size_of_object, u32 object_alignment, u32 size)
     {
-        object_alignment = xalignUp(object_alignment, (u32)4);
+        object_alignment = math::alignUp(object_alignment, (u32)4);
 
         mFreeObjectList       = nullptr;
         mAllocCount           = 0;
         mObjectArrayAllocator = nullptr;
         mObjectArraySize      = size;
-        mSizeOfObject         = xalignUp(size_of_object, object_alignment);
+        mSizeOfObject         = math::alignUp(size_of_object, object_alignment);
         mObjectArray          = (u8*)object_array;
         mObjectArrayEnd       = mObjectArray + (mObjectArraySize * mSizeOfObject);
     }
 
-    void x_fsadexed_allocator::initialize(alloc_t* allocator, u32 size_of_object, u32 object_alignment, u32 size)
+    void fsadexed_allocator::initialize(alloc_t* allocator, u32 size_of_object, u32 object_alignment, u32 size)
     {
         mFreeObjectList       = nullptr;
         mAllocCount           = 0;
@@ -95,11 +95,11 @@ namespace ncore
         mObjectArrayAllocator = allocator;
         mObjectArraySize      = size;
 
-        mAlignOfObject = xalignUp(object_alignment, (u32)4);
-        mSizeOfObject  = xalignUp(size_of_object, mAlignOfObject);
+        mAlignOfObject = math::alignUp(object_alignment, (u32)4);
+        mSizeOfObject  = math::alignUp(size_of_object, mAlignOfObject);
     }
 
-    void x_fsadexed_allocator::init()
+    void fsadexed_allocator::init()
     {
         clear();
 
@@ -111,7 +111,7 @@ namespace ncore
         init_freelist();
     }
 
-    void x_fsadexed_allocator::clear()
+    void fsadexed_allocator::clear()
     {
         ASSERT(mAllocCount == 0);
         if (mObjectArrayAllocator != nullptr)
@@ -127,7 +127,7 @@ namespace ncore
         mFreeObjectList = nullptr;
     }
 
-    void* x_fsadexed_allocator::v_allocate()
+    void* fsadexed_allocator::v_allocate()
     {
         void* p = nullptr;
         if (mFreeObjectList == nullptr)
@@ -149,7 +149,7 @@ namespace ncore
         return p;
     }
 
-    u32 x_fsadexed_allocator::v_deallocate(void* ptr)
+    u32 fsadexed_allocator::v_deallocate(void* ptr)
     {
         u32 idx = ptr2idx(ptr);
         if (idx < mObjectArraySize)
@@ -162,7 +162,7 @@ namespace ncore
         return mSizeOfObject;
     }
 
-    void* x_fsadexed_allocator::v_idx2ptr(u32 idx) const
+    void* fsadexed_allocator::v_idx2ptr(u32 idx) const
     {
         if (idx == NILL_IDX)
             return nullptr;
@@ -171,7 +171,7 @@ namespace ncore
         return p;
     }
 
-    u32 x_fsadexed_allocator::v_ptr2idx(void* p) const
+    u32 fsadexed_allocator::v_ptr2idx(void* p) const
     {
         ASSERT(mObjectArray != nullptr && mObjectArrayEnd != nullptr);
         if ((u8*)p >= mObjectArray && (u8*)p < mObjectArrayEnd)
@@ -185,10 +185,10 @@ namespace ncore
         }
     }
 
-    void x_fsadexed_allocator::v_release()
+    void fsadexed_allocator::v_release()
     {
         clear();
-        this->~x_fsadexed_allocator();
+        this->~fsadexed_allocator();
         mAllocator->deallocate(this);
     }
 } // namespace ncore

@@ -1,16 +1,17 @@
 #include "cbase/c_allocator.h"
 #include "callocator/c_allocator_forward.h"
+#include "callocator/test_allocator.h"
 
 #include "cunittest/cunittest.h"
 
 using namespace ncore;
 
-extern alloc_t* gSystemAllocator;
-
 UNITTEST_SUITE_BEGIN(x_allocator_forward)
 {
 	UNITTEST_FIXTURE(main)
 	{
+		UNITTEST_ALLOCATOR;
+
 		alloc_t*	gCustomAllocator;
 
 		UNITTEST_FIXTURE_SETUP()
@@ -23,7 +24,7 @@ UNITTEST_SUITE_BEGIN(x_allocator_forward)
 
 		UNITTEST_TEST(alloc3_free3)
 		{
-			gCustomAllocator = gCreateForwardAllocator(gSystemAllocator, 32 * 1024);
+			gCustomAllocator = gCreateForwardAllocator(Allocator, 32 * 1024);
 
 			for (s32 i=0; i<12; ++i)
 			{

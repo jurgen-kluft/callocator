@@ -374,7 +374,7 @@ namespace ncore
     static const size_t block_header_overhead = sizeof(size_t);
 
     /* User data starts directly after the size field in a used block. */
-    static const size_t block_start_offset = X_OFFSET_OF(block_header_t, size) + sizeof(size_t);
+    static const size_t block_start_offset = D_OFFSET_OF(block_header_t, size) + sizeof(size_t);
 
     /*
     ** A free block must be large enough to store its header minus the size of
@@ -1029,7 +1029,9 @@ namespace ncore
 
         if (rv)
         {
-            ascii::printf(ascii::crunes("tlsf_create: %x ffs/fls tests failed!\n"), va_t(rv));
+            const char* format_str = "tlsf_create: %x ffs/fls tests failed!\n";
+            ascii::crunes_t format(format_str, ascii::strlen(format_str));
+            printf(format, va_t(rv));
         }
         return rv;
     }
@@ -1145,6 +1147,7 @@ namespace ncore
             block_insert(control, block);
             return cursize;
         }
+        return 0;
     }
 
     /*
@@ -1262,7 +1265,7 @@ namespace ncore
     {
         x_allocator_tlsf* allocator = new (mem) x_allocator_tlsf();
 
-        s32 allocator_class_size = xceilpo2(sizeof(x_allocator_tlsf));
+        s32 allocator_class_size = math::ceilpo2(sizeof(x_allocator_tlsf));
         mem                      = (void*)((u8*)mem + allocator_class_size);
 
         allocator->init(mem, memsize - allocator_class_size);
