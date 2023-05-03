@@ -5,10 +5,6 @@
 
 #include "callocator/c_allocator_dlmalloc.h"
 
-#ifdef TARGET_PS3
-#pragma diag_suppress = no_corresponding_delete
-#endif
-
 namespace ncore
 {
     typedef uint_t msize_t; ///< Described below */
@@ -93,7 +89,7 @@ namespace ncore
     /**
      * A memory heap capable of managing multiple segments (based on dlmalloc)
      */
-    class xmem_heap_base
+    class mem_heap_base_t
     {
     protected:
         malloc_params mParams;
@@ -134,7 +130,7 @@ namespace ncore
     /**
      * A memory heap capable of managing multiple segments (based on dlmalloc)
      */
-    class xmem_heap : public xmem_heap_base
+    class mem_heap_t : public mem_heap_base_t
     {
     public:
         void __initialize();
@@ -652,7 +648,7 @@ namespace ncore
 
     /* ---------------------------- setting malloc_params -------------------------- */
 
-    s32 xmem_heap_base::__init_mparams()
+    s32 mem_heap_base_t::__init_mparams()
     {
         nmem::memset(&mParams, 0, sizeof(malloc_params));
         {
@@ -683,7 +679,7 @@ namespace ncore
             mState->mflags = mParams.default_mflags;
 
             {
-                magic = (msize_t)((msize_t)&mParams ^ (msize_t)0x55555555U);
+                magic = (msize_t)((msize_t)(u64)(void*)&mParams ^ (msize_t)0x55555555U);
                 magic |= (msize_t)8U;  /* ensure nonzero */
                 magic &= ~(msize_t)7U; /* improve chances of fault for bad values */
                 mParams.magic = magic;
@@ -694,7 +690,7 @@ namespace ncore
     }
 
     /* support for mallopt */
-    s32 xmem_heap_base::__change_mparam(s32 param_number, s32 value)
+    s32 mem_heap_base_t::__change_mparam(s32 param_number, s32 value)
     {
         msize_t val;
         ensure_initialization();
@@ -1001,7 +997,7 @@ namespace ncore
 
     /* ----------------------------- statistics ------------------------------ */
 
-    //	void xmem_heap_base::__internal_malloc_stats(xmem_managed_size& stats)
+    //	void mem_heap_base_t::__internal_malloc_stats(xmem_managed_size& stats)
     //	{
     //		mstate m = mState;
     //
@@ -1368,7 +1364,7 @@ compilers.
 #endif /* PROCEED_ON_ERROR */
 
     /* Add a segment to hold a new noncontiguous region */
-    void xmem_heap_base::__add_segment(void* tbase, msize_t tsize, s32 sflags)
+    void mem_heap_base_t::__add_segment(void* tbase, msize_t tsize, s32 sflags)
     {
         mstate m = mState;
 
@@ -1425,7 +1421,7 @@ compilers.
         check_top_chunk(m, m->top);
     }
 
-    msize_t xmem_heap_base::__release_unused_segments(mstate m)
+    msize_t mem_heap_base_t::__release_unused_segments(mstate m)
     {
         msize_t     released = 0;
         int         nsegs    = 0;
@@ -1488,7 +1484,7 @@ compilers.
         Initialize global mstate from a 'given' memory block
     */
 
-    void xmem_heap::__initialize()
+    void mem_heap_t::__initialize()
     {
         mSysAlloc = nullptr;
         mSysFree  = nullptr;
@@ -1499,14 +1495,14 @@ compilers.
         __init_mparams();
     }
 
-    void xmem_heap::__destroy()
+    void mem_heap_t::__destroy()
     {
         // Release all segments that where obtained from the system
         __release_unused_segments(mState);
     }
 
     /* mstate, give block of memory*/
-    void xmem_heap::__manage(void* block, msize_t nb)
+    void mem_heap_t::__manage(void* block, msize_t nb)
     {
         nmem::memset(block, 0, nb);
 
@@ -1551,7 +1547,7 @@ compilers.
     /* ---------------------------- malloc support --------------------------- */
 
     /* allocate a large request from the best fitting chunk in a treebin */
-    void* xmem_heap_base::__tmalloc_large(mstate m, msize_t nb)
+    void* mem_heap_base_t::__tmalloc_large(mstate m, msize_t nb)
     {
         tchunkptr v     = 0;
         msize_t   rsize = -nb; /* Unsigned negation */
@@ -1635,7 +1631,7 @@ compilers.
     }
 
     /* allocate a small request from the best fitting chunk in a treebin */
-    void* xmem_heap_base::__tmalloc_small(mstate m, msize_t nb)
+    void* mem_heap_base_t::__tmalloc_small(mstate m, msize_t nb)
     {
         tchunkptr t, v;
         msize_t   rsize;
@@ -1682,7 +1678,7 @@ compilers.
 
     /* --------------------------- realloc support --------------------------- */
 
-    void* xmem_heap_base::__internal_realloc(mstate m, void* oldmem, msize_t alignment, msize_t bytes)
+    void* mem_heap_base_t::__internal_realloc(mstate m, void* oldmem, msize_t alignment, msize_t bytes)
     {
         if (bytes >= MAX_REQUEST)
         {
@@ -1772,7 +1768,7 @@ compilers.
 
     /* --------------------------- memalign support -------------------------- */
 
-    void* xmem_heap_base::__internal_memalign(msize_t alignment, msize_t bytes)
+    void* mem_heap_base_t::__internal_memalign(msize_t alignment, msize_t bytes)
     {
         mstate m = mState;
 
@@ -1869,7 +1865,7 @@ compilers.
     }
 
     /* ------------------------ comalloc/coalloc support --------------------- */
-    void** xmem_heap_base::__internal_ic_alloc(msize_t n_elements, msize_t* sizes, s32 opts, void* chunks[])
+    void** mem_heap_base_t::__internal_ic_alloc(msize_t n_elements, msize_t* sizes, s32 opts, void* chunks[])
     {
         /*
         This provides common support for independent_X routines, handling
@@ -2004,7 +2000,7 @@ compilers.
 
     /* -------------------------- public routines ---------------------------- */
 
-    void* xmem_heap_base::__alloc(msize_t bytes)
+    void* mem_heap_base_t::__alloc(msize_t bytes)
     {
         /*
         Basic algorithm:
@@ -2184,7 +2180,7 @@ compilers.
         }
     }
 
-    u32 xmem_heap_base::__free(void* mem)
+    u32 mem_heap_base_t::__free(void* mem)
     {
         /*
             Consolidate freed chunks with preceding or succeeding bordering
@@ -2309,7 +2305,7 @@ compilers.
         return 0;
     }
 
-    void* xmem_heap_base::__allocN(msize_t n_elements, msize_t elem_size)
+    void* mem_heap_base_t::__allocN(msize_t n_elements, msize_t elem_size)
     {
         void*   mem;
         msize_t req = 0;
@@ -2331,7 +2327,7 @@ compilers.
         return mem;
     }
 
-    void* xmem_heap_base::__allocR(void* oldmem, msize_t alignment, msize_t bytes)
+    void* mem_heap_base_t::__allocR(void* oldmem, msize_t alignment, msize_t bytes)
     {
         if (oldmem == 0)
             return __allocA(alignment, bytes);
@@ -2359,7 +2355,7 @@ compilers.
         }
     }
 
-    void* xmem_heap_base::__allocA(msize_t alignment, msize_t bytes)
+    void* mem_heap_base_t::__allocA(msize_t alignment, msize_t bytes)
     {
         if (!ok_magic(mState))
         {
@@ -2369,7 +2365,7 @@ compilers.
         return __internal_memalign(alignment, bytes);
     }
 
-    void** xmem_heap_base::__allocIC(msize_t n_elements, msize_t elem_size, void* chunks[])
+    void** mem_heap_base_t::__allocIC(msize_t n_elements, msize_t elem_size, void* chunks[])
     {
         msize_t sz = elem_size; /* serves as 1-element array */
         mstate  ms = mState;
@@ -2381,7 +2377,7 @@ compilers.
         return __internal_ic_alloc(n_elements, &sz, 3, chunks);
     }
 
-    void** xmem_heap_base::__allocICO(msize_t n_elements, msize_t sizes[], void* chunks[])
+    void** mem_heap_base_t::__allocICO(msize_t n_elements, msize_t sizes[], void* chunks[])
     {
         mstate ms = mState;
         if (!ok_magic(ms))
@@ -2392,7 +2388,7 @@ compilers.
         return __internal_ic_alloc(n_elements, sizes, 0, chunks);
     }
 
-    u32 xmem_heap_base::__usable_size(void* mem)
+    u32 mem_heap_base_t::__usable_size(void* mem)
     {
         if (mem != 0)
         {
@@ -2403,7 +2399,7 @@ compilers.
         return 0;
     }
 
-    msize_t xmem_heap_base::__footprint()
+    msize_t mem_heap_base_t::__footprint()
     {
         msize_t result = 0;
         mstate  ms     = mState;
@@ -2418,7 +2414,7 @@ compilers.
         return result;
     }
 
-    msize_t xmem_heap_base::__max_footprint()
+    msize_t mem_heap_base_t::__max_footprint()
     {
         msize_t result = 0;
         mstate  ms     = mState;
@@ -2433,7 +2429,7 @@ compilers.
         return result;
     }
 
-    //	void xmem_heap_base::__stats(xmem_managed_size& stats)
+    //	void mem_heap_base_t::__stats(xmem_managed_size& stats)
     //	{
     //		mstate ms = mState;
     //		if (ok_magic(ms))
@@ -2446,15 +2442,15 @@ compilers.
     //		}
     //	}
 
-    ncore::u32 xmem_heap::__sGetMemSize(void* mem)
+    ncore::u32 mem_heap_t::__sGetMemSize(void* mem)
     {
         mchunkptr chunkPtr = mem2chunk(mem);
         return chunksize(chunkPtr);
     }
 
-    class x_allocator_dlmalloc : public alloc_t
+    class allocator_dlmalloc : public alloc_t
     {
-        xmem_heap mDlMallocHeap;
+        mem_heap_t mDlMallocHeap;
 
     public:
         void init(void* mem, s32 mem_size)
@@ -2488,9 +2484,9 @@ compilers.
 
     alloc_t* gCreateDlAllocator(void* mem, u32 memsize)
     {
-        x_allocator_dlmalloc* allocator = new (mem) x_allocator_dlmalloc();
+        allocator_dlmalloc* allocator = new (mem) allocator_dlmalloc();
 
-        s32 allocator_class_size = math::ceilpo2(sizeof(x_allocator_dlmalloc));
+        s32 allocator_class_size = math::ceilpo2(sizeof(allocator_dlmalloc));
         mem                      = (void*)((u8*)mem + allocator_class_size);
 
         allocator->init(mem, memsize - allocator_class_size);

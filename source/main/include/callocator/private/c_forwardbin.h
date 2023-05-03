@@ -9,11 +9,11 @@
 #endif
 
 //==============================================================================
-// xCore namespace
+// ccore namespace
 //==============================================================================
 namespace ncore
 {
-	namespace xforwardbin
+	namespace forwardbin
 	{
 		///< Behavior:
 		///< This allocator only allocates memory from what is in front of head, when it is
@@ -23,9 +23,9 @@ namespace ncore
 
 		struct chunk;
 
-		struct xallocator
+		struct allocator
 		{
-								xallocator();
+								allocator();
 
 			void				init(u8* mem_begin, u8* mem_end);
 			void				reset();

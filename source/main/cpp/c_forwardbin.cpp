@@ -8,7 +8,7 @@
 
 namespace ncore
 {
-    namespace xforwardbin
+    namespace forwardbin
     {
         //==============================================================================
         //==============================================================================
@@ -97,11 +97,11 @@ namespace ncore
         //==============================================================================
         //==============================================================================
 
-        xallocator::xallocator() : mMemBegin(nullptr), mMemEnd(nullptr), mHead(nullptr), mNumAllocations(0) {}
+        allocator::allocator() : mMemBegin(nullptr), mMemEnd(nullptr), mHead(nullptr), mNumAllocations(0) {}
 
         inline static void gIsValidChunk(chunk const* begin, chunk const* end, chunk const* c) { ASSERT(c->isValid() && c->inRange(begin, end)); }
 
-        void xallocator::reset()
+        void allocator::reset()
         {
             // We hold a 'Begin' and 'End' chunk so that we only merge like a list and not like a ring.
             // Coalescing a block at the end with one at the beginning (wrapping around) is something
@@ -124,7 +124,7 @@ namespace ncore
             mNumAllocations = 0;
         }
 
-        void xallocator::init(u8* mem_begin, u8* mem_end)
+        void allocator::init(u8* mem_begin, u8* mem_end)
         {
             mMemBegin = mem_begin;
             mMemEnd   = mem_end;
@@ -185,7 +185,7 @@ namespace ncore
             return diff;
         }
 
-        u8* xallocator::allocate(u32 size, u32 alignment)
+        u8* allocator::allocate(u32 size, u32 alignment)
         {
             // do we have to align up ?
             size = math::alignUp(size, (u32)4);
@@ -274,14 +274,14 @@ namespace ncore
             return alloc_address;
         }
 
-        u32 xallocator::get_size(void* p) const
+        u32 allocator::get_size(void* p) const
         {
             chunk const* c = (chunk const*)((u8*)p - sizeof(chunk));
             ASSERT(c->isValid());
             return c->getSize();
         }
 
-        u32 xallocator::deallocate(void* p)
+        u32 allocator::deallocate(void* p)
         {
             if (p == nullptr)
                 return 0;

@@ -1,4 +1,4 @@
-# xcore allocator library
+# ccore allocator library
 
 A library containing many different allocators using a simple allocator interface:
 

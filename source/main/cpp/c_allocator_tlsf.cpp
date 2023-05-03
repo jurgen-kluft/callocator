@@ -1221,7 +1221,7 @@ namespace ncore
         return p;
     }
 
-    class x_allocator_tlsf : public alloc_t
+    class allocator_tlsf : public alloc_t
     {
         void*   mPool;
         uint_t mPoolSize;
@@ -1258,14 +1258,14 @@ namespace ncore
         void  operator delete(void* pMem, void*) {}
 
     protected:
-        virtual ~x_allocator_tlsf() {}
+        virtual ~allocator_tlsf() {}
     };
 
     alloc_t* gCreateTlsfAllocator(void* mem, u32 memsize)
     {
-        x_allocator_tlsf* allocator = new (mem) x_allocator_tlsf();
+        allocator_tlsf* allocator = new (mem) allocator_tlsf();
 
-        s32 allocator_class_size = math::ceilpo2(sizeof(x_allocator_tlsf));
+        s32 allocator_class_size = math::ceilpo2(sizeof(allocator_tlsf));
         mem                      = (void*)((u8*)mem + allocator_class_size);
 
         allocator->init(mem, memsize - allocator_class_size);

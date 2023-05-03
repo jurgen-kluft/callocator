@@ -7,7 +7,9 @@
 
 namespace ncore
 {
-	class xranges
+	class alloc_t;
+
+	class ranges
 	{
 	public:
 		class comparer
@@ -16,7 +18,7 @@ namespace ncore
 			virtual s32	compare(u32 lhs, u32 rhs, u32 tag) const = 0;
 		};
 
-		void		init(u32 tag, xrange_compare* cmp, alloc_t* allocator);
+		void		init(u32 tag, comparer* cmp, alloc_t* allocator);
 
 		s32			size() const;
 
