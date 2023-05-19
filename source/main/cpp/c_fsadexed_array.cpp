@@ -40,15 +40,15 @@ namespace ncore
         u32      mAllocCount;
         alloc_t* mObjectArrayAllocator;
         u32      mObjectArraySize;
-        u8*   mObjectArray;
-        u8*   mObjectArrayEnd;
+        u8*      mObjectArray;
+        u8*      mObjectArrayEnd;
         u32      mSizeOfObject;
         u32      mAlignOfObject;
     };
 
     fsadexed_t* gCreateArrayIdxAllocator(alloc_t* allocator, alloc_t* object_array_allocator, u32 size_of_object, u32 object_alignment, u32 size)
     {
-        void*                 mem             = allocator->allocate(sizeof(fsadexed_allocator), 4);
+        void*               mem             = allocator->allocate(sizeof(fsadexed_allocator), 4);
         fsadexed_allocator* array_allocator = new (mem) fsadexed_allocator(allocator);
         array_allocator->initialize(object_array_allocator, size_of_object, object_alignment, size);
         return array_allocator;
@@ -56,7 +56,7 @@ namespace ncore
 
     fsadexed_t* gCreateArrayIdxAllocator(alloc_t* allocator, void* object_array, u32 size_of_object, u32 object_alignment, u32 size)
     {
-        void*                 mem             = allocator->allocate(sizeof(fsadexed_allocator), 4);
+        void*               mem             = allocator->allocate(sizeof(fsadexed_allocator), 4);
         fsadexed_allocator* array_allocator = new (mem) fsadexed_allocator(allocator);
         array_allocator->initialize(object_array, size_of_object, object_alignment, size);
         return array_allocator;

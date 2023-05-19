@@ -6,6 +6,7 @@
                 "${workspaceFolder}/source/main/include",
                 "${workspaceFolder}/source/test/include",
                 "${workspaceFolder}/../cbase/source/main/include",
+                "${workspaceFolder}/../ccore/source/main/include",
                 "${workspaceFolder}/../cunittest/source/main/include"
             ],
             "defines": [ "TARGET_MAC", "TARGET_DEBUG", "TARGET_DEV"],

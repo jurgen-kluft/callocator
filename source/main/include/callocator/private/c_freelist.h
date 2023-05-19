@@ -11,19 +11,14 @@ namespace ncore
     {
         freelist_t();
 
-        const s32 NULL_INDEX = -1;
+        const u32 NULL_INDEX = 0xffffffff;
 
-        void init_with_array(u8* array, u32 array_size, u32 elem_size, u32 elem_alignment);
-        void init_with_alloc(alloc_t* allocator, u32 elem_size, u32 elem_alignment, s32 size);
-        void init_list();
-        void release();
+        void init(u8* array, u32 array_size, u32 elem_size);
+        void reset();
 
         inline bool valid() const { return (mElementArray != nullptr); }
         inline s32  size() const { return mSize; }
-        inline s32  used() const { return mUsed; }
-
-        inline u32 getElemSize() const { return mElemSize; }
-        inline u32 getElemAlignment() const { return mElemAlignment; }
+        inline s32  max() const { return mSizeMax; }
 
         struct item_t;
 
@@ -33,7 +28,8 @@ namespace ncore
                 return nullptr;
             return (item_t*)(mElementArray + (index * mElemSize));
         }
-        inline s32 idx_of(item_t const* element) const
+
+        inline u32 idx_of(item_t const* element) const
         {
             if (element == nullptr)
                 return NULL_INDEX;
@@ -47,13 +43,12 @@ namespace ncore
         void    free(item_t*);
 
     private:
-        alloc_t* mAllocator;
-        u32      mElemSize;
-        u32      mElemAlignment;
-        u32      mUsed;
-        u32      mSize;
         u8*      mElementArray;
-        item_t*  mFreeList;
+        u32      mFreeIndex;
+        u32      mFreeList;
+        u32      mElemSize;
+        u32      mSize;
+        u32      mSizeMax;
     };
 
 }; // namespace ncore
