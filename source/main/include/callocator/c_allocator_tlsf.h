@@ -5,13 +5,29 @@
 #pragma once
 #endif
 
+#include "cbase/c_allocator.h"
+
 namespace ncore
 {
-    /// Forward declares
-    class alloc_t;
+    class tlsf_alloc_t : public alloc_t
+    {
+        void*  mPool;
+        int_t mPoolSize;
 
-    /// A custom allocator; 'Two-Level Segregate Fit' allocator
-    extern alloc_t* gCreateTlsfAllocator(void* mem, u32 memsize);
+    public:
+        tlsf_alloc_t();
+        virtual ~tlsf_alloc_t() {}
+
+        void init(void* mem, int_t mem_size);
+
+        virtual void* v_allocate(u32 size, u32 alignment);
+        virtual void v_deallocate(void* ptr);
+
+        void* operator new(uint_t num_bytes) { return nullptr; }
+        void* operator new(uint_t num_bytes, void* mem) { return mem; }
+        void  operator delete(void* pMem) {}
+        void  operator delete(void* pMem, void*) {}
+    };
 
 }; // namespace ncore
 

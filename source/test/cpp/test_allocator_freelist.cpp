@@ -1,24 +1,28 @@
 #include "cbase/c_allocator.h"
 #include "cbase/c_integer.h"
-#include "callocator/c_fsadexed_array.h"
 #include "callocator/test_allocator.h"
+#include "callocator/c_allocator_freelist.h"
 
 #include "cunittest/cunittest.h"
 
 using namespace ncore;
 
-UNITTEST_SUITE_BEGIN(x_allocator_freelist)
+UNITTEST_SUITE_BEGIN(allocator_freelist)
 {
     UNITTEST_FIXTURE(main)
     {
 		UNITTEST_ALLOCATOR;
 
+		void* freelist_mem = nullptr;
+
         UNITTEST_FIXTURE_SETUP()
 		{
+			freelist_mem = Allocator->allocate(1 * cMB);
 		}
 
         UNITTEST_FIXTURE_TEARDOWN()
 		{
+			Allocator->deallocate(freelist_mem);
 		}
 
 		static bool gIsAligned(void* p, u32 alignment)
@@ -52,14 +56,15 @@ UNITTEST_SUITE_BEGIN(x_allocator_freelist)
         UNITTEST_TEST(alloc3_free3)
         {
 			u32 const alignment = 2048;
-			fsadexed_t* alloc = gCreateFreeListAllocator(Allocator, alignment, alignment, 128);
+			freelist_t alloc;
+			alloc.init(freelist_mem, alignment, alignment);
 
-			void* mem1 = alloc->allocate();
+			void* mem1 = alloc.allocate();
 			CHECK_TRUE(gIsAligned(mem1, alignment));
-			void* mem2 = alloc->allocate();
-			void* mem3 = alloc->allocate();
-			void* mem4 = alloc->allocate();
-			void* mem5 = alloc->allocate();
+			void* mem2 = alloc.allocate();
+			void* mem3 = alloc.allocate();
+			void* mem4 = alloc.allocate();
+			void* mem5 = alloc.allocate();
 			gFill(mem5, 256, 5);
 			gFill(mem3, 512, 3);
 			gFill(mem4, 1024, 4);
@@ -70,39 +75,39 @@ UNITTEST_SUITE_BEGIN(x_allocator_freelist)
 			CHECK_TRUE(gTest(mem4, 1024, 4));
 			CHECK_TRUE(gTest(mem1, 512, 1));
 
-			alloc->deallocate(mem4);
+			alloc.deallocate(mem4);
 
-			void* mem6 = alloc->allocate();
-			void* mem7 = alloc->allocate();
-			void* mem8 = alloc->allocate();
+			void* mem6 = alloc.allocate();
+			void* mem7 = alloc.allocate();
+			void* mem8 = alloc.allocate();
 
-			alloc->deallocate(mem1);
-			alloc->deallocate(mem3);
-			alloc->deallocate(mem2);
+			alloc.deallocate(mem1);
+			alloc.deallocate(mem3);
+			alloc.deallocate(mem2);
 
-			void* mem9 = alloc->allocate();
+			void* mem9 = alloc.allocate();
 
-			alloc->deallocate(mem7);
-			alloc->deallocate(mem5);
-			alloc->deallocate(mem8);
-			alloc->deallocate(mem9);
-			alloc->deallocate(mem6);
+			alloc.deallocate(mem7);
+			alloc.deallocate(mem5);
+			alloc.deallocate(mem8);
+			alloc.deallocate(mem9);
+			alloc.deallocate(mem6);
 
-			alloc->release();
         }
 
         UNITTEST_TEST(alloc3_free3_idx)
         {
 			u32 const alignment = 2048;
-            fsadexed_t* alloc     = gCreateFreeListIdxAllocator(Allocator, alignment, alignment, 128);
+			freelist_t alloc;
+			alloc.init(freelist_mem, alignment, alignment);
 
-			void* mem1 = alloc->allocate();
+			void* mem1 = alloc.allocate();
 			CHECK_TRUE(gIsAligned(mem1, alignment));
-			void* mem2 = alloc->allocate();
-			void* mem3 = alloc->allocate();
-			void* mem4 = alloc->allocate();
+			void* mem2 = alloc.allocate();
+			void* mem3 = alloc.allocate();
+			void* mem4 = alloc.allocate();
 
-			void* mem5 = alloc->allocate();
+			void* mem5 = alloc.allocate();
 			gFill(mem5, 256, 5);
 			gFill(mem3, 512, 3);
 			gFill(mem4, 1024, 4);
@@ -113,25 +118,23 @@ UNITTEST_SUITE_BEGIN(x_allocator_freelist)
 			CHECK_TRUE(gTest(mem4, 1024, 4));
 			CHECK_TRUE(gTest(mem1, 512, 1));
 
-			alloc->deallocate(mem4);
+			alloc.deallocate(mem4);
 
-			void* mem6 = alloc->allocate();
-			void* mem7 = alloc->allocate();
-			void* mem8 = alloc->allocate();
+			void* mem6 = alloc.allocate();
+			void* mem7 = alloc.allocate();
+			void* mem8 = alloc.allocate();
 
-			alloc->deallocate(mem1);
-			alloc->deallocate(mem3);
-			alloc->deallocate(mem2);
+			alloc.deallocate(mem1);
+			alloc.deallocate(mem3);
+			alloc.deallocate(mem2);
 
-			void* mem9 = alloc->allocate();
+			void* mem9 = alloc.allocate();
 
-			alloc->deallocate(mem7);
-			alloc->deallocate(mem5);
-			alloc->deallocate(mem8);
-			alloc->deallocate(mem9);
-			alloc->deallocate(mem6);
-
-			alloc->release();
+			alloc.deallocate(mem7);
+			alloc.deallocate(mem5);
+			alloc.deallocate(mem8);
+			alloc.deallocate(mem9);
+			alloc.deallocate(mem6);
         }
 	}
 }

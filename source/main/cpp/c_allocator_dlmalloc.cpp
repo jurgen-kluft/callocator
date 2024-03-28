@@ -43,7 +43,7 @@ namespace ncore
 
     struct malloc_segment
     {
-        u8*                 base;   ///< base address */
+        u8*                    base;   ///< base address */
         msize_t                size;   ///< allocated size */
         flag_t                 sflags; ///< user and extern flag */
         struct malloc_segment* next;   ///< ptr to next segment */
@@ -61,7 +61,7 @@ namespace ncore
         binmap_t  treemap;
         msize_t   dvsize;
         msize_t   topsize;
-        u8*    least_addr;
+        u8*       least_addr;
         mchunkptr dv;
         mchunkptr top;
         msize_t   release_checks;
@@ -89,7 +89,7 @@ namespace ncore
     /**
      * A memory heap capable of managing multiple segments (based on dlmalloc)
      */
-    class mem_heap_base_t
+    class dlmalloc_heap_base_t
     {
     protected:
         malloc_params mParams;
@@ -130,7 +130,7 @@ namespace ncore
     /**
      * A memory heap capable of managing multiple segments (based on dlmalloc)
      */
-    class mem_heap_t : public mem_heap_base_t
+    class dlmalloc_mem_heap_t : public dlmalloc_heap_base_t
     {
     public:
         void __initialize();
@@ -158,11 +158,11 @@ namespace ncore
 #define MAX_SIZE_T (~(msize_t)0)
 
 #ifndef ABORT_ON_ASSERT_FAILURE
-#define ABORT_ON_ASSERT_FAILURE 1
+#    define ABORT_ON_ASSERT_FAILURE 1
 #endif /* ABORT_ON_ASSERT_FAILURE */
 
 #ifndef PROCEED_ON_ERROR
-#define PROCEED_ON_ERROR 0
+#    define PROCEED_ON_ERROR 0
 #endif /* PROCEED_ON_ERROR */
 
 #define MAX_RELEASE_CHECK_RATE 256
@@ -174,38 +174,38 @@ namespace ncore
     static void FatalError() {}
 
 #if defined(TARGET_PC)
-#pragma warning(disable : 4146) /* no "unsigned" warnings */
+#    pragma warning(disable : 4146) /* no "unsigned" warnings */
 #endif
 
 #ifdef XMEM_HEAP_DEBUG
-#if ABORT_ON_ASSERT_FAILURE
-#undef ASSERT
+#    if ABORT_ON_ASSERT_FAILURE
+#        undef ASSERT
 /// TODO: These should be callbacks!!!!
-#define ASSERT(x) \
-    if (!(x))     \
-    FatalError()
-#endif
+#        define ASSERT(x) \
+            if (!(x))     \
+            FatalError()
+#    endif
 #else /* XMEM_HEAP_DEBUG */
-#ifndef ASSERT
-#define ASSERT(x) ((void*)0)
-#endif
-#define XMEM_HEAP_DEBUG 0
+#    ifndef ASSERT
+#        define ASSERT(x) ((void*)0)
+#    endif
+#    define XMEM_HEAP_DEBUG 0
 #endif /* XMEM_HEAP_DEBUG */
 
 #if defined(TARGET_PC)
-#define malloc_getpagesize 65536
+#    define malloc_getpagesize 65536
 #elif defined(TARGET_MAC)
-#define malloc_getpagesize 65536
+#    define malloc_getpagesize 65536
 #elif defined(TARGET_WII)
-#define malloc_getpagesize 65536
+#    define malloc_getpagesize 65536
 #elif defined(TARGET_PSP)
-#define malloc_getpagesize 65536
+#    define malloc_getpagesize 65536
 #elif defined(TARGET_PS3)
-#define malloc_getpagesize 65536
+#    define malloc_getpagesize 65536
 #elif defined(TARGET_360)
-#define malloc_getpagesize 65536
+#    define malloc_getpagesize 65536
 #elif defined(TARGET_3DS)
-#define malloc_getpagesize 65536
+#    define malloc_getpagesize 65536
 #endif
 
 /* ------------------- msize_t and alignment properties -------------------- */
@@ -232,7 +232,7 @@ namespace ncore
 #define is_aligned(A) (((msize_t)((A)) & (CHUNK_ALIGN_MASK)) == 0)
 
 /* the number of bytes to offset an address to align it */
-#define align_offset(A) ((((msize_t)(A)&CHUNK_ALIGN_MASK) == 0) ? 0 : ((MALLOC_ALIGNMENT - ((msize_t)(A)&CHUNK_ALIGN_MASK)) & CHUNK_ALIGN_MASK))
+#define align_offset(A) ((((msize_t)(A) & CHUNK_ALIGN_MASK) == 0) ? 0 : ((MALLOC_ALIGNMENT - ((msize_t)(A) & CHUNK_ALIGN_MASK)) & CHUNK_ALIGN_MASK))
 
     /* -------------------------- MMAP preliminaries ------------------------- */
 
@@ -244,9 +244,9 @@ namespace ncore
 #define MCHUNK_SIZE (sizeof(mchunk))
 
 #if FOOTERS
-#define CHUNK_OVERHEAD (TWO_SIZE_T_SIZES)
+#    define CHUNK_OVERHEAD (TWO_SIZE_T_SIZES)
 #else /* FOOTERS */
-#define CHUNK_OVERHEAD (SIZE_T_SIZE)
+#    define CHUNK_OVERHEAD (SIZE_T_SIZE)
 #endif /* FOOTERS */
 
 /* The smallest size we can malloc is an aligned minimal chunk */
@@ -405,11 +405,11 @@ namespace ncore
     */
 
 #ifndef PREACTION
-#define PREACTION(M) (0)
+#    define PREACTION(M) (0)
 #endif /* PREACTION */
 
 #ifndef POSTACTION
-#define POSTACTION(M)
+#    define POSTACTION(M)
 #endif /* POSTACTION */
 
     /*
@@ -428,20 +428,20 @@ namespace ncore
     /* default corruption action */
     static void reset_on_error(mstate m);
 
-#define CORRUPTION_ERROR_ACTION(m) reset_on_error(m)
-#define USAGE_ERROR_ACTION(m, p)
+#    define CORRUPTION_ERROR_ACTION(m) reset_on_error(m)
+#    define USAGE_ERROR_ACTION(m, p)
 
 #else /* PROCEED_ON_ERROR */
 
-#ifndef CORRUPTION_ERROR_ACTION
+#    ifndef CORRUPTION_ERROR_ACTION
 /// TODO: These should be callbacks!!!!
-#define CORRUPTION_ERROR_ACTION(m) FatalError()
-#endif /* CORRUPTION_ERROR_ACTION */
+#        define CORRUPTION_ERROR_ACTION(m) FatalError()
+#    endif /* CORRUPTION_ERROR_ACTION */
 
-#ifndef USAGE_ERROR_ACTION
+#    ifndef USAGE_ERROR_ACTION
 /// TODO: These should be callbacks!!!!
-#define USAGE_ERROR_ACTION(m, p) FatalError()
-#endif /* USAGE_ERROR_ACTION */
+#        define USAGE_ERROR_ACTION(m, p) FatalError()
+#    endif /* USAGE_ERROR_ACTION */
 
 #endif /* PROCEED_ON_ERROR */
 
@@ -449,19 +449,19 @@ namespace ncore
 
 #if !XMEM_HEAP_DEBUG
 
-#define check_free_chunk(M, P)
-#define check_inuse_chunk(M, R, P)
-#define check_top_chunk(M, P)
-#define check_malloced_chunk(M, R, P, N)
-#define check_malloc_state(M, R)
+#    define check_free_chunk(M, P)
+#    define check_inuse_chunk(M, R, P)
+#    define check_top_chunk(M, P)
+#    define check_malloced_chunk(M, R, P, N)
+#    define check_malloc_state(M, R)
 
 #else /* XMEM_HEAP_DEBUG */
 
-#define check_free_chunk(M, P) do_check_free_chunk(M, P)
-#define check_inuse_chunk(M, R, P) do_check_inuse_chunk(M, R, P)
-#define check_top_chunk(M, P) do_check_top_chunk(M, P)
-#define check_malloced_chunk(M, R, P, N) do_check_malloced_chunk(M, R, P, N)
-#define check_malloc_state(M, R) do_check_malloc_state(M, R)
+#    define check_free_chunk(M, P) do_check_free_chunk(M, P)
+#    define check_inuse_chunk(M, R, P) do_check_inuse_chunk(M, R, P)
+#    define check_top_chunk(M, P) do_check_top_chunk(M, P)
+#    define check_malloced_chunk(M, R, P, N) do_check_malloced_chunk(M, R, P, N)
+#    define check_malloc_state(M, R) do_check_malloc_state(M, R)
 
     static void    do_check_any_chunk(mstate m, mchunkptr p);
     static void    do_check_top_chunk(mstate m, mchunkptr p);
@@ -513,7 +513,7 @@ namespace ncore
 #define leftshift_for_tree_index(i) ((i == NTREEBINS - 1) ? 0 : ((SIZE_T_BITSIZE - SIZE_T_ONE) - (((i) >> 1) + TREEBIN_SHIFT - 2)))
 
 /* The size of the smallest chunk held in bin with index i */
-#define minsize_for_tree_index(i) ((SIZE_T_ONE << (((i) >> 1) + TREEBIN_SHIFT)) | (((msize_t)((i)&SIZE_T_ONE)) << (((i) >> 1) + TREEBIN_SHIFT - 1)))
+#define minsize_for_tree_index(i) ((SIZE_T_ONE << (((i) >> 1) + TREEBIN_SHIFT)) | (((msize_t)((i) & SIZE_T_ONE)) << (((i) >> 1) + TREEBIN_SHIFT - 1)))
 
 /* ------------------------ Operations on bin maps ----------------------- */
 
@@ -586,69 +586,69 @@ namespace ncore
 
 #if !INSECURE
 /* Check if address a is at least as high as any from MORECORE or MMAP */
-#define ok_address(M, a) ((u8*)(a) >= (M)->least_addr)
+#    define ok_address(M, a) ((u8*)(a) >= (M)->least_addr)
 /* Check if address of next chunk n is higher than base chunk p */
-#define ok_next(p, n) ((u8*)(p) < (u8*)(n))
+#    define ok_next(p, n) ((u8*)(p) < (u8*)(n))
 /* Check if p has inuse status */
-#define ok_inuse(p) is_inuse(p)
+#    define ok_inuse(p) is_inuse(p)
 /* Check if p has its pinuse bit on */
-#define ok_pinuse(p) pinuse(p)
+#    define ok_pinuse(p) pinuse(p)
 #else /* !INSECURE */
-#define ok_address(M, a) (1)
-#define ok_next(b, n) (1)
-#define ok_inuse(p) (1)
-#define ok_pinuse(p) (1)
+#    define ok_address(M, a) (1)
+#    define ok_next(b, n) (1)
+#    define ok_inuse(p) (1)
+#    define ok_pinuse(p) (1)
 #endif /* !INSECURE */
 
 #if (FOOTERS && !INSECURE)
 /* Check if (alleged) mstate m has expected magic field */
-#define ok_magic(M) ((M)->magic == mParams.magic)
+#    define ok_magic(M) ((M)->magic == mParams.magic)
 #else /* (FOOTERS && !INSECURE) */
-#define ok_magic(M) (1)
+#    define ok_magic(M) (1)
 #endif /* (FOOTERS && !INSECURE) */
 
 /* In gcc, use __builtin_expect to minimize impact of checks */
 #if !INSECURE
-#define RTCHECK(e) (e)
+#    define RTCHECK(e) (e)
 #else /* !INSECURE */
-#define RTCHECK(e) (1)
+#    define RTCHECK(e) (1)
 #endif /* !INSECURE */
 
     /* macros to set up inuse chunks with or without footers */
 
 #if !FOOTERS
 
-#define mark_inuse_foot(M, p, s)
+#    define mark_inuse_foot(M, p, s)
 
 /* Macros for setting head/foot of non-mmapped chunks */
 
 /* Set cinuse bit and pinuse bit of next chunk */
-#define set_inuse(M, p, s) ((p)->head = (((p)->head & PINUSE_BIT) | s | CINUSE_BIT), ((mchunkptr)(((u8*)(p)) + (s)))->head |= PINUSE_BIT)
+#    define set_inuse(M, p, s) ((p)->head = (((p)->head & PINUSE_BIT) | s | CINUSE_BIT), ((mchunkptr)(((u8*)(p)) + (s)))->head |= PINUSE_BIT)
 
 /* Set cinuse and pinuse of this chunk and pinuse of next chunk */
-#define set_inuse_and_pinuse(M, p, s) ((p)->head = (s | PINUSE_BIT | CINUSE_BIT), ((mchunkptr)(((u8*)(p)) + (s)))->head |= PINUSE_BIT)
+#    define set_inuse_and_pinuse(M, p, s) ((p)->head = (s | PINUSE_BIT | CINUSE_BIT), ((mchunkptr)(((u8*)(p)) + (s)))->head |= PINUSE_BIT)
 
 /* Set size, cinuse and pinuse bit of this chunk */
-#define set_size_and_pinuse_of_inuse_chunk(M, p, s) ((p)->head = (s | PINUSE_BIT | CINUSE_BIT))
+#    define set_size_and_pinuse_of_inuse_chunk(M, p, s) ((p)->head = (s | PINUSE_BIT | CINUSE_BIT))
 
 #else /* FOOTERS */
 
 /* Set foot of inuse chunk to be xor of mstate and seed */
-#define mark_inuse_foot(M, p, s) (((mchunkptr)((u8*)(p) + (s)))->prev_foot = ((msize_t)(M) ^ mParams.magic))
+#    define mark_inuse_foot(M, p, s) (((mchunkptr)((u8*)(p) + (s)))->prev_foot = ((msize_t)(M) ^ mParams.magic))
 
-#define get_mstate_for(p) ((mstate)(((mchunkptr)((u8*)(p) + (chunksize(p))))->prev_foot ^ mParams.magic))
+#    define get_mstate_for(p) ((mstate)(((mchunkptr)((u8*)(p) + (chunksize(p))))->prev_foot ^ mParams.magic))
 
-#define set_inuse(M, p, s) ((p)->head = (((p)->head & PINUSE_BIT) | s | CINUSE_BIT), (((mchunkptr)(((u8*)(p)) + (s)))->head |= PINUSE_BIT), mark_inuse_foot(M, p, s))
+#    define set_inuse(M, p, s) ((p)->head = (((p)->head & PINUSE_BIT) | s | CINUSE_BIT), (((mchunkptr)(((u8*)(p)) + (s)))->head |= PINUSE_BIT), mark_inuse_foot(M, p, s))
 
-#define set_inuse_and_pinuse(M, p, s) ((p)->head = (s | PINUSE_BIT | CINUSE_BIT), (((mchunkptr)(((u8*)(p)) + (s)))->head |= PINUSE_BIT), mark_inuse_foot(M, p, s))
+#    define set_inuse_and_pinuse(M, p, s) ((p)->head = (s | PINUSE_BIT | CINUSE_BIT), (((mchunkptr)(((u8*)(p)) + (s)))->head |= PINUSE_BIT), mark_inuse_foot(M, p, s))
 
-#define set_size_and_pinuse_of_inuse_chunk(M, p, s) ((p)->head = (s | PINUSE_BIT | CINUSE_BIT), mark_inuse_foot(M, p, s))
+#    define set_size_and_pinuse_of_inuse_chunk(M, p, s) ((p)->head = (s | PINUSE_BIT | CINUSE_BIT), mark_inuse_foot(M, p, s))
 
 #endif /* !FOOTERS */
 
     /* ---------------------------- setting malloc_params -------------------------- */
 
-    s32 mem_heap_base_t::__init_mparams()
+    s32 dlmalloc_heap_base_t::__init_mparams()
     {
         nmem::memset(&mParams, 0, sizeof(malloc_params));
         {
@@ -690,7 +690,7 @@ namespace ncore
     }
 
     /* support for mallopt */
-    s32 mem_heap_base_t::__change_mparam(s32 param_number, s32 value)
+    s32 dlmalloc_heap_base_t::__change_mparam(s32 param_number, s32 value)
     {
         msize_t val;
         ensure_initialization();
@@ -997,7 +997,7 @@ namespace ncore
 
     /* ----------------------------- statistics ------------------------------ */
 
-    //	void mem_heap_base_t::__internal_malloc_stats(xmem_managed_size& stats)
+    //	void dlmalloc_heap_base_t::__internal_malloc_stats(xmem_managed_size& stats)
     //	{
     //		mstate m = mState;
     //
@@ -1364,19 +1364,19 @@ compilers.
 #endif /* PROCEED_ON_ERROR */
 
     /* Add a segment to hold a new noncontiguous region */
-    void mem_heap_base_t::__add_segment(void* tbase, msize_t tsize, s32 sflags)
+    void dlmalloc_heap_base_t::__add_segment(void* tbase, msize_t tsize, s32 sflags)
     {
         mstate m = mState;
 
         /* Determine locations and sizes of segment, fenceposts, old top */
-        u8*      old_top = (u8*)m->top;
+        u8*         old_top = (u8*)m->top;
         msegmentptr oldsp   = segment_holding(m, old_top);
-        u8*      old_end = oldsp->base + oldsp->size;
+        u8*         old_end = oldsp->base + oldsp->size;
         msize_t     ssize   = pad_request(sizeof(struct malloc_segment));
-        u8*      rawsp   = old_end - (ssize + FOUR_SIZE_T_SIZES + CHUNK_ALIGN_MASK);
+        u8*         rawsp   = old_end - (ssize + FOUR_SIZE_T_SIZES + CHUNK_ALIGN_MASK);
         msize_t     offset  = align_offset(chunk2mem(rawsp));
-        u8*      asp     = rawsp + offset;
-        u8*      csp     = (asp < (old_top + MIN_CHUNK_SIZE)) ? old_top : asp;
+        u8*         asp     = rawsp + offset;
+        u8*         csp     = (asp < (old_top + MIN_CHUNK_SIZE)) ? old_top : asp;
         mchunkptr   sp      = (mchunkptr)csp;
         msegmentptr ss      = (msegmentptr)(chunk2mem(sp));
         mchunkptr   tnext   = chunk_plus_offset(sp, ssize);
@@ -1421,7 +1421,7 @@ compilers.
         check_top_chunk(m, m->top);
     }
 
-    msize_t mem_heap_base_t::__release_unused_segments(mstate m)
+    msize_t dlmalloc_heap_base_t::__release_unused_segments(mstate m)
     {
         msize_t     released = 0;
         int         nsegs    = 0;
@@ -1429,7 +1429,7 @@ compilers.
         msegmentptr sp       = pred->next;
         while (sp != 0)
         {
-            u8*      base = sp->base;
+            u8*         base = sp->base;
             msize_t     size = sp->size;
             msegmentptr next = sp->next;
             ++nsegs;
@@ -1484,7 +1484,7 @@ compilers.
         Initialize global mstate from a 'given' memory block
     */
 
-    void mem_heap_t::__initialize()
+    void dlmalloc_mem_heap_t::__initialize()
     {
         mSysAlloc = nullptr;
         mSysFree  = nullptr;
@@ -1495,27 +1495,27 @@ compilers.
         __init_mparams();
     }
 
-    void mem_heap_t::__destroy()
+    void dlmalloc_mem_heap_t::__destroy()
     {
         // Release all segments that where obtained from the system
         __release_unused_segments(mState);
     }
 
     /* mstate, give block of memory*/
-    void mem_heap_t::__manage(void* block, msize_t nb)
+    void dlmalloc_mem_heap_t::__manage(void* block, msize_t nb)
     {
         nmem::memset(block, 0, nb);
 
         mstate m = mState;
 
-        u8*  tbase = 0;
+        u8*     tbase = 0;
         msize_t tsize = 0;
         {
             msegmentptr ss    = (m->top == 0) ? 0 : segment_holding(m, (u8*)m->top);
             msize_t     asize = 0;
 
             u8* base = (u8*)block;
-            asize       = nb;
+            asize    = nb;
 
             tbase = base;
             tsize = asize;
@@ -1547,7 +1547,7 @@ compilers.
     /* ---------------------------- malloc support --------------------------- */
 
     /* allocate a large request from the best fitting chunk in a treebin */
-    void* mem_heap_base_t::__tmalloc_large(mstate m, msize_t nb)
+    void* dlmalloc_heap_base_t::__tmalloc_large(mstate m, msize_t nb)
     {
         tchunkptr v     = 0;
         msize_t   rsize = -nb; /* Unsigned negation */
@@ -1631,7 +1631,7 @@ compilers.
     }
 
     /* allocate a small request from the best fitting chunk in a treebin */
-    void* mem_heap_base_t::__tmalloc_small(mstate m, msize_t nb)
+    void* dlmalloc_heap_base_t::__tmalloc_small(mstate m, msize_t nb)
     {
         tchunkptr t, v;
         msize_t   rsize;
@@ -1678,7 +1678,7 @@ compilers.
 
     /* --------------------------- realloc support --------------------------- */
 
-    void* mem_heap_base_t::__internal_realloc(mstate m, void* oldmem, msize_t alignment, msize_t bytes)
+    void* dlmalloc_heap_base_t::__internal_realloc(mstate m, void* oldmem, msize_t alignment, msize_t bytes)
     {
         if (bytes >= MAX_REQUEST)
         {
@@ -1768,7 +1768,7 @@ compilers.
 
     /* --------------------------- memalign support -------------------------- */
 
-    void* mem_heap_base_t::__internal_memalign(msize_t alignment, msize_t bytes)
+    void* dlmalloc_heap_base_t::__internal_memalign(msize_t alignment, msize_t bytes)
     {
         mstate m = mState;
 
@@ -1799,7 +1799,7 @@ compilers.
         {
             msize_t nb  = request2size(bytes);
             msize_t req = nb + alignment + MIN_CHUNK_SIZE - CHUNK_OVERHEAD;
-            u8*  mem = (u8*)(__alloc(req));
+            u8*     mem = (u8*)(__alloc(req));
             if (mem != 0)
             {
                 void*     leader  = 0;
@@ -1819,8 +1819,8 @@ compilers.
                     We've allocated enough total room so that this is always
                     possible.
                     */
-                    u8*    br       = (u8*)mem2chunk((msize_t)(((msize_t)(mem + alignment - SIZE_T_ONE)) & -alignment));
-                    u8*    pos      = ((msize_t)(br - (u8*)(p)) >= MIN_CHUNK_SIZE) ? br : br + alignment;
+                    u8*       br       = (u8*)mem2chunk((msize_t)(((msize_t)(mem + alignment - SIZE_T_ONE)) & -alignment));
+                    u8*       pos      = ((msize_t)(br - (u8*)(p)) >= MIN_CHUNK_SIZE) ? br : br + alignment;
                     mchunkptr newp     = (mchunkptr)pos;
                     msize_t   leadsize = (msize_t)(pos - (u8*)(p));
                     msize_t   newsize  = chunksize(p) - leadsize;
@@ -1865,7 +1865,7 @@ compilers.
     }
 
     /* ------------------------ comalloc/coalloc support --------------------- */
-    void** mem_heap_base_t::__internal_ic_alloc(msize_t n_elements, msize_t* sizes, s32 opts, void* chunks[])
+    void** dlmalloc_heap_base_t::__internal_ic_alloc(msize_t n_elements, msize_t* sizes, s32 opts, void* chunks[])
     {
         /*
         This provides common support for independent_X routines, handling
@@ -2000,7 +2000,7 @@ compilers.
 
     /* -------------------------- public routines ---------------------------- */
 
-    void* mem_heap_base_t::__alloc(msize_t bytes)
+    void* dlmalloc_heap_base_t::__alloc(msize_t bytes)
     {
         /*
         Basic algorithm:
@@ -2180,7 +2180,7 @@ compilers.
         }
     }
 
-    u32 mem_heap_base_t::__free(void* mem)
+    u32 dlmalloc_heap_base_t::__free(void* mem)
     {
         /*
             Consolidate freed chunks with preceding or succeeding bordering
@@ -2305,7 +2305,7 @@ compilers.
         return 0;
     }
 
-    void* mem_heap_base_t::__allocN(msize_t n_elements, msize_t elem_size)
+    void* dlmalloc_heap_base_t::__allocN(msize_t n_elements, msize_t elem_size)
     {
         void*   mem;
         msize_t req = 0;
@@ -2327,7 +2327,7 @@ compilers.
         return mem;
     }
 
-    void* mem_heap_base_t::__allocR(void* oldmem, msize_t alignment, msize_t bytes)
+    void* dlmalloc_heap_base_t::__allocR(void* oldmem, msize_t alignment, msize_t bytes)
     {
         if (oldmem == 0)
             return __allocA(alignment, bytes);
@@ -2344,7 +2344,7 @@ compilers.
 #if !FOOTERS
             mstate m = mState;
 #else  /* FOOTERS */
-            mstate m  = get_mstate_for(mem2chunk(oldmem));
+            mstate m = get_mstate_for(mem2chunk(oldmem));
             if (!ok_magic(m))
             {
                 USAGE_ERROR_ACTION(m, oldmem);
@@ -2355,7 +2355,7 @@ compilers.
         }
     }
 
-    void* mem_heap_base_t::__allocA(msize_t alignment, msize_t bytes)
+    void* dlmalloc_heap_base_t::__allocA(msize_t alignment, msize_t bytes)
     {
         if (!ok_magic(mState))
         {
@@ -2365,7 +2365,7 @@ compilers.
         return __internal_memalign(alignment, bytes);
     }
 
-    void** mem_heap_base_t::__allocIC(msize_t n_elements, msize_t elem_size, void* chunks[])
+    void** dlmalloc_heap_base_t::__allocIC(msize_t n_elements, msize_t elem_size, void* chunks[])
     {
         msize_t sz = elem_size; /* serves as 1-element array */
         mstate  ms = mState;
@@ -2377,7 +2377,7 @@ compilers.
         return __internal_ic_alloc(n_elements, &sz, 3, chunks);
     }
 
-    void** mem_heap_base_t::__allocICO(msize_t n_elements, msize_t sizes[], void* chunks[])
+    void** dlmalloc_heap_base_t::__allocICO(msize_t n_elements, msize_t sizes[], void* chunks[])
     {
         mstate ms = mState;
         if (!ok_magic(ms))
@@ -2388,7 +2388,7 @@ compilers.
         return __internal_ic_alloc(n_elements, sizes, 0, chunks);
     }
 
-    u32 mem_heap_base_t::__usable_size(void* mem)
+    u32 dlmalloc_heap_base_t::__usable_size(void* mem)
     {
         if (mem != 0)
         {
@@ -2399,7 +2399,7 @@ compilers.
         return 0;
     }
 
-    msize_t mem_heap_base_t::__footprint()
+    msize_t dlmalloc_heap_base_t::__footprint()
     {
         msize_t result = 0;
         mstate  ms     = mState;
@@ -2414,7 +2414,7 @@ compilers.
         return result;
     }
 
-    msize_t mem_heap_base_t::__max_footprint()
+    msize_t dlmalloc_heap_base_t::__max_footprint()
     {
         msize_t result = 0;
         mstate  ms     = mState;
@@ -2429,7 +2429,7 @@ compilers.
         return result;
     }
 
-    //	void mem_heap_base_t::__stats(xmem_managed_size& stats)
+    //	void dlmalloc_heap_base_t::__stats(xmem_managed_size& stats)
     //	{
     //		mstate ms = mState;
     //		if (ok_magic(ms))
@@ -2442,59 +2442,41 @@ compilers.
     //		}
     //	}
 
-    ncore::u32 mem_heap_t::__sGetMemSize(void* mem)
+    ncore::u32 dlmalloc_mem_heap_t::__sGetMemSize(void* mem)
     {
         mchunkptr chunkPtr = mem2chunk(mem);
         return chunksize(chunkPtr);
     }
 
-    class allocator_dlmalloc : public alloc_t
+    void dlmalloc_t::init(void* mem, s32 mem_size)
     {
-        mem_heap_t mDlMallocHeap;
+        m_heap = (dlmalloc_mem_heap_t*)mem;
+        mem = (void*)((u8*)mem + sizeof(dlmalloc_mem_heap_t));
+        m_heap->__initialize();
+        m_heap->__manage(mem, mem_size);
+    }
 
-    public:
-        void init(void* mem, s32 mem_size)
-        {
-            mDlMallocHeap.__initialize();
-            mDlMallocHeap.__manage(mem, mem_size);
-        }
-
-        virtual void* v_allocate(u32 size, u32 alignment)
-        {
-            if (alignment <= MEMALIGN)
-                return mDlMallocHeap.__alloc((msize_t)size);
-
-            return mDlMallocHeap.__allocA(alignment, (msize_t)size);
-        }
-
-        virtual u32 v_deallocate(void* ptr)
-        {
-            if (ptr != nullptr)
-                return mDlMallocHeap.__free(ptr);
-            return 0;
-        }
-
-        virtual void v_release() { mDlMallocHeap.__destroy(); }
-
-        void* operator new(uint_t num_bytes) { return nullptr; }
-        void* operator new(uint_t num_bytes, void* mem) { return mem; }
-        void  operator delete(void* pMem) {}
-        void  operator delete(void* pMem, void*) {}
-    };
-
-    alloc_t* gCreateDlAllocator(void* mem, u32 memsize)
+    void dlmalloc_t::exit()
     {
-        allocator_dlmalloc* allocator = new (mem) allocator_dlmalloc();
+        m_heap->__destroy();
+    }
 
-        s32 allocator_class_size = math::ceilpo2(sizeof(allocator_dlmalloc));
-        mem                      = (void*)((u8*)mem + allocator_class_size);
+    void* dlmalloc_t::v_allocate(u32 size, u32 alignment)
+    {
+        if (alignment <= MEMALIGN)
+            return m_heap->__alloc((msize_t)size);
 
-        allocator->init(mem, memsize - allocator_class_size);
-        return allocator;
+        return m_heap->__allocA(alignment, (msize_t)size);
+    }
+
+    void dlmalloc_t::v_deallocate(void* ptr)
+    {
+        if (ptr != nullptr)
+            m_heap->__free(ptr);
     }
 
 }; // namespace ncore
 
 #ifdef TARGET_PS3
-#pragma diag_warning = no_corresponding_delete
+#    pragma diag_warning = no_corresponding_delete
 #endif

@@ -10,13 +10,13 @@
 #include "callocator/c_allocator_tlsf.h"
 
 ///< TLSF allocator, Two-Level Segregate Fit
-///< http://rtportal.upv.es/rtmalloc/
+///< https://github.com/mattconte/tlsf
 ///< 02/20/2008 - 15:54	TLSF 2.4
 
 #if defined(__cplusplus)
-#define tlsf_decl inline
+#    define tlsf_decl inline
 #else
-#define tlsf_decl static
+#    define tlsf_decl static
 #endif
 
 #ifdef TARGET_64BIT
@@ -49,7 +49,7 @@ typedef ncore::u32 ptrdiff_t;
 ** architecture. There is no reliable portable method at compile-time.
 */
 #if defined(__alpha__) || defined(__ia64__) || defined(__x86_64__) || defined(_WIN64) || defined(__LP64__) || defined(__LLP64__)
-#define TLSF_64BIT
+#    define TLSF_64BIT
 #endif
 
 /*
@@ -69,10 +69,10 @@ tlsf_decl int tlsf_fls(unsigned int word)
 #elif defined(_MSC_VER) && (_MSC_VER >= 1400) && (defined(_M_IX86) || defined(_M_X64))
 /* Microsoft Visual C++ support on x86/X64 architectures. */
 
-#include <intrin.h>
+#    include <intrin.h>
 
-#pragma intrinsic(_BitScanReverse)
-#pragma intrinsic(_BitScanForward)
+#    pragma intrinsic(_BitScanReverse)
+#    pragma intrinsic(_BitScanForward)
 
 tlsf_decl int tlsf_fls(unsigned int word)
 {
@@ -89,7 +89,7 @@ tlsf_decl int tlsf_ffs(unsigned int word)
 #elif defined(_MSC_VER) && defined(_M_PPC)
 /* Microsoft Visual C++ support on PowerPC architectures. */
 
-#include <ppcintrinsics.h>
+#    include <ppcintrinsics.h>
 
 tlsf_decl int tlsf_fls(unsigned int word)
 {
@@ -123,7 +123,7 @@ tlsf_decl int tlsf_fls(unsigned int word)
 #elif defined(__ghs__)
 /* Green Hills support for PowerPC */
 
-#include <ppc_ghs.h>
+#    include <ppc_ghs.h>
 
 tlsf_decl int tlsf_ffs(unsigned int word)
 {
@@ -200,7 +200,7 @@ tlsf_decl int tlsf_fls_sizet(size_t size)
     return bits;
 }
 #else
-#define tlsf_fls_sizet tlsf_fls
+#    define tlsf_fls_sizet tlsf_fls
 #endif
 
 #undef tlsf_decl
@@ -288,7 +288,7 @@ namespace ncore
         */
         FL_INDEX_MAX = 32,
 #else
-        FL_INDEX_MAX    = 30,
+        FL_INDEX_MAX = 30,
 #endif
         SL_INDEX_COUNT = (1 << SL_INDEX_COUNT_LOG2),
         FL_INDEX_SHIFT = (SL_INDEX_COUNT_LOG2 + ALIGN_SIZE_LOG2),
@@ -309,7 +309,7 @@ namespace ncore
 ** Set assert macro, if it has not been provided by the user.
 */
 #if !defined(tlsf_assert)
-#define tlsf_assert ASSERT
+#    define tlsf_assert ASSERT
 #endif
 
     /*
@@ -494,10 +494,15 @@ namespace ncore
     static size_t adjust_request_size(size_t size, size_t align)
     {
         size_t adjust = 0;
-        if (size && size < block_size_max)
+        if (size)
         {
             const size_t aligned = align_up(size, align);
-            adjust               = tlsf_max(aligned, block_size_min);
+
+            /* aligned sized must not exceed block_size_max or we'll go out of bounds on sl_bitmap */
+            if (aligned < block_size_max)
+            {
+                adjust = tlsf_max(aligned, block_size_min);
+            }
         }
         return adjust;
     }
@@ -529,7 +534,7 @@ namespace ncore
     /* This version rounds up to the next block size (for allocations) */
     static void mapping_search(size_t size, int* fli, int* sli)
     {
-        if (size >= (1 << SL_INDEX_COUNT_LOG2))
+        if (size >= SMALL_BLOCK_SIZE)
         {
             const size_t round = (1 << (tlsf_fls_sizet(size) - SL_INDEX_COUNT_LOG2)) - 1;
             size += round;
@@ -546,11 +551,11 @@ namespace ncore
         ** First, search for a block in the list associated with the given
         ** fl/sl index.
         */
-        unsigned int sl_map = control->sl_bitmap[fl] & (~0 << sl);
+        unsigned int sl_map = control->sl_bitmap[fl] & (~0U << sl);
         if (!sl_map)
         {
             /* No block exists. Search in the next largest first-level list. */
-            const unsigned int fl_map = control->fl_bitmap & (~0 << (fl + 1));
+            const unsigned int fl_map = control->fl_bitmap & (~0U << (fl + 1));
             if (!fl_map)
             {
                 /* No free blocks available, memory has been exhausted. */
@@ -587,12 +592,12 @@ namespace ncore
             /* If the new head is null, clear the bitmap. */
             if (next == &control->block_null)
             {
-                control->sl_bitmap[fl] &= ~(1 << sl);
+                control->sl_bitmap[fl] &= ~(1U << sl);
 
                 /* If the second bitmap is now empty, clear the fl bitmap. */
                 if (!control->sl_bitmap[fl])
                 {
-                    control->fl_bitmap &= ~(1 << fl);
+                    control->fl_bitmap &= ~(1U << fl);
                 }
             }
         }
@@ -614,8 +619,8 @@ namespace ncore
         ** and second-level bitmaps appropriately.
         */
         control->blocks[fl][sl] = block;
-        control->fl_bitmap |= (1 << fl);
-        control->sl_bitmap[fl] |= (1 << sl);
+        control->fl_bitmap |= (1U << fl);
+        control->sl_bitmap[fl] |= (1U << sl);
     }
 
     /* Remove a given block from the free list. */
@@ -749,7 +754,17 @@ namespace ncore
         if (size)
         {
             mapping_search(size, &fl, &sl);
-            block = search_suitable_block(control, &fl, &sl);
+
+            /*
+            ** mapping_search can futz with the size, so for excessively large sizes it can sometimes wind up
+            ** with indices that are off the end of the block array.
+            ** So, we protect against that here, since this is the only callsite of mapping_search.
+            ** Note that we don't need to check sl, since it comes from a modulo operation that guarantees it's always in range.
+            */
+            if (fl < FL_INDEX_COUNT)
+            {
+                block = search_suitable_block(control, &fl, &sl);
+            }
         }
 
         if (block)
@@ -766,6 +781,7 @@ namespace ncore
         void* p = 0;
         if (block)
         {
+            tlsf_assert(size && "size must be non-zero");
             block_trim_free(control, block, size);
             block_mark_as_used(block);
             p = block_to_ptr(block);
@@ -820,6 +836,7 @@ namespace ncore
         const size_t    this_block_size  = block_size(block);
 
         int status = 0;
+        (void)used;
         tlsf_insist(integ->prev_status == this_prev_status && "prev status incorrect");
         tlsf_insist(size == this_block_size && "block size incorrect");
 
@@ -1021,15 +1038,15 @@ namespace ncore
         rv += (tlsf_fls(0x80000008) == 31) ? 0 : 0x40;
         rv += (tlsf_fls(0x7FFFFFFF) == 30) ? 0 : 0x80;
 
-#if defined(TLSF_64BIT)
+#    if defined(TLSF_64BIT)
         rv += (tlsf_fls_sizet(0x80000000) == 31) ? 0 : 0x100;
         rv += (tlsf_fls_sizet(0x100000000) == 32) ? 0 : 0x200;
         rv += (tlsf_fls_sizet(0xffffffffffffffff) == 63) ? 0 : 0x400;
-#endif
+#    endif
 
         if (rv)
         {
-            const char* format_str = "tlsf_create: %x ffs/fls tests failed!\n";
+            const char*     format_str = "tlsf_create: %x ffs/fls tests failed!\n";
             ascii::crunes_t format(format_str, ascii::strlen(format_str));
             printf(format, va_t(rv));
         }
@@ -1221,55 +1238,21 @@ namespace ncore
         return p;
     }
 
-    class allocator_tlsf : public alloc_t
+    tlsf_alloc_t::tlsf_alloc_t() : mPool(nullptr), mPoolSize(0) {}
+
+    void tlsf_alloc_t::init(void* mem, int_t mem_size) { mPool = tlsf_create_with_pool(mem, mem_size); }
+
+    void* tlsf_alloc_t::v_allocate(u32 size, u32 alignment)
     {
-        void*   mPool;
-        uint_t mPoolSize;
+        if (alignment <= 8)
+            return tlsf_malloc(mPool, size);
+        return tlsf_memalign(mPool, alignment, size);
+    }
 
-    public:
-        virtual const char* name() const { return TARGET_FULL_DESCR_STR " TLSF allocator"; }
-
-        void init(void* mem, s32 mem_size) { mPool = tlsf_create_with_pool(mem, mem_size); }
-
-        virtual void* v_allocate(u32 size, u32 alignment)
-        {
-            if (alignment <= 8)
-                return tlsf_malloc(mPool, size);
-            return tlsf_memalign(mPool, alignment, size);
-        }
-
-        virtual u32 v_deallocate(void* ptr)
-        {
-            if (ptr != nullptr)
-                return (u32)tlsf_free(mPool, ptr);
-            return 0;
-        }
-
-        virtual void v_release()
-        {
-            tlsf_destroy(mPool);
-            mPool     = nullptr;
-            mPoolSize = 0;
-        }
-
-        void* operator new(uint_t num_bytes) { return nullptr; }
-        void* operator new(uint_t num_bytes, void* mem) { return mem; }
-        void  operator delete(void* pMem) {}
-        void  operator delete(void* pMem, void*) {}
-
-    protected:
-        virtual ~allocator_tlsf() {}
-    };
-
-    alloc_t* gCreateTlsfAllocator(void* mem, u32 memsize)
+    void tlsf_alloc_t::v_deallocate(void* ptr)
     {
-        allocator_tlsf* allocator = new (mem) allocator_tlsf();
-
-        s32 allocator_class_size = math::ceilpo2(sizeof(allocator_tlsf));
-        mem                      = (void*)((u8*)mem + allocator_class_size);
-
-        allocator->init(mem, memsize - allocator_class_size);
-        return allocator;
+        if (ptr != nullptr)
+            tlsf_free(mPool, ptr);
     }
 
 }; // namespace ncore
