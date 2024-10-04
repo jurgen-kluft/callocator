@@ -6,7 +6,9 @@ import (
 )
 
 func main() {
-	ccode.Init()
-	ccode.GenerateFiles()
-	ccode.Generate(cpkg.GetPackage())
+	if ccode.Init() {
+		pkg := cpkg.GetPackage()
+		ccode.GenerateFiles(pkg)
+		ccode.Generate(pkg)
+	}
 }
