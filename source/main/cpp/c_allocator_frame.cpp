@@ -1,9 +1,6 @@
 #include "ccore/c_target.h"
-#include "cbase/c_memory.h"
-#include "cbase/c_limits.h"
-#include "cbase/c_integer.h"
-#include "cbase/c_allocator.h"
-#include "cbase/c_integer.h"
+#include "ccore/c_allocator.h"
+#include "ccore/c_memory.h"
 
 #include "callocator/c_allocator_frame.h"
 
@@ -28,7 +25,7 @@ namespace ncore
         {
             return frame_alloc_t(nullptr, 0);
         }
-        checkout_ = math::alignUp(size, alignment);
+        checkout_ = (size + (alignment - 1)) & ~(alignment - 1);
 #ifdef TARGET_DEBUG
         nmem::memset(buffer_cursor_, 0xCDCDCDCD, checkout_);
 #endif

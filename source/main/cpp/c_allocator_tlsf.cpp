@@ -1,11 +1,6 @@
 #include "ccore/c_target.h"
-#include "cbase/c_console.h"
 #include "ccore/c_debug.h"
-#include "cbase/c_integer.h"
-#include "cbase/c_memory.h"
-#include "cbase/c_allocator.h"
-#include "cbase/c_printf.h"
-#include "cbase/c_runes.h"
+#include "ccore/c_memory.h"
 
 #include "callocator/c_allocator_tlsf.h"
 
@@ -178,7 +173,7 @@ tlsf_decl int tlsf_fls(unsigned int word) { return tlsf_fls_generic(word) - 1; }
 
 /* Possibly 64-bit version of tlsf_fls. */
 #if defined(TLSF_64BIT)
-tlsf_decl int tlsf_fls_sizet(size_t size)
+tlsf_decl int tlsf_fls_sizet(ncore::uint_t size)
 {
     int high = (int)(size >> 32);
     int bits = 0;
@@ -244,11 +239,11 @@ namespace ncore
         size_t tlsf_alloc_overhead();
 
         /* Debugging. */
-        typedef void (*tlsf_walker)(void* ptr, size_t size, int used, void* user);
-        void tlsf_walk_pool(pool_t pool, tlsf_walker walker, void* user);
+        //typedef void (*tlsf_walker)(void* ptr, size_t size, int used, void* user);
+        //void tlsf_walk_pool(pool_t pool, tlsf_walker walker, void* user);
         /* Returns nonzero if any internal consistency check fails. */
-        int tlsf_check(tlsf_t tlsf);
-        int tlsf_check_pool(pool_t pool);
+        //int tlsf_check(tlsf_t tlsf);
+        //int tlsf_check_pool(pool_t pool);
 
         /*
         ** Constants.
@@ -901,24 +896,24 @@ namespace ncore
 
 #undef tlsf_insist
 
-        static void default_walker(void* ptr, size_t size, int used, void* user)
-        {
-            (void)user;
-            crunes_t format = make_crunes("\t%p %s size: %x (%p)\n");
-            printf(format, va_t(ptr), va_t(used ? "used" : "free"), va_t((unsigned int)size), va_t(block_from_ptr(ptr)));
-        }
+        // static void default_walker(void* ptr, size_t size, int used, void* user)
+        // {
+        //     (void)user;
+        //     crunes_t format = make_crunes("\t%p %s size: %x (%p)\n");
+        //     printf(format, va_t(ptr), va_t(used ? "used" : "free"), va_t((unsigned int)size), va_t(block_from_ptr(ptr)));
+        // }
 
-        void tlsf_walk_pool(pool_t pool, tlsf_walker walker, void* user)
-        {
-            tlsf_walker     pool_walker = walker ? walker : default_walker;
-            block_header_t* block       = offset_to_block(pool, -(int)block_header_overhead);
+        // void tlsf_walk_pool(pool_t pool, tlsf_walker walker, void* user)
+        // {
+        //     tlsf_walker     pool_walker = walker ? walker : default_walker;
+        //     block_header_t* block       = offset_to_block(pool, -(int)block_header_overhead);
 
-            while (block && !block_is_last(block))
-            {
-                pool_walker(block_to_ptr(block), block_size(block), !block_is_free(block), user);
-                block = block_next(block);
-            }
-        }
+        //     while (block && !block_is_last(block))
+        //     {
+        //         pool_walker(block_to_ptr(block), block_size(block), !block_is_free(block), user);
+        //         block = block_next(block);
+        //     }
+        // }
 
         size_t tlsf_block_size(void* ptr)
         {
@@ -931,25 +926,22 @@ namespace ncore
             return size;
         }
 
-        int tlsf_check_pool(pool_t pool)
-        {
-            /* Check that the blocks are physically correct. */
-            integrity_t integ = {0, 0};
-            tlsf_walk_pool(pool, integrity_walker, &integ);
+        // int tlsf_check_pool(pool_t pool)
+        // {
+        //     /* Check that the blocks are physically correct. */
+        //     integrity_t integ = {0, 0};
+        //     tlsf_walk_pool(pool, integrity_walker, &integ);
 
-            return integ.status;
-        }
+        //     return integ.status;
+        // }
 
         /*
         ** Size of the TLSF structures in a given memory block passed to
         ** tlsf_create, equal to the size of a control_t
         */
         size_t tlsf_size() { return sizeof(control_t); }
-
         size_t tlsf_align_size() { return ALIGN_SIZE; }
-
         size_t tlsf_block_size_min() { return block_size_min; }
-
         size_t tlsf_block_size_max() { return block_size_max; }
 
         /*
@@ -971,19 +963,19 @@ namespace ncore
 
             if (((ptrdiff_t)mem % ALIGN_SIZE) != 0)
             {
-                crunes_t format = make_crunes("tlsf_add_pool: Memory must be aligned by %u bytes.\n");
-                printf(format, va_t((unsigned int)ALIGN_SIZE));
+                // crunes_t format = make_crunes("tlsf_add_pool: Memory must be aligned by %u bytes.\n");
+                // printf(format, va_t((unsigned int)ALIGN_SIZE));
                 return 0;
             }
 
             if (pool_bytes < block_size_min || pool_bytes > block_size_max)
             {
 #if defined(TLSF_64BIT)
-                crunes_t format = make_crunes("tlsf_add_pool: Memory size must be between 0x%x and 0x%x00 bytes.\n");
-                printf(format, va_t((unsigned int)(pool_overhead + block_size_min)), va_t((unsigned int)((pool_overhead + block_size_max) / 256)));
+                // crunes_t format = make_crunes("tlsf_add_pool: Memory size must be between 0x%x and 0x%x00 bytes.\n");
+                // printf(format, va_t((unsigned int)(pool_overhead + block_size_min)), va_t((unsigned int)((pool_overhead + block_size_max) / 256)));
 #else
-                crunes_t format = make_crunes("tlsf_add_pool: Memory size must be between %u and %u bytes.\n");
-                printf(format, va_t((unsigned int)(pool_overhead + block_size_min)), va_t((unsigned int)(pool_overhead + block_size_max)));
+                // crunes_t format = make_crunes("tlsf_add_pool: Memory size must be between %u and %u bytes.\n");
+                // printf(format, va_t((unsigned int)(pool_overhead + block_size_min)), va_t((unsigned int)(pool_overhead + block_size_max)));
 #endif
                 return 0;
             }
@@ -1049,9 +1041,9 @@ namespace ncore
 
             if (rv)
             {
-                const char* format_str = "tlsf_create: %x ffs/fls tests failed!\n";
-                crunes_t    format     = make_crunes(format_str, format_str + ascii::strlen(format_str));
-                printf(format, va_t(rv));
+                // const char* format_str = "tlsf_create: %x ffs/fls tests failed!\n";
+                // crunes_t    format     = make_crunes(format_str, format_str + ascii::strlen(format_str));
+                // printf(format, va_t(rv));
             }
             return rv;
         }
@@ -1068,8 +1060,8 @@ namespace ncore
 
             if (((tlsfptr_t)mem % ALIGN_SIZE) != 0)
             {
-                crunes_t format = make_crunes("tlsf_create: Memory must be aligned to %u bytes.\n");
-                printf(format, va_t((unsigned int)ALIGN_SIZE));
+                // crunes_t format = make_crunes("tlsf_create: Memory must be aligned to %u bytes.\n");
+                // printf(format, va_t((unsigned int)ALIGN_SIZE));
                 return 0;
             }
 

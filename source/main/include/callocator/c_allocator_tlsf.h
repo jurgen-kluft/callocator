@@ -5,7 +5,7 @@
 #pragma once
 #endif
 
-#include "cbase/c_allocator.h"
+#include "ccore/c_allocator.h"
 
 namespace ncore
 {

@@ -1,7 +1,5 @@
-#include "ccore/c_target.h"
-#include "cbase/c_integer.h"
-#include "cbase/c_memory.h"
-#include "cbase/c_allocator.h"
+#include "ccore/c_allocator.h"
+#include "ccore/c_memory.h"
 
 #include "callocator/c_allocator_dlmalloc.h"
 
@@ -376,10 +374,10 @@ namespace ncore
 
 #if 0
 	/* Return true if segment contains a segment link */
-	static s32 has_segment_link(mstate m, msegmentptr ss) 
+	static s32 has_segment_link(mstate m, msegmentptr ss)
 	{
 		msegmentptr sp = &m->seg;
-		for (;;) 
+		for (;;)
 		{
 			if ((u8*)sp >= ss->base && (u8*)sp < ss->base + ss->size)
 				return 1;
