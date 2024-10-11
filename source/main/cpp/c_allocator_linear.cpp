@@ -5,11 +5,11 @@
 
 namespace ncore
 {
-    const u32 c_node_state_free   = 0x80000000;
-    const u32 c_node_state_alloc  = 0x40000000;
+    const u32 c_node_state_free   = 0x00000000;
+    const u32 c_node_state_alloc  = 0x80000000;
     const u32 c_node_state_locked = 0x80000000;
-    const u32 c_node_state_head   = 0x40000000;
-    const u32 c_node_state_mask   = 0xC0000000;
+    const u32 c_node_state_head   = 0x00000000;
+    const u32 c_node_state_mask   = 0x80000000;
 
     struct linear_alloc_t::node_t
     {
@@ -68,193 +68,163 @@ namespace ncore
     static inline u32   s_align_u32(u32 size, u32 align) { return (size + (align - 1)) & ~(align - 1); }
     static inline void* s_align_ptr(void* ptr, ptr_t align) { return (void*)(((ptr_t)ptr + (align - 1)) & ~(align - 1)); }
 
-    const u32 c_state_parent = 0x80000000;
-    const u32 c_state_mask   = 0xC0000000;
+    static inline bool is_pointer_inside(void* ptr, linear_alloc_t::node_t* begin, linear_alloc_t::node_t* end) { return ptr >= (void*)(begin + 1) && ptr < (void*)(end - 1); }
 
-    // static inline void set_parent(u32& flags) { flags = (flags & ~c_state_mask) | c_state_parent; }
-    // static inline bool is_parent(u32 flags) { return (flags & c_state_mask) == c_state_parent; }
+    static linear_alloc_t::node_t* s_reset_cursor(linear_alloc_t::node_t* begin, linear_alloc_t::node_t* end)
+    {
+        linear_alloc_t::node_t* cursor = begin + 1;
+        cursor->reset();
+        cursor->set_prev(begin);
+        cursor->set_next(end);
+        cursor->set_state_head();
+        begin->set_next(cursor);
+        begin->set_prev(nullptr);
+        begin->set_state_free();
+        end->set_next(nullptr);
+        end->set_prev(cursor);
+        end->set_state_locked();
+        return cursor;
+    }
 
     linear_alloc_t::linear_alloc_t() : m_buffer_begin(nullptr), m_buffer_cursor(nullptr) {}
     linear_alloc_t::~linear_alloc_t() {}
 
-    void linear_alloc_t::setup(void* beginAddress, u32 size)
+    void linear_alloc_t::setup(void* _beginAddress, u32 _size)
     {
         // Align to 8 bytes
-        beginAddress = (void*)s_align_ptr(beginAddress, (u32)8);
+        void* const beginAddress = s_align_ptr(_beginAddress, (u32)sizeof(node_t));
+        void* const endAddress   = (u8*)_beginAddress + _size;
+        u32 const   size         = (u8*)endAddress - (u8*)beginAddress;
 
         m_buffer_begin = (node_t*)beginAddress;
-        m_buffer_end   = m_buffer_begin + (size / sizeof(node_t));
+        m_buffer_end   = m_buffer_begin + (size / sizeof(node_t)) - 1;
         m_buffer_begin->reset();
         m_buffer_end->reset();
-        m_buffer_cursor = m_buffer_begin + 1;
 
         m_buffer_begin->set_prev(nullptr);
         m_buffer_begin->set_next(m_buffer_cursor);
-        m_buffer_begin->set_state_locked();
+        m_buffer_begin->set_state_free();
 
         m_buffer_end->set_prev(m_buffer_cursor);
         m_buffer_end->set_next(nullptr);
         m_buffer_end->set_state_locked();
 
-        m_buffer_cursor->set_prev(m_buffer_begin);
-        m_buffer_cursor->set_next(m_buffer_end);
-        m_buffer_cursor->set_state_head();
+        m_buffer_cursor = s_reset_cursor(m_buffer_begin, m_buffer_end);
     }
 
     bool linear_alloc_t::is_valid() const { return m_buffer_begin != nullptr && m_buffer_cursor < m_buffer_cursor->get_next(); }
-    bool linear_alloc_t::is_empty() const { return m_buffer_cursor == m_buffer_begin->get_next() && m_buffer_cursor->get_next() == m_buffer_end; }
-    void linear_alloc_t::reset()
-    {
-        m_buffer_cursor = m_buffer_begin;
-        m_buffer_cursor->reset();
-        m_buffer_cursor->set_prev(m_buffer_cursor);
-        m_buffer_cursor->set_next(m_buffer_end);
-    }
-
-    // // Checkout will reserve a part of the memory and construct a new linear_alloc_t and provides
-    // // it a start and end block of memory to work with.
-    // linear_alloc_t* linear_alloc_t::checkout(u32 _size, u32 alignment)
-    // {
-    //     ASSERT(m_buffer_cursor->is_head());
-
-    //     _size = s_align_u32(_size + 8, 8);
-
-    //     // Check if we had an active checkout already, if so we should commit it first.
-
-    //     // Set the beginning node here to a state that will not be merged by any
-    //     // deallocation that might happen.
-    //     m_buffer_cursor->set_state_locked();
-
-    //     // [parent node, checkout] [child linear alloc] [child begin/cursor, head] ----- memory ------ [child end, checkout] [parent cursor, head]
-
-    //     void*           na_mem = ((u8*)(m_buffer_cursor + 1));
-    //     linear_alloc_t* na     = new (na_mem) linear_alloc_t();
-    //     na->m_parent           = this;
-    //     na->m_flags            = 0;
-    //     na->m_buffer_begin     = m_buffer_cursor + 1 + s_align_u32((u32)sizeof(linear_alloc_t), 8) / sizeof(node_t);
-    //     na->m_buffer_begin->reset();
-    //     na->m_buffer_begin->set_prev(m_buffer_cursor);
-    //     na->m_buffer_begin->set_next(na->m_buffer_begin);
-    //     na->m_buffer_begin->set_state_head();
-    //     na->m_buffer_end = na->m_buffer_begin + (_size / sizeof(node_t));
-    //     na->m_buffer_end->reset();
-    //     na->m_buffer_end->set_next(na->m_buffer_end + 1); // See 'cursor' below
-    //     na->m_buffer_end->set_prev(na->m_buffer_cursor);
-    //     na->m_buffer_end->set_state_locked();
-
-    //     na->m_buffer_cursor = na->m_buffer_begin;
-
-    //     // We do need to create a next node for this allocator, so that any call to v_allocate
-    //     // will create a new node at the end of the requested memory size. This is necessary to
-    //     // keep the chain of nodes consistent.
-    //     // When commit is called we can check the last node and if it is a free node we can merge it.
-    //     node_t* next = na->m_buffer_end + 1;
-    //     next->reset();
-    //     next->set_next(next);
-    //     next->set_prev(na->m_buffer_end);
-    //     next->set_state_head();
-
-    //     m_buffer_cursor->set_next(na->m_buffer_begin);
-    //     m_buffer_cursor->set_state_locked();
-    //     m_buffer_cursor = next;
-
-    //     return na;
-    // }
-
-    // // Commit will finalize the checkout and merge the memory of the checkout allocator with the current allocator.
-    // // This means that any allocation done with the checkout allocator will be part of the current allocator, and
-    // // calling deallocate on the current allocator will also deallocate the memory of the checkout allocator.
-    // void linear_alloc_t::commit()
-    // {
-    //     if (m_parent == nullptr)
-    //         return;
-
-    //     if (m_count == 0)
-    //     {
-    //         // We haven't allocated anything, see if our parent also hasn't allocated anything.
-    //         // All of our nodes are in a chain, so we only have to check the last node which is
-    //         // a node that is managed by our parent. If that node is still marked as head then
-    //         // we know that our parent hasn't allocated anything more.
-    //         if (m_buffer_end->get_next()->is_head())
-    //         {
-    //             // We can rewind the parent cursor
-    //             m_parent->m_buffer_cursor = m_buffer_begin->get_prev();
-    //             m_parent->m_buffer_cursor->set_state_head();
-    //         }
-    //         else
-    //         {
-    //             // We can't merge the memory of the checkout allocator with the parent allocator
-    //             // because the parent allocator has, in the meantime, received more allocation requests.
-    //             // We should commit the memory of the checkout allocator and make it part of the parent allocator.
-    //             // This is very 'bad' since we are waisting memory, but we can't do anything about it.
-    //             m_buffer_begin->get_prev()->set_next(m_buffer_end->get_next());
-    //         }
-    //     }
-    //     else
-    //     {
-    //         // We have allocated memory, see if our parent, in the meantime, has allocated memory.
-    //         // If not we can change the cursor of our parent allocator to be our cursor.
-    //         if (m_buffer_end->get_next()->is_head())
-    //         {
-    //             // Parent hasn't allocated anything, we can rewind the cursor
-    //             m_parent->m_buffer_cursor = m_buffer_cursor;
-    //         }
-    //         else
-    //         {
-    //             // Parent has allocated memory, connect our last allocation with the node after m_buffer_end
-    //             m_buffer_cursor->get_prev()->set_next(m_buffer_end->get_next());
-    //         }
-    //     }
-
-    //     // We are done, reset the parent pointer
-    //     m_parent = nullptr;
-    // }
+    bool linear_alloc_t::is_empty() const { return m_buffer_cursor == m_buffer_begin + 1; }
+    void linear_alloc_t::reset() { m_buffer_cursor = s_reset_cursor(m_buffer_begin, m_buffer_end); }
 
     void* linear_alloc_t::v_allocate(u32 size, u32 alignment)
     {
-        // @todo
-        // allocate initializes current node and creates a new
-        // node at the end of the requested memory size
+        if (m_buffer_cursor == m_buffer_end)
+            return nullptr;
+
         ASSERT(m_buffer_cursor->is_head());
 
+        // align the size to a multiple of the node_t size
         size = s_align_u32(size, sizeof(node_t));
 
-        // @todo, check if we can allocate this size
+        // check if we can allocate this size
+        u32 sizeLeft = (m_buffer_end - (m_buffer_cursor + 1)) * sizeof(node_t);
+        if (size > sizeLeft)
+            return nullptr;
 
-        // @todo, alignment, shift m_buffer_cursor forward to handle the alignment request
-        // for that we need to update m_buffer_cursor->m_prev->m_next
+        // alignment, shift cursor forward to handle the alignment request
+        // for that we need to update cursor->prev->next
+        void* ptr         = (void*)(m_buffer_cursor + 1);
+        void* aligned_ptr = s_align_ptr(ptr, alignment);
+        if (ptr < aligned_ptr)
+        {
+            // Move cursor according to the alignment shift
+            u32 const offset = (u32)((u8*)aligned_ptr - (u8*)ptr);
+            ASSERT(offset >= sizeof(node_t) && ((offset & (sizeof(node_t) - 1)) == 0));
+            node_t* adjusted_cursor = m_buffer_cursor + (offset / sizeof(node_t));
+            adjusted_cursor->reset();
+            m_buffer_cursor->get_prev()->set_next(adjusted_cursor);
+            m_buffer_cursor->get_next()->set_prev(adjusted_cursor);
+            adjusted_cursor->set_prev(m_buffer_cursor->get_prev());
+            adjusted_cursor->set_next(m_buffer_cursor->get_next());
+            adjusted_cursor->set_state_head();
 
-        void* ptr = (void*)(m_buffer_cursor + 1);
+            // check again if we can allocate this size
+            sizeLeft = (m_buffer_end - (adjusted_cursor + 1)) * sizeof(node_t);
+            if (size > sizeLeft)
+                return nullptr;
+
+            m_buffer_cursor = adjusted_cursor;
+            ptr             = aligned_ptr;
+        }
+
         m_buffer_cursor->set_state_alloc();
 
-        node_t* cursor = m_buffer_cursor + 1 + (size / sizeof(node_t));
-        cursor->set_next(cursor);
-        cursor->set_prev(m_buffer_cursor);
-        cursor->set_state_head();
-        m_buffer_cursor = cursor; // This is our new head
+        sizeLeft = sizeLeft - size;
+        if (sizeLeft <= sizeof(node_t))
+        {
+            // We are out of memory, we can't create a new node
+            m_buffer_cursor->get_prev()->set_next(m_buffer_end);
+            m_buffer_cursor->get_next()->set_prev(m_buffer_cursor->get_prev());
+            m_buffer_cursor = m_buffer_end;
+        }
+        else
+        {
+            node_t* new_cursor = m_buffer_cursor + 1 + (size / sizeof(node_t));
+            new_cursor->reset();
+            new_cursor->set_next(m_buffer_cursor->get_next());
+            new_cursor->set_prev(m_buffer_cursor);
+            new_cursor->set_state_head();
+            m_buffer_cursor->get_next()->set_prev(new_cursor);
+            m_buffer_cursor->set_next(new_cursor);
+            m_buffer_cursor = new_cursor;
+        }
 
 #ifdef TARGET_DEBUG
         nmem::memset(ptr, 0xCD, size);
 #endif
+
         return ptr;
     }
 
     void linear_alloc_t::v_deallocate(void* ptr)
     {
+        if (ptr == nullptr)
+            return;
+
+        ASSERT(is_pointer_inside(ptr, m_buffer_begin, m_buffer_end));
+
         node_t* node = (node_t*)ptr - 1;
         ASSERT(!node->is_free());
-        node->set_state_free();
 
         // remove this node from the chain (merge)
-        if (node->get_prev() != nullptr)
-        {
-            node->get_prev()->set_next(node->get_next());
-        }
-        if (node->get_next() != nullptr)
-        {
-            node->get_next()->set_prev(node->get_prev());
-        }
+        node_t* prev = node->get_prev();
+        node_t* next = node->get_next();
 
+        // always see if we can move the cursor to the most left of the chain
+        if (m_buffer_cursor == next)
+        {
+            if (m_buffer_begin == prev)
+            {
+                m_buffer_cursor = s_reset_cursor(m_buffer_begin, m_buffer_end);
+            }
+            else
+            {
+                // we can move the cursor back to this node that has been freed
+                node->set_next(m_buffer_cursor->get_next());
+                m_buffer_cursor->get_next()->set_prev(node);
+                m_buffer_cursor = node;
+                m_buffer_cursor->set_state_head();
+            }
+        }
+        else
+        {
+            // the node freed is in the middle of the chain, cannot move cursor
+            prev->set_next(next);
+            next->set_prev(prev);
+            node->set_state_free();
+            node->set_next(nullptr);
+            node->set_prev(nullptr);
+        }
     }
 
 }; // namespace ncore

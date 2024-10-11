@@ -4,8 +4,6 @@
             "name": "Mac",
             "includePath": [
                 "${workspaceFolder}/source/main/include",
-                "${workspaceFolder}/source/test/include",
-                "${workspaceFolder}/../cbase/source/main/include",
                 "${workspaceFolder}/../ccore/source/main/include",
                 "${workspaceFolder}/../cunittest/source/main/include"
             ],
