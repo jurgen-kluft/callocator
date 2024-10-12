@@ -9,6 +9,6 @@ virtual void void deallocate(void* p) = 0;         ///< Deallocate/Free memory
 
 Some allocators in this package:
 
-* tlsf 
-* frame allocator
-* linear allocator
+* TLSF allocator, Two-Level Segregate Fit
+* Frame allocator, per-frame allocator
+* Linear allocator, linear allocator designed for temporary memory

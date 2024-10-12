@@ -27,8 +27,6 @@ namespace ncore
         DCORE_CLASS_PLACEMENT_NEW_DELETE
 
     private:
-        virtual frame_alloc_t v_checkout(u32 size, u32 alignment);
-        virtual void          v_commit(frame_alloc_t const&);
         virtual void*         v_allocate(u32 size, u32 alignment);
         virtual void          v_deallocate(void* ptr);
 
