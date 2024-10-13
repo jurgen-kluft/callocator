@@ -6,7 +6,7 @@
 
 using namespace ncore;
 
-UNITTEST_SUITE_BEGIN(x_allocator_tlfs)
+UNITTEST_SUITE_BEGIN(tlfs)
 {
     UNITTEST_FIXTURE(main)
     {

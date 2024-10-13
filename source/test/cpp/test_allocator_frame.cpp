@@ -5,7 +5,7 @@
 
 using namespace ncore;
 
-UNITTEST_SUITE_BEGIN(frame_alloc)
+UNITTEST_SUITE_BEGIN(frame)
 {
 	UNITTEST_FIXTURE(main)
 	{

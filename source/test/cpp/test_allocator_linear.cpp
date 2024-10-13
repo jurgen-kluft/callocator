@@ -6,7 +6,7 @@
 
 using namespace ncore;
 
-UNITTEST_SUITE_BEGIN(linear_alloc)
+UNITTEST_SUITE_BEGIN(linear)
 {
     UNITTEST_FIXTURE(main)
     {
@@ -27,6 +27,15 @@ UNITTEST_SUITE_BEGIN(linear_alloc)
 
             for (s32 i = 0; i < 16; ++i)
             {
+                {
+                    void* mema = alloc.allocate(1 * cKB, 16);
+                    CHECK_TRUE(nmem::ptr_is_aligned(mema, 16));
+                    void* memb = alloc.allocate(512, 32);
+                    CHECK_TRUE(nmem::ptr_is_aligned(memb, 32));
+                    alloc.deallocate(mema);
+                    alloc.deallocate(memb);
+                }
+
                 CHECK_TRUE(alloc.is_empty());
 
                 void* mem1 = alloc.allocate(512, 8);
@@ -37,9 +46,9 @@ UNITTEST_SUITE_BEGIN(linear_alloc)
 
                 CHECK_TRUE(alloc.is_empty());
 
-                void* mem2 = alloc.allocate(1024, 16);
+                void* mem2 = alloc.allocate(1 * cKB, 16);
                 void* mem3 = alloc.allocate(512, 32);
-                void* mem4 = alloc.allocate(1024, 256);
+                void* mem4 = alloc.allocate(1 * cKB, 256);
                 void* mem5 = alloc.allocate(256, 32);
                 CHECK_NOT_NULL(mem2);
                 CHECK_NOT_NULL(mem3);
@@ -59,8 +68,8 @@ UNITTEST_SUITE_BEGIN(linear_alloc)
                 alloc.deallocate(mem6);
                 mem6 = nullptr;
 
-                void* mem7 = alloc.allocate(2048, 256);
-                void* mem8 = alloc.allocate(1024, 256);
+                void* mem7 = alloc.allocate(2 * cKB, 256);
+                void* mem8 = alloc.allocate(1 * cKB, 256);
                 CHECK_NOT_NULL(mem7);
                 CHECK_NOT_NULL(mem8);
                 CHECK_TRUE(nmem::ptr_is_aligned(mem7, 256));
@@ -84,9 +93,9 @@ UNITTEST_SUITE_BEGIN(linear_alloc)
                 CHECK_NOT_NULL(memfull);
                 CHECK_TRUE(nmem::ptr_is_aligned(memfull, 8));
 
-                // This should fail
+                // This should not fail, since the allocator has wrapped around
                 void* mema = alloc.allocate(2 * cKB, 8);
-                CHECK_NULL(mema);
+                CHECK_NOT_NULL(mema);
 
                 alloc.deallocate(mem9);
                 mem9 = nullptr;
