@@ -2,8 +2,6 @@
 *
 !*/
 
-vendor/
-t2-output/
 target/
 tags
 
@@ -16,8 +14,6 @@ tags
 !*.h
 !*.inl
 
-!*.build
-
 !*.go
 
 !*.cs
@@ -27,11 +23,7 @@ tags
 !*.hlsl
 !*.fragment
 
-!*.mold
-!*.sc
-!*.diagram
-
-!*.ini
-!*.bat
+!*.png
+!*.md
 
 #except the following folders

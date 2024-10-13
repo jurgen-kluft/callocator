@@ -1,13 +1,13 @@
 # ccore allocator library
 
-A library containing many different allocators using a simple allocator interface:
+A library containing some  allocators using the allocator interface from ccore:
 
 ```c++
 virtual void* allocate(u32 size, u32 align) = 0;  ///< Allocate memory with alignment
 virtual void void deallocate(void* p) = 0;         ///< Deallocate/Free memory
 ```
 
-Some allocators in this package:
+This package contains:
 
 * TLSF allocator, Two-Level Segregate Fit
 * Frame allocator, per-frame allocator
