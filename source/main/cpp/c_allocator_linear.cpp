@@ -5,12 +5,6 @@
 
 namespace ncore
 {
-    const u32 c_node_state_free   = 0x00000000;
-    const u32 c_node_state_alloc  = 0x80000000;
-    const u32 c_node_state_locked = 0x80000000;
-    const u32 c_node_state_head   = 0x00000000;
-    const u32 c_node_state_mask   = 0x80000000;
-
     struct linear_alloc_t::node_t
     {
         inline void reset()
@@ -19,48 +13,11 @@ namespace ncore
             m_prev = 0;
         }
 
-        inline void set_state_free() { m_next = (m_next & ~c_node_state_mask) | c_node_state_free; }
-        inline void set_state_alloc() { m_next = (m_next & ~c_node_state_mask) | c_node_state_alloc; }
-        inline void set_state_locked() { m_prev = (m_prev & ~c_node_state_mask) | c_node_state_locked; }
-        inline void set_state_head() { m_prev = (m_prev & ~c_node_state_mask) | c_node_state_head; }
+        inline linear_alloc_t::node_t* get_next() { return (m_next == 0) ? nullptr : this + m_next; }
+        inline void                    set_next(linear_alloc_t::node_t* next) { m_next = (next == nullptr) ? 0 : ((u32)(next - this)); }
+        inline linear_alloc_t::node_t* get_prev() { return (m_prev == 0) ? nullptr : this - m_prev; }
+        inline void                    set_prev(linear_alloc_t::node_t* prev) { m_prev = (prev == nullptr) ? 0 : ((u32)(this - prev)); }
 
-        inline bool is_free() const { return (m_next & c_node_state_mask) == c_node_state_free; }
-        inline bool is_alloc() const { return (m_next & c_node_state_mask) == c_node_state_alloc; }
-        inline bool is_locked() const { return (m_prev & c_node_state_mask) == c_node_state_locked; }
-        inline bool is_head() const { return (m_prev & c_node_state_mask) == c_node_state_head; }
-
-        inline linear_alloc_t::node_t* get_next()
-        {
-            u32 const offset = m_next & ~c_node_state_mask;
-            if (offset == 0)
-                return nullptr;
-            return this + offset;
-        }
-
-        inline void set_next(linear_alloc_t::node_t* next)
-        {
-            if (next == nullptr)
-                next = this;
-            u32 const offset = ((u32)(next - this) & ~c_node_state_mask);
-            m_next           = (m_next & c_node_state_mask) | offset;
-        }
-
-        inline linear_alloc_t::node_t* get_prev()
-        {
-            u32 const offset = m_prev & ~c_node_state_mask;
-            if (offset == 0)
-                return nullptr;
-            return this - offset;
-        }
-        inline void set_prev(linear_alloc_t::node_t* prev)
-        {
-            if (prev == nullptr)
-                prev = this;
-            u32 const offset = ((u32)(this - prev) & ~c_node_state_mask);
-            m_prev           = (m_prev & c_node_state_mask) | offset;
-        }
-
-    private:
         u32 m_next; // relative offsets (forwards)
         u32 m_prev; // relative offsets (backwards)
     };
@@ -76,13 +33,10 @@ namespace ncore
         cursor->reset();
         cursor->set_prev(begin);
         cursor->set_next(end);
-        cursor->set_state_head();
         begin->set_next(cursor);
         begin->set_prev(nullptr);
-        begin->set_state_free();
         end->set_next(nullptr);
         end->set_prev(cursor);
-        end->set_state_locked();
         return cursor;
     }
 
@@ -103,11 +57,9 @@ namespace ncore
 
         m_buffer_begin->set_prev(nullptr);
         m_buffer_begin->set_next(m_buffer_cursor);
-        m_buffer_begin->set_state_free();
 
         m_buffer_end->set_prev(m_buffer_cursor);
         m_buffer_end->set_next(nullptr);
-        m_buffer_end->set_state_locked();
 
         m_buffer_cursor = s_reset_cursor(m_buffer_begin, m_buffer_end);
     }
@@ -121,15 +73,16 @@ namespace ncore
         if (m_buffer_cursor == m_buffer_end)
             return nullptr;
 
-        ASSERT(m_buffer_cursor->is_head());
-
         // align the size to a multiple of the node_t size
         size = s_align_u32(size, sizeof(node_t));
 
         // check if we can allocate this size
-        u32 sizeLeft = (m_buffer_end - (m_buffer_cursor + 1)) * sizeof(node_t);
+        u32 sizeLeft = (m_buffer_cursor->get_next() - (m_buffer_cursor + 1)) * sizeof(node_t);
         if (size > sizeLeft)
+        {
+            // Can we move the cursor to the beginning of the chain?
             return nullptr;
+        }
 
         // alignment, shift cursor forward to handle the alignment request
         // for that we need to update cursor->prev->next
@@ -146,18 +99,18 @@ namespace ncore
             m_buffer_cursor->get_next()->set_prev(adjusted_cursor);
             adjusted_cursor->set_prev(m_buffer_cursor->get_prev());
             adjusted_cursor->set_next(m_buffer_cursor->get_next());
-            adjusted_cursor->set_state_head();
 
             // check again if we can allocate this size
-            sizeLeft = (m_buffer_end - (adjusted_cursor + 1)) * sizeof(node_t);
+            sizeLeft = (m_buffer_cursor->get_next() - (adjusted_cursor + 1)) * sizeof(node_t);
             if (size > sizeLeft)
+            {
+                // Can we move the cursor to the beginning of the chain?
                 return nullptr;
+            }
 
             m_buffer_cursor = adjusted_cursor;
             ptr             = aligned_ptr;
         }
-
-        m_buffer_cursor->set_state_alloc();
 
         sizeLeft = sizeLeft - size;
         if (sizeLeft <= sizeof(node_t))
@@ -166,6 +119,8 @@ namespace ncore
             m_buffer_cursor->get_prev()->set_next(m_buffer_end);
             m_buffer_cursor->get_next()->set_prev(m_buffer_cursor->get_prev());
             m_buffer_cursor = m_buffer_end;
+
+            // Can we move the cursor to the beginning of the chain?
         }
         else
         {
@@ -173,7 +128,6 @@ namespace ncore
             new_cursor->reset();
             new_cursor->set_next(m_buffer_cursor->get_next());
             new_cursor->set_prev(m_buffer_cursor);
-            new_cursor->set_state_head();
             m_buffer_cursor->get_next()->set_prev(new_cursor);
             m_buffer_cursor->set_next(new_cursor);
             m_buffer_cursor = new_cursor;
@@ -194,7 +148,10 @@ namespace ncore
         ASSERT(is_pointer_inside(ptr, m_buffer_begin, m_buffer_end));
 
         node_t* node = (node_t*)ptr - 1;
-        ASSERT(!node->is_free());
+
+        // check if the node wasn't already freed
+        // this is not fully bullet proof, but it's a good check
+        ASSERT(node->m_next != 0xF2EEF2EE && node->m_prev != 0xF2EEF2EE);
 
         // remove this node from the chain (merge)
         node_t* prev = node->get_prev();
@@ -213,7 +170,6 @@ namespace ncore
                 node->set_next(m_buffer_cursor->get_next());
                 m_buffer_cursor->get_next()->set_prev(node);
                 m_buffer_cursor = node;
-                m_buffer_cursor->set_state_head();
             }
         }
         else
@@ -221,9 +177,8 @@ namespace ncore
             // the node freed is in the middle of the chain, cannot move cursor
             prev->set_next(next);
             next->set_prev(prev);
-            node->set_state_free();
-            node->set_next(nullptr);
-            node->set_prev(nullptr);
+            node->m_next = 0xF2EEF2EE;
+            node->m_prev = 0xF2EEF2EE;
         }
     }
 
