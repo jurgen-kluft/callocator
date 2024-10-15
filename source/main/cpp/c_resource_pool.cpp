@@ -186,8 +186,8 @@ namespace ncore
                     m_objects[object_type_index].m_a_component[0].setup(m_allocator, max_num_objects, sizeof_object);
                     m_objects[object_type_index].m_a_component_map = (u16*)g_allocate_and_memset(m_allocator, max_num_components_global * sizeof(u16), 0xFFFFFFFF);
                     m_objects[object_type_index].m_a_component_map[0] = 0;
-                    m_objects[object_type_index].m_max_components = max_num_components_local;
-                    m_objects[object_type_index].m_num_components = 0;
+                    m_objects[object_type_index].m_max_components = max_num_components_local + 1;
+                    m_objects[object_type_index].m_num_components = 1;
                     return true;
                 }
                 return false;
@@ -195,15 +195,15 @@ namespace ncore
 
             bool pool_t::register_component_type(u16 object_type_index, u16 component_type_index, u32 sizeof_component)
             {
-                ASSERT(m_objects[object_type_index].m_a_component_map[component_type_index + 1] == 0xFFFF);
-                if (m_objects[object_type_index].m_a_component_map[component_type_index + 1] == 0xFFFF)
+                ASSERT(m_objects[object_type_index].m_a_component_map[component_type_index] == 0xFFFF);
+                if (m_objects[object_type_index].m_a_component_map[component_type_index] == 0xFFFF)
                 {
                     ASSERT(object_type_index < m_max_object_types);
                     ASSERT(component_type_index < m_max_component_types);
                     const u32 max_num_objects       = m_objects[object_type_index].m_object_map.m_count;
                     u16 const local_component_index = m_objects[object_type_index].m_num_components++;
-                    m_objects[object_type_index].m_a_component_map[component_type_index + 1] = local_component_index;
-                    m_objects[object_type_index].m_a_component[local_component_index + 1].setup(m_allocator, max_num_objects, sizeof_component);
+                    m_objects[object_type_index].m_a_component_map[component_type_index] = local_component_index;
+                    m_objects[object_type_index].m_a_component[local_component_index].setup(m_allocator, max_num_objects, sizeof_component);
                     return true;
                 }
                 return false;
@@ -218,11 +218,12 @@ namespace ncore
 
             handle_t pool_t::allocate_component(handle_t object_handle, u16 component_type_index)
             {
+                ASSERT(component_type_index > 0);
                 const u32 object_index      = get_object_index(object_handle);
                 const u16 object_type_index = get_object_type_index(object_handle);
                 ASSERT(object_type_index < m_max_object_types);
                 ASSERT(component_type_index < m_max_component_types);
-                u16 const local_component_index = m_objects[object_type_index].m_a_component_map[component_type_index + 1];
+                u16 const local_component_index = m_objects[object_type_index].m_a_component_map[component_type_index];
                 m_objects[object_type_index].m_a_component[local_component_index].allocate(object_index);
                 return make_component_handle(object_type_index, component_type_index, object_index);
             }

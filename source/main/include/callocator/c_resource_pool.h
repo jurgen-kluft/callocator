@@ -310,13 +310,11 @@ namespace ncore
 
                 template <typename T> T* get_component(handle_t handle)
                 {
-                    ASSERT(get_component_type_index(handle) > 0);
                     ASSERT((T::s_component_type_index + 1) == get_component_type_index(handle));
                     return (T*)get_object_raw(handle);
                 }
                 template <typename T> const T* get_component(handle_t handle) const
                 {
-                    ASSERT(get_component_type_index(handle) > 0);
                     ASSERT((T::s_component_type_index + 1) == get_component_type_index(handle));
                     return (const T*)get_object_raw(handle);
                 }
@@ -353,24 +351,24 @@ namespace ncore
                 }
 
                 // Register 'component' by type
-                template <typename T, typename R> bool register_component_type() { return register_component_type(T::s_object_type_index, R::s_component_type_index, sizeof(R)); }
-                template <typename T> bool             is_component(handle_t handle) const { return is_handle_a_component(handle) && get_component_type_index(handle) == T::s_component_type_index; }
+                template <typename T, typename R> bool register_component_type() { return register_component_type(T::s_object_type_index, R::s_component_type_index+1, sizeof(R)); }
+                template <typename T> bool             is_component(handle_t handle) const { return is_handle_a_component(handle) && get_component_type_index(handle) == T::s_component_type_index+1; }
                 template <typename T> handle_t         allocate_component(handle_t object_handle)
                 {
-                    const u16 component_type_index = T::s_component_type_index;
+                    const u16 component_type_index = T::s_component_type_index + 1;
                     const u32 object_type_index    = get_object_type_index(object_handle);
                     const u32 object_index         = get_object_index(object_handle);
-                    ASSERT(m_objects[object_type_index].m_a_component[component_type_index + 1] != nullptr);
                     const u16 local_component_index = m_objects[object_type_index].m_a_component_map[component_type_index];
+                    ASSERT(local_component_index != 0xFFFF); // component hasn't been registered
                     m_objects[object_type_index].m_a_component[local_component_index].allocate(object_index);
                     return make_component_handle(get_object_type_index(object_handle), component_type_index, object_index);
                 }
                 template <typename T> handle_t construct_component(handle_t object_handle)
                 {
-                    const u16 component_type_index = T::s_component_type_index;
+                    const u16 component_type_index = T::s_component_type_index + 1;
                     const u32 object_type_index    = get_object_type_index(object_handle);
                     const u32 object_index         = get_object_index(object_handle);
-                    ASSERT(m_objects[object_type_index].m_a_component[component_type_index + 1] != nullptr);
+                    ASSERT(m_objects[object_type_index].m_a_component[component_type_index] != nullptr);
                     const u16 local_component_index = m_objects[object_type_index].m_a_component_map[component_type_index];
                     ASSERT(local_component_index != 0xFFFF); // component hasn't been registered
                     m_objects[object_type_index].m_a_component[local_component_index].construct<T>(object_index);
@@ -403,7 +401,7 @@ namespace ncore
 
                 template <typename T> bool has_component(handle_t object_handle) const
                 {
-                    const u16 component_type_index = T::s_component_type_index;
+                    const u16 component_type_index = T::s_component_type_index + 1;
                     const u32 object_type_index    = get_object_type_index(object_handle);
                     ASSERT(object_type_index < m_max_object_types);
                     const u16 local_component_index = m_objects[object_type_index].m_a_component_map[component_type_index];
@@ -482,7 +480,7 @@ namespace ncore
                     ASSERT(object_type_index < m_max_object_types);
                     ASSERT(component_type_index < m_max_component_types);
                     const u16 local_component_index = m_objects[object_type_index].m_a_component_map[component_type_index];
-                    ASSERT(local_component_index != 0xFFFF || local_component_index < m_objects[object_type_index].m_max_components);
+                    ASSERT(local_component_index != 0xFFFF && local_component_index < m_objects[object_type_index].m_max_components);
                     return m_objects[object_type_index].m_a_component[local_component_index].get_access(index);
                 }
 
@@ -494,7 +492,7 @@ namespace ncore
                     ASSERT(object_type_index < m_max_object_types);
                     ASSERT(component_type_index < m_max_component_types);
                     const u16 local_component_index = m_objects[object_type_index].m_a_component_map[component_type_index];
-                    ASSERT(local_component_index != 0xFFFF || local_component_index < m_objects[object_type_index].m_max_components);
+                    ASSERT(local_component_index != 0xFFFF && local_component_index < m_objects[object_type_index].m_max_components);
                     return m_objects[object_type_index].m_a_component[local_component_index].get_access(index);
                 }
 
