@@ -12,3 +12,4 @@ This package contains:
 * TLSF allocator, Two-Level Segregate Fit
 * Frame allocator, per-frame allocator
 * Linear allocator, linear allocator designed for temporary memory
+* Object-Component allocator, allocator for managing objects that have components
