@@ -81,13 +81,59 @@ namespace ncore
             DECLARE_TAG_TYPE(kTagB);
         };
 
-    } // namespace ngfx
+    } // namespace nobject
 } // namespace ncore
 
-UNITTEST_SUITE_BEGIN(resource_pool)
+UNITTEST_SUITE_BEGIN(nobject)
 {
+    // Test the 'C' style array
+    UNITTEST_FIXTURE(array)
+    {
+        UNITTEST_ALLOCATOR;
+
+        UNITTEST_FIXTURE_SETUP() {}
+        UNITTEST_FIXTURE_TEARDOWN() {}
+
+        UNITTEST_TEST(setup_teardown)
+        {
+            nobject::array_t array;
+            array.setup(Allocator, 1024, 32);
+            array.teardown(Allocator);
+        }
+
+        struct my_object_t
+        {
+            int   ints[4];
+            float floats[4];
+            void  setup(u32 i) { ints[0] = ints[1] = ints[2] = ints[3] = floats[0] = floats[1] = floats[2] = floats[3] = i; }
+            bool  verify(u32 i) { return ints[0] == i && ints[1] == i && ints[2] == i && ints[3] == i && floats[0] == i && floats[1] == i && floats[2] == i && floats[3] == i; }
+        };
+
+        UNITTEST_TEST(get_access)
+        {
+            nobject::array_t array;
+            array.setup(Allocator, 1024, sizeof(my_object_t));
+
+            for (u32 i = 0; i < 1024; ++i)
+            {
+                my_object_t* ptr = array.get_access_as<my_object_t>(i);
+                CHECK_NOT_NULL(ptr);
+                ptr->setup(i);
+            }
+
+            for (u32 i = 0; i < 1024; ++i)
+            {
+                my_object_t* ptr = array.get_access_as<my_object_t>(i);
+                CHECK_NOT_NULL(ptr);
+                CHECK_TRUE(ptr->verify(i));
+            }
+
+            array.teardown(Allocator);
+        }
+    }
+
     // Test the 'C' style resource pool
-    UNITTEST_FIXTURE(objects)
+    UNITTEST_FIXTURE(pool)
     {
         UNITTEST_ALLOCATOR;
 
@@ -283,13 +329,15 @@ UNITTEST_SUITE_BEGIN(resource_pool)
 
             nobject::handle_t h1 = pool.allocate_component<nobject::component_a_t>(oa1);
             CHECK_EQUAL(0, h1.index & 0x00FFFFFF);
-            CHECK_EQUAL(0, h1.type[1]);
+            CHECK_EQUAL(0, h1.type[0]);
+            CHECK_EQUAL(1, h1.type[1]);
             nobject::handle_t h2 = pool.construct_component<nobject::component_b_t>(oa1);
             CHECK_EQUAL(0, h2.index & 0x00FFFFFF);
-            CHECK_EQUAL(1, h2.type[1]);
+            CHECK_EQUAL(0, h2.type[0]);
+            CHECK_EQUAL(2, h2.type[1]);
             nobject::handle_t h3 = pool.allocate_component<nobject::component_c_t>(oa1);
             CHECK_EQUAL(0, h3.index & 0x00FFFFFF);
-            CHECK_EQUAL(2, h3.type[1]);
+            CHECK_EQUAL(3, h3.type[1]);
 
             CHECK_TRUE(pool.is_object<nobject::object_a_t>(oa1));
             CHECK_FALSE(pool.is_object<nobject::object_b_t>(oa1));

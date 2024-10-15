@@ -29,10 +29,23 @@ namespace ncore
             u32   m_sizeof;
             u32   m_num_max;
 
-            void        setup(alloc_t* allocator, u32 max_num_resources, u32 sizeof_component);
-            void        teardown(alloc_t* allocator);
+            void setup(alloc_t* allocator, u32 max_num_resources, u32 sizeof_component);
+            void teardown(alloc_t* allocator);
+
             void*       get_access(u32 index) { return &m_memory[index * m_sizeof]; }
             const void* get_access(u32 index) const { return &m_memory[index * m_sizeof]; }
+
+            template <typename T> T* get_access_as(u32 index)
+            {
+                ASSERT(sizeof(T) <= m_sizeof);
+                return (T*)get_access(index);
+            }
+
+            template <typename T> const T* get_access_as(u32 index) const
+            {
+                ASSERT(sizeof(T) <= m_sizeof);
+                return (const T*)get_access(index);
+            }
 
             DCORE_CLASS_PLACEMENT_NEW_DELETE
         };
@@ -101,7 +114,7 @@ namespace ncore
             {
                 const u32 index = allocate();
                 void*     ptr   = get_access(index);
-                new (signature_t(), ptr) T();
+                new (ptr) T();
                 return index;
             }
 
@@ -177,7 +190,7 @@ namespace ncore
             {
                 const u32 index = m_object_pool.allocate();
                 void*     ptr   = m_object_pool.get_access(index);
-                new (signature_t(), ptr) T();
+                new (ptr) T();
                 return index;
             }
 
@@ -272,7 +285,7 @@ namespace ncore
 
 #define DECLARE_COMPONENT_TYPE(N) static const u16 s_component_type_index = N;
 
-        } // namespace ncomponent
+        } // namespace ncomponents
 
         namespace nobjects_with_components
         {
@@ -291,25 +304,25 @@ namespace ncore
 
                 template <typename T> T* get_object(handle_t handle)
                 {
-                    handle.index[1] = 0; // Objects have a component index of 0
+                    handle.type[1] = 0; // Objects have a component index of 0
                     return (T*)get_object_raw(handle);
                 }
                 template <typename T> const T* get_object(handle_t handle) const
                 {
-                    handle.index[1] = 0; // Objects have a component index of 0
+                    handle.type[1] = 0; // Objects have a component index of 0
                     return (const T*)get_object_raw(handle);
                 }
 
                 template <typename T> T* get_component(handle_t handle)
                 {
-                    // handle can be an object handle or any component handle, the user is 
+                    // handle can be an object handle or any component handle, the user is
                     // asking here for a component of type T, so we need to set the component type index
                     handle.type[1] = T::s_component_type_index + 1;
                     return (T*)get_object_raw(handle);
                 }
                 template <typename T> const T* get_component(handle_t handle) const
                 {
-                    // handle can be an object handle or any component handle, the user is 
+                    // handle can be an object handle or any component handle, the user is
                     // asking here for a component of type T, so we need to set the component type index
                     handle.type[1] = T::s_component_type_index + 1;
                     return (const T*)get_object_raw(handle);
@@ -322,8 +335,8 @@ namespace ncore
                 template <typename T> handle_t construct_object()
                 {
                     handle_t handle = allocate_object(T::s_object_type_index);
-                    void*    ptr    = get_access_raw(handle);
-                    new (signature_t(), ptr) T();
+                    void*    ptr    = get_object_raw(handle);
+                    new (ptr) T();
                     return handle;
                 }
 
@@ -357,7 +370,7 @@ namespace ncore
                     const u16 local_component_index = m_objects[object_type_index].m_a_component_map[component_type_index];
                     ASSERT(local_component_index != 0xFFFF); // component hasn't been registered
                     m_objects[object_type_index].m_a_component[local_component_index].allocate(object_index);
-                    return make_component_handle(get_object_type_index(object_handle), component_type_index, object_index);
+                    return make_component_handle(object_type_index, component_type_index, object_index);
                 }
                 template <typename T> handle_t construct_component(handle_t object_handle)
                 {
@@ -368,7 +381,7 @@ namespace ncore
                     const u16 local_component_index = m_objects[object_type_index].m_a_component_map[component_type_index];
                     ASSERT(local_component_index != 0xFFFF); // component hasn't been registered
                     m_objects[object_type_index].m_a_component[local_component_index].construct<T>(object_index);
-                    return make_component_handle(get_object_type_index(object_handle), component_type_index, object_index);
+                    return make_component_handle(object_type_index, component_type_index, object_index);
                 }
 
                 void deallocate_component(handle_t handle)
@@ -450,7 +463,7 @@ namespace ncore
                 {
                     handle_t handle;
                     handle.type[0] = object_type_index;
-                    handle.type[1] = component_type_index + 1;
+                    handle.type[1] = component_type_index;
                     handle.index   = component_index;
                     return handle;
                 }

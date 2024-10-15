@@ -28,7 +28,7 @@ namespace ncore
         void inventory_t::setup(alloc_t* allocator, u32 max_num_components, u32 sizeof_component)
         {
             m_array.setup(allocator, max_num_components, sizeof_component);
-            m_bitarray = (u32*)g_allocate_and_memset(allocator, ((max_num_components + 31) / 32) * sizeof(u32));
+            m_bitarray = (u32*)g_allocate_and_memset(allocator, ((max_num_components + 31) / 32) * sizeof(u32), 0);
         }
 
         void inventory_t::teardown(alloc_t* allocator)
@@ -90,7 +90,7 @@ namespace ncore
             {
                 m_allocator = allocator;
                 m_num_pools = max_types;
-                m_pools     = (nobject::pool_t**)g_allocate_and_memset(allocator, max_types * sizeof(nobject::pool_t*));
+                m_pools     = (nobject::pool_t**)g_allocate_and_memset(allocator, max_types * sizeof(nobject::pool_t*), 0);
             }
 
             void pool_t::teardown()
@@ -146,7 +146,7 @@ namespace ncore
             void pool_t::setup(alloc_t* allocator, u32 max_num_object_types, u32 max_num_resource_types)
             {
                 m_allocator           = allocator;
-                m_objects             = (object_t*)g_allocate_and_memset(allocator, max_num_object_types * sizeof(object_t));
+                m_objects             = (object_t*)g_allocate_and_memset(allocator, max_num_object_types * sizeof(object_t), 0);
                 m_max_object_types    = max_num_object_types;
                 m_max_component_types = max_num_resource_types + 1; // +1 for object
             }
@@ -155,9 +155,9 @@ namespace ncore
             {
                 for (u32 i = 0; i < m_max_object_types; i++)
                 {
-                    if (m_objects[i].m_object_map.m_count > 0)
+                    if (m_objects[i].m_object_map.size() > 0)
                     {
-                        for (u32 j = 0; j < m_objects[i].m_max_components; j++)
+                        for (u32 j = 0; j < m_objects[i].m_num_components; j++)
                         {
                             m_objects[i].m_a_component[j].teardown(m_allocator);
                         }
@@ -172,13 +172,13 @@ namespace ncore
 
             bool pool_t::register_object_type(u16 object_type_index, u32 max_num_objects, u32 sizeof_object, u32 max_num_components_local, u32 max_num_components_global)
             {
-                ASSERT(m_objects[object_type_index].m_object_map.m_count == 0);
-                if (m_objects[object_type_index].m_object_map.m_count == 0)
+                ASSERT(m_objects[object_type_index].m_object_map.size() == 0);
+                if (m_objects[object_type_index].m_object_map.size() == 0)
                 {
                     ASSERT(object_type_index < m_max_object_types);
                     m_objects[object_type_index].m_object_map.init_all_free(max_num_objects, m_allocator);
                     m_objects[object_type_index].m_a_tags      = (tags_t*)g_allocate_and_memset(m_allocator, max_num_objects * sizeof(tags_t), 0);
-                    m_objects[object_type_index].m_a_component = (nobject::inventory_t*)g_allocate_and_memset(m_allocator, max_num_components_local * sizeof(nobject::inventory_t*), 0);
+                    m_objects[object_type_index].m_a_component = (nobject::inventory_t*)g_allocate_and_memset(m_allocator, (max_num_components_local + 1) * sizeof(nobject::inventory_t*), 0);
                     // Index zero is the inventory for the objects itself.
                     m_objects[object_type_index].m_a_component[0].setup(m_allocator, max_num_objects, sizeof_object);
                     m_objects[object_type_index].m_a_component_map    = (u16*)g_allocate_and_memset(m_allocator, max_num_components_global * sizeof(u16), 0xFFFFFFFF);
@@ -197,7 +197,7 @@ namespace ncore
                 {
                     ASSERT(object_type_index < m_max_object_types);
                     ASSERT(component_type_index < m_max_component_types);
-                    const u32 max_num_objects                                            = m_objects[object_type_index].m_object_map.m_count;
+                    const u32 max_num_objects                                            = m_objects[object_type_index].m_object_map.size();
                     u16 const local_component_index                                      = m_objects[object_type_index].m_num_components++;
                     m_objects[object_type_index].m_a_component_map[component_type_index] = local_component_index;
                     m_objects[object_type_index].m_a_component[local_component_index].setup(m_allocator, max_num_objects, sizeof_component);

@@ -1,5 +1,4 @@
 #include "callocator/c_offset_allocator.h"
-
 #include "ccore/c_memory.h"
 #include "ccore/c_allocator.h"
 
@@ -9,7 +8,7 @@ namespace ncore
     {
         inline u32 lzcnt_nonzero(u32 v)
         {
-#ifdef CC_PLATFORM_WINDOWS
+#ifdef _MSC_VER
             unsigned long retVal;
             _BitScanReverse(&retVal, v);
             return 31 - retVal;
@@ -20,7 +19,7 @@ namespace ncore
 
         inline u32 tzcnt_nonzero(u32 v)
         {
-#ifdef CC_PLATFORM_WINDOWS
+#ifdef _MSC_VER
             unsigned long retVal;
             _BitScanForward(&retVal, v);
             return retVal;
@@ -64,7 +63,7 @@ namespace ncore
                         mantissa++;
                 }
 
-                return (exp << MANTISSA_BITS) + mantissa; // + allows mantissa->exp overflow for round up
+                return (exp << MANTISSA_BITS) + mantissa;  // + allows mantissa->exp overflow for round up
             }
 
             u32 uintToFloatRoundDown(u32 size)
@@ -105,7 +104,7 @@ namespace ncore
                     return (mantissa | MANTISSA_VALUE) << (exponent - 1);
                 }
             }
-        } // namespace nfloat
+        }  // namespace nfloat
 
         // Utility functions
         u32 findLowestSetBitAfter(u32 bitMask, u32 startBitIndex)
@@ -118,16 +117,34 @@ namespace ncore
             return tzcnt_nonzero(bitsAfter);
         }
 
-        // offset_allocator_t...
-        offset_allocator_t::offset_allocator_t(alloc_t* allocator, u32 size, u32 maxAllocs)
-            : m_allocator(allocator), m_size(size), m_maxAllocs(maxAllocs), m_freeStorage(0), m_usedBinsTop(0), m_nodes(nullptr), m_neighbors(nullptr), m_used(nullptr), m_freeIndex(0), m_freeListHead(node_t::NIL), m_freeOffset(maxAllocs - 1)
+        allocator_t::allocator_t(alloc_t* allocator, u32 size, u32 maxAllocs)
+            : m_allocator(allocator)
+            , m_size(size)
+            , m_maxAllocs(maxAllocs)
+            , m_freeStorage(0)
+            , m_usedBinsTop(0)
+            , m_nodes(nullptr)
+            , m_neighbors(nullptr)
+            , m_used(nullptr)
+            , m_freeIndex(0)
+            , m_freeListHead(node_t::NIL)
+            , m_freeOffset(maxAllocs - 1)
         {
-            ASSERT(m_size < 0x80000000); // Size must be less than 2^31
+            ASSERT(m_size < 0x80000000);  // Size must be less than 2^31
         }
 
-        offset_allocator_t::offset_allocator_t(offset_allocator_t&& other)
-            : m_allocator(other.m_allocator), m_size(other.m_size), m_maxAllocs(other.m_maxAllocs), m_freeStorage(other.m_freeStorage), m_usedBinsTop(other.m_usedBinsTop), m_nodes(other.m_nodes), m_neighbors(other.m_neighbors), m_used(other.m_used),
-              m_freeIndex(other.m_freeIndex), m_freeListHead(other.m_freeListHead), m_freeOffset(other.m_freeOffset)
+        allocator_t::allocator_t(allocator_t&& other)
+            : m_allocator(other.m_allocator)
+            , m_size(other.m_size)
+            , m_maxAllocs(other.m_maxAllocs)
+            , m_freeStorage(other.m_freeStorage)
+            , m_usedBinsTop(other.m_usedBinsTop)
+            , m_nodes(other.m_nodes)
+            , m_neighbors(other.m_neighbors)
+            , m_used(other.m_used)
+            , m_freeIndex(other.m_freeIndex)
+            , m_freeListHead(other.m_freeListHead)
+            , m_freeOffset(other.m_freeOffset)
         {
             nmem::memcpy(m_usedBins, other.m_usedBins, sizeof(u8) * NUM_TOP_BINS);
             nmem::memcpy(m_binIndices, other.m_binIndices, sizeof(u32) * NUM_LEAF_BINS);
@@ -143,7 +160,7 @@ namespace ncore
             other.m_usedBinsTop  = 0;
         }
 
-        void offset_allocator_t::setup()
+        void allocator_t::setup()
         {
             m_nodes     = (node_t*)m_allocator->allocate(sizeof(node_t) * m_maxAllocs);
             m_neighbors = (neighbor_t*)m_allocator->allocate(sizeof(neighbor_t) * m_maxAllocs);
@@ -152,7 +169,7 @@ namespace ncore
             reset();
         }
 
-        void offset_allocator_t::teardown()
+        void allocator_t::teardown()
         {
             if (m_nodes)
                 m_allocator->deallocate(m_nodes);
@@ -171,7 +188,7 @@ namespace ncore
             m_freeListHead = node_t::NIL;
         }
 
-        void offset_allocator_t::reset()
+        void allocator_t::reset()
         {
             m_freeStorage = 0;
             m_usedBinsTop = 0;
@@ -191,7 +208,7 @@ namespace ncore
             insertNodeIntoBin(m_size, 0);
         }
 
-        offset_allocator_t::~offset_allocator_t()
+        allocator_t::~allocator_t()
         {
             if (m_nodes)
                 m_allocator->deallocate(m_nodes);
@@ -201,15 +218,16 @@ namespace ncore
                 m_allocator->deallocate(m_used);
         }
 
-        allocation_t offset_allocator_t::allocate(u32 size)
+        allocation_t allocator_t::allocate(u32 size)
         {
             // Out of allocations?
             if (m_freeOffset == 0)
             {
-                allocation_t result;
-                result.offset   = allocation_t::NO_SPACE;
-                result.metadata = allocation_t::NO_SPACE;
-                return result;
+                //return {.offset = allocation_t::NO_SPACE, .metadata = allocation_t::NO_SPACE};
+                allocation_t a;
+                a.offset = allocation_t::NO_SPACE;
+                a.metadata = allocation_t::NO_SPACE;
+                return a;
             }
 
             // Round up to bin index to ensure that alloc >= bin
@@ -236,9 +254,11 @@ namespace ncore
                 // Out of space?
                 if (topBinIndex == allocation_t::NO_SPACE)
                 {
-                    allocation_t result;
-                    result.offset   = allocation_t::NO_SPACE;
-                    result.metadata = allocation_t::NO_SPACE;
+                    //return {.offset = allocation_t::NO_SPACE, .metadata = allocation_t::NO_SPACE};
+                    allocation_t a;
+                    a.offset = allocation_t::NO_SPACE;
+                    a.metadata = allocation_t::NO_SPACE;
+                    return a;
                 }
 
                 // All leaf bins here fit the alloc, since the top bin was rounded up. Start leaf search from bit 0.
@@ -267,12 +287,12 @@ namespace ncore
             // Bin empty?
             if (m_binIndices[binIndex] == node_t::NIL)
             {
-                m_usedBins[topBinIndex] &= ~(1 << leafBinIndex); // Remove a leaf bin mask bit
+                m_usedBins[topBinIndex] &= ~(1 << leafBinIndex);  // Remove a leaf bin mask bit
 
                 // All leaf bins empty?
                 if (m_usedBins[topBinIndex] == 0)
                 {
-                    m_usedBinsTop &= ~(1 << topBinIndex); // Remove a top bin mask bit
+                    m_usedBinsTop &= ~(1 << topBinIndex);  // Remove a top bin mask bit
                 }
             }
 
@@ -291,13 +311,14 @@ namespace ncore
                 neighbor.next                  = newNodeIndex;
             }
 
-            allocation_t result;
-            result.offset   = node.dataOffset;
-            result.metadata = nodeIndex;
-            return result;
+            //return {.offset = node.dataOffset, .metadata = nodeIndex};
+            allocation_t a;
+            a.offset = node.dataOffset;
+            a.metadata = nodeIndex;
+            return a;
         }
 
-        void offset_allocator_t::free(allocation_t allocation)
+        void allocator_t::free(allocation_t allocation)
         {
             ASSERT(allocation.metadata != allocation_t::NO_SPACE);
             if (!m_nodes)
@@ -381,7 +402,7 @@ namespace ncore
             }
         }
 
-        u32 offset_allocator_t::insertNodeIntoBin(u32 size, u32 dataOffset)
+        u32 allocator_t::insertNodeIntoBin(u32 size, u32 dataOffset)
         {
             // Round down to bin index to ensure that bin >= alloc
             u32 binIndex = nfloat::uintToFloatRoundDown(size);
@@ -420,11 +441,12 @@ namespace ncore
 #ifdef DEBUG_VERBOSE
             printf("Getting node %u from freelist[%u]\n", nodeIndex, m_freeOffset + 1);
 #endif
-            //m_nodes[nodeIndex]     = {.dataOffset = dataOffset, .dataSize = size, .binListNext = topNodeIndex};
-            m_nodes[nodeIndex].dataOffset = dataOffset;
-            m_nodes[nodeIndex].dataSize   = size;
+            // m_nodes[nodeIndex]     = {.dataOffset = dataOffset, .dataSize = size, .binListNext = topNodeIndex};
+            m_nodes[nodeIndex].dataOffset  = dataOffset;
+            m_nodes[nodeIndex].dataSize    = size;
             m_nodes[nodeIndex].binListNext = topNodeIndex;
-            //m_neighbors[nodeIndex] = {.prev = node_t::NIL, .next = node_t::NIL};
+            m_nodes[nodeIndex].binListPrev = node_t::NIL;
+            // m_neighbors[nodeIndex] = {.prev = node_t::NIL, .next = node_t::NIL};
             m_neighbors[nodeIndex].prev = node_t::NIL;
             m_neighbors[nodeIndex].next = node_t::NIL;
             setUnused(nodeIndex);
@@ -441,7 +463,7 @@ namespace ncore
             return nodeIndex;
         }
 
-        void offset_allocator_t::removeNodeFromBin(u32 nodeIndex)
+        void allocator_t::removeNodeFromBin(u32 nodeIndex)
         {
             node_t& node = m_nodes[nodeIndex];
 
@@ -505,7 +527,7 @@ namespace ncore
 #endif
         }
 
-        u32 offset_allocator_t::allocationSize(allocation_t allocation) const
+        u32 allocator_t::allocationSize(allocation_t allocation) const
         {
             if (allocation.metadata == allocation_t::NO_SPACE || !m_nodes)
                 return 0;
@@ -513,7 +535,7 @@ namespace ncore
             return m_nodes[allocation.metadata].dataSize;
         }
 
-        storage_report_t offset_allocator_t::storageReport() const
+        storage_report_t allocator_t::storageReport() const
         {
             u32 largestFreeRegion = 0;
             u32 freeStorage       = 0;
@@ -531,14 +553,10 @@ namespace ncore
                 }
             }
 
-            //return {.totalFreeSpace = freeStorage, .largestFreeRegion = largestFreeRegion};
-            storage_report_t report;
-            report.totalFreeSpace   = freeStorage;
-            report.largestFreeRegion = largestFreeRegion;
-            return report;
+            return {.totalFreeSpace = freeStorage, .largestFreeRegion = largestFreeRegion};
         }
 
-        full_storage_report_t offset_allocator_t::storageReportFull() const
+        full_storage_report_t allocator_t::storageReportFull() const
         {
             full_storage_report_t report;
             for (u32 i = 0; i < NUM_LEAF_BINS; i++)
@@ -550,12 +568,10 @@ namespace ncore
                     nodeIndex = m_nodes[nodeIndex].binListNext;
                     count++;
                 }
-                //report.freeRegions[i] = {.size = nfloat::floatToUint(i), .count = count};
-                report.freeRegions[i].size  = nfloat::floatToUint(i);
-                report.freeRegions[i].count = count;
+                report.freeRegions[i] = {.size = nfloat::floatToUint(i), .count = count};
             }
             return report;
         }
-    } // namespace ngfx
+    }  // namespace ngfx
 
-} // namespace ncore
+}  // namespace ncore

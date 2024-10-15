@@ -17,7 +17,7 @@ namespace ncore
     }  // namespace noffset
 }  // namespace ncore
 
-UNITTEST_SUITE_BEGIN(test_resource_pool)
+UNITTEST_SUITE_BEGIN(offset)
 {
     UNITTEST_FIXTURE(small_float)
     {
@@ -93,15 +93,15 @@ UNITTEST_SUITE_BEGIN(test_resource_pool)
         }
     }
 
-    UNITTEST_FIXTURE(offset_allocator)
+    UNITTEST_FIXTURE(allocator)
     {
         UNITTEST_ALLOCATOR;
 
-        ncore::noffset::offset_allocator_t* allocator = nullptr;
+        ncore::noffset::allocator_t* allocator = nullptr;
 
         UNITTEST_FIXTURE_SETUP()
         {
-            allocator = Allocator->construct<ncore::noffset::offset_allocator_t>(Allocator, 1024 * 1024 * 256);
+            allocator = Allocator->construct<ncore::noffset::allocator_t>(Allocator, 1024 * 1024 * 256);
             allocator->setup();
         }
 
@@ -113,7 +113,7 @@ UNITTEST_SUITE_BEGIN(test_resource_pool)
 
         UNITTEST_TEST(basic)
         {
-            ncore::noffset::offset_allocator_t alloc(Allocator, 1024 * 1024 * 256);
+            ncore::noffset::allocator_t alloc(Allocator, 1024 * 1024 * 256);
             alloc.setup();
 
             ncore::noffset::allocation_t a      = alloc.allocate(1337);

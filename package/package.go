@@ -3,7 +3,6 @@ package callocator
 import (
 	cbase "github.com/jurgen-kluft/cbase/package"
 	"github.com/jurgen-kluft/ccode/denv"
-	ccore "github.com/jurgen-kluft/ccore/package"
 	cunittest "github.com/jurgen-kluft/cunittest/package"
 )
 
@@ -11,18 +10,15 @@ import (
 func GetPackage() *denv.Package {
 	// Dependencies
 	cunittestpkg := cunittest.GetPackage()
-	ccorepkg := ccore.GetPackage()
 	cbasepkg := cbase.GetPackage()
 
 	// The main (callocator) package
 	mainpkg := denv.NewPackage("callocator")
 	mainpkg.AddPackage(cunittestpkg)
-	mainpkg.AddPackage(ccorepkg)
 	mainpkg.AddPackage(cbasepkg)
 
 	// 'callocator' library
 	mainlib := denv.SetupDefaultCppLibProject("callocator", "github.com\\jurgen-kluft\\callocator")
-	mainlib.Dependencies = append(mainlib.Dependencies, ccorepkg.GetMainLib())
 	mainlib.Dependencies = append(mainlib.Dependencies, cbasepkg.GetMainLib())
 
 	// 'callocator' unittest project
