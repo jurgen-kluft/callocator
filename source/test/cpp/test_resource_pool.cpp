@@ -356,6 +356,17 @@ UNITTEST_SUITE_BEGIN(nobject)
             CHECK_FALSE(pool.is_component<nobject::component_a_t>(h3));
             CHECK_FALSE(pool.is_component<nobject::component_b_t>(h3));
 
+            // You can get a component through the handle of the object or the handle of the component.
+            // The handle of the component knows the type of the component but also the type of the object.
+            CHECK_TRUE(pool.has_component<nobject::component_a_t>(oa1));
+            CHECK_TRUE(pool.has_component<nobject::component_b_t>(oa1));
+            CHECK_TRUE(pool.has_component<nobject::component_c_t>(oa1));
+            nobject::component_a_t* cpa1 = pool.get_component<nobject::component_a_t>(oa1);
+            CHECK_NOT_NULL(cpa1);
+            nobject::component_a_t* cpa2 = pool.get_component<nobject::component_a_t>(h1);
+            CHECK_NOT_NULL(cpa2);
+            CHECK_EQUAL(cpa1, cpa2);
+
             pool.add_tag<nobject::tag_a_t>(oa1);
             pool.add_tag<nobject::tag_b_t>(oa1);
             pool.add_tag<nobject::tag_b_t>(oa2);

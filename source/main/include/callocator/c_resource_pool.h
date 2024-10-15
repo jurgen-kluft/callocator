@@ -468,13 +468,13 @@ namespace ncore
                     return handle;
                 }
 
-                inline u16  get_object_type_index(handle_t handle) const { return handle.type[0]; }
-                inline u16  get_component_type_index(handle_t handle) const { return handle.type[1]; }
-                inline u32  get_object_index(handle_t handle) const { return handle.index; }
-                inline u32  get_component_index(handle_t handle) const { return handle.index; }
-                inline u16  get_handle_type(handle_t handle) const { return handle.type[1] == 0 ? 0 : 1; }
-                inline bool is_handle_an_object(handle_t handle) const { return get_handle_type(handle) == 0; }
-                inline bool is_handle_a_component(handle_t handle) const { return get_handle_type(handle) == 1; }
+                static D_FORCEINLINE u16  get_object_type_index(handle_t handle) { return handle.type[0]; }
+                static D_FORCEINLINE u16  get_component_type_index(handle_t handle) { return handle.type[1]; }
+                static D_FORCEINLINE u32  get_object_index(handle_t handle) { return handle.index; }
+                static D_FORCEINLINE u32  get_component_index(handle_t handle) { return handle.index; }
+                static D_FORCEINLINE u16  get_handle_type(handle_t handle) { return handle.type[1] == 0 ? 0 : 1; }
+                static D_FORCEINLINE bool is_handle_an_object(handle_t handle) { return get_handle_type(handle) == 0; }
+                static D_FORCEINLINE bool is_handle_a_component(handle_t handle) { return get_handle_type(handle) == 1; }
 
                 bool     register_object_type(u16 object_type_index, u32 max_num_objects, u32 sizeof_object, u32 max_num_components_local, u32 max_num_components_global);
                 bool     register_component_type(u16 object_type_index, u16 component_type_index, u32 sizeof_component);
@@ -489,7 +489,7 @@ namespace ncore
                     ASSERT(object_type_index < m_max_object_types);
                     ASSERT(component_type_index < m_max_component_types);
                     const u16 local_component_index = m_objects[object_type_index].m_a_component_map[component_type_index];
-                    ASSERT(local_component_index != 0xFFFF && local_component_index < m_objects[object_type_index].m_max_components);
+                    ASSERT(local_component_index != 0xFFFF && local_component_index < m_objects[object_type_index].m_num_components);
                     return m_objects[object_type_index].m_a_component[local_component_index].get_access(index);
                 }
 
@@ -501,7 +501,7 @@ namespace ncore
                     ASSERT(object_type_index < m_max_object_types);
                     ASSERT(component_type_index < m_max_component_types);
                     const u16 local_component_index = m_objects[object_type_index].m_a_component_map[component_type_index];
-                    ASSERT(local_component_index != 0xFFFF && local_component_index < m_objects[object_type_index].m_max_components);
+                    ASSERT(local_component_index != 0xFFFF && local_component_index < m_objects[object_type_index].m_num_components);
                     return m_objects[object_type_index].m_a_component[local_component_index].get_access(index);
                 }
 
