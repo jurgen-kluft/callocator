@@ -4,88 +4,85 @@
 
 namespace ncore
 {
-    namespace ngfx
+    namespace nobject
     {
-        namespace nobject
+        array_t::array_t() : m_memory(nullptr), m_num_max(0), m_sizeof(0) {}
+
+        void array_t::setup(alloc_t* allocator, u32 max_num_components, u32 sizeof_component)
         {
-            array_t::array_t() : m_memory(nullptr), m_num_max(0), m_sizeof(0) {}
+            ASSERT(sizeof_component >= sizeof(u32)); // Resource size must be at least the size of a u32 since we use it as a linked list.
 
-            void array_t::setup(alloc_t* allocator, u32 max_num_components, u32 sizeof_component)
+            u32 const alignment = (u32)sizeof(void*);
+            m_sizeof            = (sizeof_component + alignment - 1) & ~(alignment - 1);
+            m_memory            = (byte*)allocator->allocate(max_num_components * m_sizeof);
+            m_num_max           = max_num_components;
+            m_sizeof            = sizeof_component;
+        }
+
+        void array_t::teardown(alloc_t* allocator) { allocator->deallocate(m_memory); }
+
+        // ------------------------------------------------------------------------------------------------
+
+        inventory_t::inventory_t() : m_bitarray(nullptr), m_array() {}
+
+        void inventory_t::setup(alloc_t* allocator, u32 max_num_components, u32 sizeof_component)
+        {
+            m_array.setup(allocator, max_num_components, sizeof_component);
+            m_bitarray = (u32*)g_allocate_and_memset(allocator, ((max_num_components + 31) / 32) * sizeof(u32));
+        }
+
+        void inventory_t::teardown(alloc_t* allocator)
+        {
+            if (m_bitarray != nullptr)
             {
-                ASSERT(sizeof_component >= sizeof(u32)); // Resource size must be at least the size of a u32 since we use it as a linked list.
-
-                u32 const alignment = (u32)sizeof(void*);
-                m_sizeof            = (sizeof_component + alignment - 1) & ~(alignment - 1);
-                m_memory            = (byte*)allocator->allocate(max_num_components * m_sizeof);
-                m_num_max           = max_num_components;
-                m_sizeof            = sizeof_component;
+                m_array.teardown(allocator);
+                allocator->deallocate(m_bitarray);
             }
+        }
 
-            void array_t::teardown(alloc_t* allocator) { allocator->deallocate(m_memory); }
+        void inventory_t::free_all() { nmem::memset(m_bitarray, 0, ((m_array.m_num_max + 31) / 32) * sizeof(u32)); }
 
-            // ------------------------------------------------------------------------------------------------
+        // ------------------------------------------------------------------------------------------------
+        pool_t::pool_t() : m_object_array(), m_free_resource_map() {}
 
-            inventory_t::inventory_t() : m_bitarray(nullptr), m_array() {}
+        void pool_t::setup(array_t* object_array, alloc_t* allocator)
+        {
+            m_object_array = object_array;
+            m_free_resource_map.init_all_free(object_array->m_num_max, allocator);
+        }
 
-            void inventory_t::setup(alloc_t* allocator, u32 max_num_components, u32 sizeof_component)
-            {
-                m_array.setup(allocator, max_num_components, sizeof_component);
-                m_bitarray = (u32*)g_allocate_and_memset(allocator, ((max_num_components + 31) / 32) * sizeof(u32));
-            }
+        void pool_t::teardown(alloc_t* allocator)
+        {
+            m_object_array = nullptr;
+            m_free_resource_map.release(allocator);
+        }
 
-            void inventory_t::teardown(alloc_t* allocator)
-            {
-                if (m_bitarray != nullptr)
-                {
-                    m_array.teardown(allocator);
-                    allocator->deallocate(m_bitarray);
-                }
-            }
+        void pool_t::free_all() { m_free_resource_map.init_all_free(); }
 
-            void inventory_t::free_all() { nmem::memset(m_bitarray, 0, ((m_array.m_num_max + 31) / 32) * sizeof(u32)); }
+        u32 pool_t::allocate()
+        {
+            s32 const index = m_free_resource_map.find_and_set();
+            ASSERTS(index >= 0, "Error: no more resources left!");
+            return index;
+        }
 
-            // ------------------------------------------------------------------------------------------------
-            pool_t::pool_t() : m_object_array(), m_free_resource_map() {}
+        void pool_t::deallocate(u32 index) { m_free_resource_map.set_free(index); }
 
-            void pool_t::setup(array_t* object_array, alloc_t* allocator)
-            {
-                m_object_array = object_array;
-                m_free_resource_map.init_all_free(object_array->m_num_max, allocator);
-            }
+        void* pool_t::get_access(u32 index)
+        {
+            ASSERT(index != c_invalid_handle);
+            ASSERTS(m_free_resource_map.is_used(index), "Error: resource is not marked as being in use!");
+            return &m_object_array->m_memory[index * m_object_array->m_sizeof];
+        }
 
-            void pool_t::teardown(alloc_t* allocator)
-            {
-                m_object_array = nullptr;
-                m_free_resource_map.release(allocator);
-            }
+        const void* pool_t::get_access(u32 index) const
+        {
+            ASSERT(index != c_invalid_handle);
+            ASSERTS(m_free_resource_map.is_used(index), "Error: resource is not marked as being in use!");
+            return &m_object_array->m_memory[index * m_object_array->m_sizeof];
+        }
 
-            void pool_t::free_all() { m_free_resource_map.init_all_free(); }
-
-            u32 pool_t::allocate()
-            {
-                s32 const index = m_free_resource_map.find_and_set();
-                ASSERTS(index >= 0, "Error: no more resources left!");
-                return index;
-            }
-
-            void pool_t::deallocate(u32 index) { m_free_resource_map.set_free(index); }
-
-            void* pool_t::get_access(u32 index)
-            {
-                ASSERT(index != c_invalid_handle);
-                ASSERTS(m_free_resource_map.is_used(index), "Error: resource is not marked as being in use!");
-                return &m_object_array->m_memory[index * m_object_array->m_sizeof];
-            }
-
-            const void* pool_t::get_access(u32 index) const
-            {
-                ASSERT(index != c_invalid_handle);
-                ASSERTS(m_free_resource_map.is_used(index), "Error: resource is not marked as being in use!");
-                return &m_object_array->m_memory[index * m_object_array->m_sizeof];
-            }
-        } // namespace nobject
-
-        namespace nresources
+        namespace ncomponents
         {
             const handle_t pool_t::c_invalid_handle = {0xFFFFFFFF, 0xFFFF, 0xFFFF};
 
@@ -140,7 +137,7 @@ namespace ncore
                 }
                 return false;
             }
-        } // namespace nresources
+        } // namespace ncomponents
 
         namespace nobjects_with_components
         {
@@ -180,14 +177,14 @@ namespace ncore
                 {
                     ASSERT(object_type_index < m_max_object_types);
                     m_objects[object_type_index].m_object_map.init_all_free(max_num_objects, m_allocator);
-                    m_objects[object_type_index].m_a_tags          = (tags_t*)g_allocate_and_memset(m_allocator, max_num_objects * sizeof(tags_t), 0);
-                    m_objects[object_type_index].m_a_component     = (nobject::inventory_t*)g_allocate_and_memset(m_allocator, max_num_components_local * sizeof(nobject::inventory_t*), 0);
+                    m_objects[object_type_index].m_a_tags      = (tags_t*)g_allocate_and_memset(m_allocator, max_num_objects * sizeof(tags_t), 0);
+                    m_objects[object_type_index].m_a_component = (nobject::inventory_t*)g_allocate_and_memset(m_allocator, max_num_components_local * sizeof(nobject::inventory_t*), 0);
                     // Index zero is the inventory for the objects itself.
                     m_objects[object_type_index].m_a_component[0].setup(m_allocator, max_num_objects, sizeof_object);
-                    m_objects[object_type_index].m_a_component_map = (u16*)g_allocate_and_memset(m_allocator, max_num_components_global * sizeof(u16), 0xFFFFFFFF);
+                    m_objects[object_type_index].m_a_component_map    = (u16*)g_allocate_and_memset(m_allocator, max_num_components_global * sizeof(u16), 0xFFFFFFFF);
                     m_objects[object_type_index].m_a_component_map[0] = 0;
-                    m_objects[object_type_index].m_max_components = max_num_components_local + 1;
-                    m_objects[object_type_index].m_num_components = 1;
+                    m_objects[object_type_index].m_max_components     = max_num_components_local + 1;
+                    m_objects[object_type_index].m_num_components     = 1;
                     return true;
                 }
                 return false;
@@ -200,8 +197,8 @@ namespace ncore
                 {
                     ASSERT(object_type_index < m_max_object_types);
                     ASSERT(component_type_index < m_max_component_types);
-                    const u32 max_num_objects       = m_objects[object_type_index].m_object_map.m_count;
-                    u16 const local_component_index = m_objects[object_type_index].m_num_components++;
+                    const u32 max_num_objects                                            = m_objects[object_type_index].m_object_map.m_count;
+                    u16 const local_component_index                                      = m_objects[object_type_index].m_num_components++;
                     m_objects[object_type_index].m_a_component_map[component_type_index] = local_component_index;
                     m_objects[object_type_index].m_a_component[local_component_index].setup(m_allocator, max_num_objects, sizeof_component);
                     return true;
@@ -227,7 +224,6 @@ namespace ncore
                 m_objects[object_type_index].m_a_component[local_component_index].allocate(object_index);
                 return make_component_handle(object_type_index, component_type_index, object_index);
             }
-
         } // namespace nobjects_with_components
-    } // namespace ngfx
+    } // namespace nobject
 } // namespace ncore
