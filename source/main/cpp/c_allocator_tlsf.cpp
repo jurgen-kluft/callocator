@@ -15,6 +15,17 @@ namespace ncore
         typedef u32    uint32_t;
         typedef u64    uint64_t;
 
+        static inline uint32_t s_ffs(uint32_t x)
+        {
+#ifdef CC_PLATFORM_WINDOWS
+            unsigned long r = 0;
+            _BitScanForward(&r, x);
+            return (uint32_t)r;
+#else
+            return __builtin_ffs(x);
+#endif
+        }
+
         struct tlsf_block_t
         {
             /* Points to the previous block.
@@ -32,8 +43,6 @@ namespace ncore
             tlsf_block_t* next_free;
             tlsf_block_t* prev_free;
         };
-
-#define NULL nullptr
 
 #define TLSF_MAX_SIZE (((size_t)1 << (TLSF_FL_MAX - 1)) - sizeof(size_t))
 
@@ -54,8 +63,8 @@ namespace ncore
             }
         }
 
-#ifndef UNLIKELY
-#    define UNLIKELY(x) __builtin_expect(!!(x), false)
+#ifndef CC_UNLIKELY
+#    define CC_UNLIKELY(x) __builtin_expect(!!(x), false)
 #endif
 
 /* All allocation sizes and addresses are aligned. */
@@ -88,10 +97,6 @@ namespace ncore
 #define BLOCK_SIZE_MAX ((size_t)1 << (FL_MAX - 1))
 #define BLOCK_SIZE_SMALL ((size_t)1 << FL_SHIFT)
 
-#ifndef INLINE
-#    define INLINE static inline __attribute__((always_inline))
-#endif
-
         // _Static_assert(sizeof(size_t) == 4 || sizeof(size_t) == 8, "size_t must be 32 or 64 bit");
         // _Static_assert(sizeof(size_t) == sizeof(void*), "size_t must equal pointer size");
         // _Static_assert(ALIGN_SIZE == BLOCK_SIZE_SMALL / SL_COUNT, "sizes are not properly set");
@@ -102,65 +107,80 @@ namespace ncore
         // _Static_assert(FL_COUNT == TLSF_FL_COUNT, "invalid level configuration");
         // _Static_assert(SL_COUNT == TLSF_SL_COUNT, "invalid level configuration");
 
-        INLINE uint32_t bitmap_ffs(uint32_t x)
+        D_INLINE uint32_t bitmap_ffs(uint32_t x)
         {
-            uint32_t i = (uint32_t)__builtin_ffs((int32_t)x);
+            uint32_t i = (uint32_t)s_ffs((int32_t)x);
             ASSERTS(i, "no set bit found");
             return i - 1U;
         }
 
-        INLINE uint32_t log2floor(size_t x)
+        D_INLINE uint32_t log2floor(size_t x)
         {
             ASSERTS(x > 0, "log2 of zero");
-#if __SIZE_WIDTH__ == 64
+#ifdef TARGET_64BIT
+            //return (uint32_t)(63 - (uint32_t)__builtin_clzll((unsigned long long)x));
+#    ifdef CC_PLATFORM_WINDOWS
+            unsigned long r = 0;
+            _BitScanReverse64(&r, x);
+            return (uint32_t)r;
+#    else
             return (uint32_t)(63 - (uint32_t)__builtin_clzll((unsigned long long)x));
+#    endif
+
 #else
+            //return (uint32_t)(31 - (uint32_t)__builtin_clzl((unsigned long)x));
+#    ifdef CC_PLATFORM_WINDOWS
+            unsigned long r = 0;
+            _BitScanReverse(&r, x);
+            return (uint32_t)r;
+#    else
             return (uint32_t)(31 - (uint32_t)__builtin_clzl((unsigned long)x));
+#    endif
 #endif
         }
 
-        INLINE size_t block_size(const tlsf_block_t* block) { return block->header & ~BLOCK_BITS; }
+        D_INLINE size_t block_size(const tlsf_block_t* block) { return block->header & ~BLOCK_BITS; }
 
-        INLINE void block_set_size(tlsf_block_t* block, size_t size)
+        D_INLINE void block_set_size(tlsf_block_t* block, size_t size)
         {
             ASSERTS(!(size % ALIGN_SIZE), "invalid size");
             block->header = size | (block->header & BLOCK_BITS);
         }
 
-        INLINE bool block_is_free(const tlsf_block_t* block) { return !!(block->header & BLOCK_BIT_FREE); }
+        D_INLINE bool block_is_free(const tlsf_block_t* block) { return !!(block->header & BLOCK_BIT_FREE); }
 
-        INLINE bool block_is_prev_free(const tlsf_block_t* block) { return !!(block->header & BLOCK_BIT_PREV_FREE); }
+        D_INLINE bool block_is_prev_free(const tlsf_block_t* block) { return !!(block->header & BLOCK_BIT_PREV_FREE); }
 
-        INLINE void block_set_prev_free(tlsf_block_t* block, bool free) { block->header = free ? block->header | BLOCK_BIT_PREV_FREE : block->header & ~BLOCK_BIT_PREV_FREE; }
+        D_INLINE void block_set_prev_free(tlsf_block_t* block, bool free) { block->header = free ? block->header | BLOCK_BIT_PREV_FREE : block->header & ~BLOCK_BIT_PREV_FREE; }
 
-        INLINE size_t align_up(size_t x, size_t align)
+        D_INLINE size_t align_up(size_t x, size_t align)
         {
             ASSERTS(!(align & (align - 1)), "must align to a power of two");
             return (((x - 1) | (align - 1)) + 1);
         }
 
-        INLINE char* align_ptr(char* p, size_t align) { return (char*)align_up((size_t)p, align); }
+        D_INLINE char* align_ptr(char* p, size_t align) { return (char*)align_up((size_t)p, align); }
 
-        INLINE char* block_payload(tlsf_block_t* block) { return (char*)block + D_OFFSET_OF(tlsf_block_t, header) + BLOCK_OVERHEAD; }
+        D_INLINE char* block_payload(tlsf_block_t* block) { return (char*)block + CC_OFFSETOF(tlsf_block_t, header) + BLOCK_OVERHEAD; }
 
-        INLINE tlsf_block_t* to_block(void* ptr)
+        D_INLINE tlsf_block_t* to_block(void* ptr)
         {
             tlsf_block_t* block = (tlsf_block_t*)ptr;
             ASSERTS(block_payload(block) == align_ptr(block_payload(block), ALIGN_SIZE), "block not aligned properly");
             return block;
         }
 
-        INLINE tlsf_block_t* block_from_payload(void* ptr) { return to_block((char*)ptr - D_OFFSET_OF(tlsf_block_t, header) - BLOCK_OVERHEAD); }
+        D_INLINE tlsf_block_t* block_from_payload(void* ptr) { return to_block((char*)ptr - CC_OFFSETOF(tlsf_block_t, header) - BLOCK_OVERHEAD); }
 
         /* Return location of previous block. */
-        INLINE tlsf_block_t* block_prev(const tlsf_block_t* block)
+        D_INLINE tlsf_block_t* block_prev(const tlsf_block_t* block)
         {
             ASSERTS(block_is_prev_free(block), "previous block must be free");
             return block->prev;
         }
 
         /* Return location of next existing block. */
-        INLINE tlsf_block_t* block_next(tlsf_block_t* block)
+        D_INLINE tlsf_block_t* block_next(tlsf_block_t* block)
         {
             tlsf_block_t* next = to_block(block_payload(block) + block_size(block) - BLOCK_OVERHEAD);
             ASSERTS(block_size(block), "block is last");
@@ -168,16 +188,16 @@ namespace ncore
         }
 
         /* Link a new block with its neighbor, return the neighbor. */
-        INLINE tlsf_block_t* block_link_next(tlsf_block_t* block)
+        D_INLINE tlsf_block_t* block_link_next(tlsf_block_t* block)
         {
             tlsf_block_t* next = block_next(block);
             next->prev         = block;
             return next;
         }
 
-        INLINE bool block_can_split(tlsf_block_t* block, size_t size) { return block_size(block) >= sizeof(tlsf_block_t) + size; }
+        D_INLINE bool block_can_split(tlsf_block_t* block, size_t size) { return block_size(block) >= sizeof(tlsf_block_t) + size; }
 
-        INLINE void block_set_free(tlsf_block_t* block, bool free)
+        D_INLINE void block_set_free(tlsf_block_t* block, bool free)
         {
             ASSERTS(block_is_free(block) != free, "block free bit unchanged");
             block->header = free ? block->header | BLOCK_BIT_FREE : block->header & ~BLOCK_BIT_FREE;
@@ -186,20 +206,20 @@ namespace ncore
 
         /* Adjust allocation size to be aligned, and no smaller than internal minimum.
          */
-        INLINE size_t adjust_size(size_t size, size_t align)
+        D_INLINE size_t adjust_size(size_t size, size_t align)
         {
             size = align_up(size, align);
             return size < BLOCK_SIZE_MIN ? BLOCK_SIZE_MIN : size;
         }
 
         /* Round up to the next block size */
-        INLINE size_t round_block_size(size_t size)
+        D_INLINE size_t round_block_size(size_t size)
         {
             size_t t = ((size_t)1 << (log2floor(size) - SL_SHIFT)) - 1;
             return size >= BLOCK_SIZE_SMALL ? (size + t) & ~t : size;
         }
 
-        INLINE void mapping(size_t size, uint32_t* fl, uint32_t* sl)
+        D_INLINE void mapping(size_t size, uint32_t* fl, uint32_t* sl)
         {
             if (size < BLOCK_SIZE_SMALL)
             {
@@ -217,7 +237,7 @@ namespace ncore
             ASSERTS(*sl < SL_COUNT, "wrong second level");
         }
 
-        INLINE tlsf_block_t* block_find_suitable(tlsf_alloc_t* t, uint32_t* fl, uint32_t* sl)
+        D_INLINE tlsf_block_t* block_find_suitable(tlsf_alloc_t* t, uint32_t* fl, uint32_t* sl)
         {
             ASSERTS(*fl < FL_COUNT, "wrong first level");
             ASSERTS(*sl < SL_COUNT, "wrong second level");
@@ -230,7 +250,7 @@ namespace ncore
                 uint32_t fl_map = t->fl & (uint32_t)(~(uint64_t)0 << (*fl + 1));
 
                 /* No free blocks available, memory has been exhausted. */
-                if (UNLIKELY(!fl_map))
+                if (CC_UNLIKELY(!fl_map))
                     return NULL;
 
                 *fl = bitmap_ffs(fl_map);
@@ -247,7 +267,7 @@ namespace ncore
         }
 
         /* Remove a free block from the free list. */
-        INLINE void remove_free_block(tlsf_alloc_t* t, tlsf_block_t* block, uint32_t fl, uint32_t sl)
+        D_INLINE void remove_free_block(tlsf_alloc_t* t, tlsf_block_t* block, uint32_t fl, uint32_t sl)
         {
             ASSERTS(fl < FL_COUNT, "wrong first level");
             ASSERTS(sl < SL_COUNT, "wrong second level");
@@ -277,7 +297,7 @@ namespace ncore
         }
 
         /* Insert a free block into the free block list and mark the bitmaps. */
-        INLINE void insert_free_block(tlsf_alloc_t* t, tlsf_block_t* block, uint32_t fl, uint32_t sl)
+        D_INLINE void insert_free_block(tlsf_alloc_t* t, tlsf_block_t* block, uint32_t fl, uint32_t sl)
         {
             tlsf_block_t* current = t->block[fl][sl];
             ASSERTS(block, "cannot insert a null entry into the free list");
@@ -291,7 +311,7 @@ namespace ncore
         }
 
         /* Remove a given block from the free list. */
-        INLINE void block_remove(tlsf_alloc_t* t, tlsf_block_t* block)
+        D_INLINE void block_remove(tlsf_alloc_t* t, tlsf_block_t* block)
         {
             uint32_t fl, sl;
             mapping(block_size(block), &fl, &sl);
@@ -299,7 +319,7 @@ namespace ncore
         }
 
         /* Insert a given block into the free list. */
-        INLINE void block_insert(tlsf_alloc_t* t, tlsf_block_t* block)
+        D_INLINE void block_insert(tlsf_alloc_t* t, tlsf_block_t* block)
         {
             uint32_t fl, sl;
             mapping(block_size(block), &fl, &sl);
@@ -307,7 +327,7 @@ namespace ncore
         }
 
         /* Split a block into two, the second of which is free. */
-        INLINE tlsf_block_t* block_split(tlsf_block_t* block, size_t size)
+        D_INLINE tlsf_block_t* block_split(tlsf_block_t* block, size_t size)
         {
             tlsf_block_t* rest      = to_block(block_payload(block) + size - BLOCK_OVERHEAD);
             size_t        rest_size = block_size(block) - (size + BLOCK_OVERHEAD);
@@ -321,7 +341,7 @@ namespace ncore
         }
 
         /* Absorb a free block's storage into an adjacent previous free block. */
-        INLINE tlsf_block_t* block_absorb(tlsf_block_t* prev, tlsf_block_t* block)
+        D_INLINE tlsf_block_t* block_absorb(tlsf_block_t* prev, tlsf_block_t* block)
         {
             ASSERTS(block_size(prev), "previous block can't be last");
             /* Note: Leaves flags untouched. */
@@ -331,7 +351,7 @@ namespace ncore
         }
 
         /* Merge a just-freed block with an adjacent previous free block. */
-        INLINE tlsf_block_t* block_merge_prev(tlsf_alloc_t* t, tlsf_block_t* block)
+        D_INLINE tlsf_block_t* block_merge_prev(tlsf_alloc_t* t, tlsf_block_t* block)
         {
             if (block_is_prev_free(block))
             {
@@ -345,7 +365,7 @@ namespace ncore
         }
 
         /* Merge a just-freed block with an adjacent free block. */
-        INLINE tlsf_block_t* block_merge_next(tlsf_alloc_t* t, tlsf_block_t* block)
+        D_INLINE tlsf_block_t* block_merge_next(tlsf_alloc_t* t, tlsf_block_t* block)
         {
             tlsf_block_t* next = block_next(block);
             ASSERTS(next, "next block can't be null");
@@ -359,7 +379,7 @@ namespace ncore
         }
 
         /* Trim any trailing block space off the end of a block, return to pool. */
-        INLINE void block_rtrim_free(tlsf_alloc_t* t, tlsf_block_t* block, size_t size)
+        D_INLINE void block_rtrim_free(tlsf_alloc_t* t, tlsf_block_t* block, size_t size)
         {
             ASSERTS(block_is_free(block), "block must be free");
             if (!block_can_split(block, size))
@@ -371,7 +391,7 @@ namespace ncore
         }
 
         /* Trim any trailing block space off the end of a used block, return to pool. */
-        INLINE void block_rtrim_used(tlsf_alloc_t* t, tlsf_block_t* block, size_t size)
+        D_INLINE void block_rtrim_used(tlsf_alloc_t* t, tlsf_block_t* block, size_t size)
         {
             ASSERTS(!block_is_free(block), "block must be used");
             if (!block_can_split(block, size))
@@ -382,7 +402,7 @@ namespace ncore
             block_insert(t, rest);
         }
 
-        INLINE tlsf_block_t* block_ltrim_free(tlsf_alloc_t* t, tlsf_block_t* block, size_t size)
+        D_INLINE tlsf_block_t* block_ltrim_free(tlsf_alloc_t* t, tlsf_block_t* block, size_t size)
         {
             ASSERTS(block_is_free(block), "block must be free");
             ASSERTS(block_can_split(block, size), "block is too small");
@@ -393,14 +413,14 @@ namespace ncore
             return rest;
         }
 
-        INLINE void* block_use(tlsf_alloc_t* t, tlsf_block_t* block, size_t size)
+        D_INLINE void* block_use(tlsf_alloc_t* t, tlsf_block_t* block, size_t size)
         {
             block_rtrim_free(t, block, size);
             block_set_free(block, false);
             return block_payload(block);
         }
 
-        INLINE void check_sentinel(tlsf_block_t* block)
+        D_INLINE void check_sentinel(tlsf_block_t* block)
         {
             (void)block;
             ASSERTS(!block_size(block), "sentinel should be last");
@@ -444,13 +464,13 @@ namespace ncore
             }
         }
 
-        INLINE tlsf_block_t* block_find_free(tlsf_alloc_t* t, size_t size)
+        D_INLINE tlsf_block_t* block_find_free(tlsf_alloc_t* t, size_t size)
         {
             size_t   rounded = round_block_size(size);
             uint32_t fl, sl;
             mapping(rounded, &fl, &sl);
             tlsf_block_t* block = block_find_suitable(t, &fl, &sl);
-            if (UNLIKELY(!block))
+            if (CC_UNLIKELY(!block))
             {
                 if (!arena_grow(t, rounded))
                     return NULL;
@@ -465,10 +485,10 @@ namespace ncore
         void* tlsf_malloc(tlsf_alloc_t* t, size_t size)
         {
             size = adjust_size(size, ALIGN_SIZE);
-            if (UNLIKELY(size > TLSF_MAX_SIZE))
+            if (CC_UNLIKELY(size > TLSF_MAX_SIZE))
                 return NULL;
             tlsf_block_t* block = block_find_free(t, size);
-            if (UNLIKELY(!block))
+            if (CC_UNLIKELY(!block))
                 return NULL;
             return block_use(t, block, size);
         }
@@ -477,7 +497,7 @@ namespace ncore
         {
             size_t adjust = adjust_size(size, ALIGN_SIZE);
 
-            if (UNLIKELY(!size || ((align | size) & (align - 1)) /* align!=2**x, size!=n*align */ || adjust > TLSF_MAX_SIZE - align - sizeof(tlsf_block_t) /* size is too large */))
+            if (CC_UNLIKELY(!size || ((align | size) & (align - 1)) /* align!=2**x, size!=n*align */ || adjust > TLSF_MAX_SIZE - align - sizeof(tlsf_block_t) /* size is too large */))
                 return NULL;
 
             if (align <= ALIGN_SIZE)
@@ -485,7 +505,7 @@ namespace ncore
 
             size_t        asize = adjust_size(adjust + align - 1 + sizeof(tlsf_block_t), align);
             tlsf_block_t* block = block_find_free(t, asize);
-            if (UNLIKELY(!block))
+            if (CC_UNLIKELY(!block))
                 return NULL;
 
             char* mem = align_ptr(block_payload(block) + sizeof(tlsf_block_t), align);
@@ -495,7 +515,7 @@ namespace ncore
 
         void tlsf_free(tlsf_alloc_t* t, void* mem)
         {
-            if (UNLIKELY(!mem))
+            if (CC_UNLIKELY(!mem))
                 return;
 
             tlsf_block_t* block = block_from_payload(mem);
@@ -505,7 +525,7 @@ namespace ncore
             block = block_merge_prev(t, block);
             block = block_merge_next(t, block);
 
-            if (UNLIKELY(!block_size(block_next(block))))
+            if (CC_UNLIKELY(!block_size(block_next(block))))
                 arena_shrink(t, block);
             else
                 block_insert(t, block);
@@ -514,20 +534,20 @@ namespace ncore
         void* tlsf_realloc(tlsf_alloc_t* t, void* mem, size_t size)
         {
             /* Zero-size requests are treated as free. */
-            if (UNLIKELY(mem && !size))
+            if (CC_UNLIKELY(mem && !size))
             {
                 tlsf_free(t, mem);
                 return NULL;
             }
 
             /* Null-pointer requests are treated as malloc. */
-            if (UNLIKELY(!mem))
+            if (CC_UNLIKELY(!mem))
                 return tlsf_malloc(t, size);
 
             tlsf_block_t* block = block_from_payload(mem);
             size_t        avail = block_size(block);
             size                = adjust_size(size, ALIGN_SIZE);
-            if (UNLIKELY(size > TLSF_MAX_SIZE))
+            if (CC_UNLIKELY(size > TLSF_MAX_SIZE))
                 return NULL;
 
             ASSERTS(!block_is_free(block), "block already marked as free");

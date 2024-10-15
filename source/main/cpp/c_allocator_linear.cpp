@@ -114,7 +114,7 @@ namespace ncore
         // Align to 8 bytes
         void* const beginAddress = nmem::ptr_align(_beginAddress, (u32)sizeof(node_t));
         void* const endAddress   = (u8*)_beginAddress + _size;
-        u32 const   size         = (u8*)endAddress - (u8*)beginAddress;
+        u32 const   size         = (u32)((u8*)endAddress - (u8*)beginAddress);
 
         m_buffer_begin = (node_t*)beginAddress;
         m_buffer_end   = m_buffer_begin + (size / sizeof(node_t)) - 1;

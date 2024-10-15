@@ -18,7 +18,7 @@ namespace ncore
 
     void* frame_alloc_t::v_allocate(u32 size, u32 alignment)
     {
-        u8* p = ncore::g_align_ptr(m_buffer_cursor, alignment);
+        u8* p = ncore::g_ptr_align(m_buffer_cursor, alignment);
         if ((p + size) > m_buffer_end)
             return nullptr;
 #ifdef TARGET_DEBUG

@@ -64,7 +64,7 @@ UNITTEST_SUITE_BEGIN(tlfs)
                     {
                         const uint_t maxitems = 2 * spacelen;
 
-                        void** p = (void**)Allocator->allocate(maxitems * sizeof(void*));
+                        void** p = (void**)Allocator->allocate((u32)(maxitems * sizeof(void*)));
                         CHECK_NOT_NULL(p);
 
                         // Allocate random sizes up to the cap threshold.
@@ -76,16 +76,16 @@ UNITTEST_SUITE_BEGIN(tlfs)
                             uint_t len = ((uint_t)s_rand() % cap) + 1;
                             if (s_rand() % 2 == 0)
                             {
-                                p[i] = tlsf->allocate(len);
+                                p[i] = tlsf->allocate((u32)(len));
                             }
                             else
                             {
-                                uint_t align = 1U << (s_rand() % 7);
+                                u32 align = 1U << (s_rand() % 7);
                                 if (cap < align)
                                     align = 0;
                                 else
                                     len = align * (((uint_t)s_rand() % (cap / align)) + 1);
-                                p[i] = !align || !len ? tlsf->allocate(len) : tlsf->allocate(len, align);
+                                p[i] = !align || !len ? tlsf->allocate((u32)len) : tlsf->allocate((u32)(len), align);
                                 if (align)
                                 {
                                     uint_t const aligned = ((uint_t)p[i] & (align - 1));
@@ -98,7 +98,7 @@ UNITTEST_SUITE_BEGIN(tlfs)
                             if (s_rand() % 10 == 0)
                             {
                                 uint_t newlen = ((uint_t)s_rand() % cap) + 1;
-                                p[i]          = g_reallocate(tlsf, p[i], len, newlen);
+                                p[i]          = g_reallocate(tlsf, p[i], (u32)len, (u32)newlen);
                                 CHECK_NOT_NULL(p[i]);
                                 len = newlen;
                             }
