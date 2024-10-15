@@ -13,7 +13,7 @@ namespace ncore
 {
     class alloc_t;
 
-    namespace ngfx
+    namespace nobject
     {
         struct handle_t
         {
@@ -21,8 +21,6 @@ namespace ncore
             u16 type[2];
         };
 
-        namespace nobject
-        {
             struct array_t
             {
                 array_t();
@@ -195,13 +193,12 @@ namespace ncore
                 template <typename T> inline const T* pool_t<T>::get_access(u32 index) const { return (const T*)m_object_pool.get_access(index); }
 
             } // namespace ntyped
-        } // namespace nobject
 
         // A multi resource pool, where an item is of a specific resource type and the pool holds multiple resource pools.
         // We can allocate a specific resource and the index encodes the resource type so that we know which pool it belongs to.
 
-        // Pool that holds multiple resource pools
-        namespace nresources
+        // Pool that holds multiple component pools
+        namespace ncomponent
         {
             struct pool_t
             {
@@ -304,17 +301,25 @@ namespace ncore
                 template <typename T> const T* get_object(handle_t handle) const
                 {
                     ASSERT(T::s_object_type_index == get_object_type_index(handle));
+                    component type index doesn't have to be zero, however we have to set it to zero and then
+                    ask to get the object
                     ASSERT(0 == get_component_type_index(handle));
                     return (const T*)get_object_raw(handle);
                 }
 
                 template <typename T> T* get_component(handle_t handle)
                 {
+                    again, this is not necessary to check, if the component index of the handle is 0 it just means we are
+                    using the object handle to obtain a component which should be fine, the component type index is the
+                    one from T::s_component_type_index + 1.
                     ASSERT((T::s_component_type_index + 1) == get_component_type_index(handle));
                     return (T*)get_object_raw(handle);
                 }
                 template <typename T> const T* get_component(handle_t handle) const
                 {
+                    again, this is not necessary to check, if the component index of the handle is 0 it just means we are
+                    using the object handle to obtain a component which should be fine, the component type index is the
+                    one from T::s_component_type_index + 1.
                     ASSERT((T::s_component_type_index + 1) == get_component_type_index(handle));
                     return (const T*)get_object_raw(handle);
                 }
