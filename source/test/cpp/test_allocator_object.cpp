@@ -1,5 +1,5 @@
 #include "ccore/c_allocator.h"
-#include "callocator/c_resource_pool.h"
+#include "callocator/c_allocator_object.h"
 
 #include "cunittest/cunittest.h"
 
@@ -145,10 +145,9 @@ UNITTEST_SUITE_BEGIN(nobject)
             nobject::array_t array;
             array.setup(Allocator, 1024, 32);
             nobject::pool_t pool;
-            pool.setup(&array, Allocator);
+            pool.setup(array, Allocator);
 
             pool.teardown(Allocator);
-            array.teardown(Allocator);
         }
 
         UNITTEST_TEST(obtain_release)
@@ -156,14 +155,13 @@ UNITTEST_SUITE_BEGIN(nobject)
             nobject::array_t array;
             array.setup(Allocator, 1024, 32);
             nobject::pool_t pool;
-            pool.setup(&array, Allocator);
+            pool.setup(array, Allocator);
 
             u32 r = pool.allocate();
             CHECK_EQUAL(0, r);
             pool.deallocate(r);
 
             pool.teardown(Allocator);
-            array.teardown(Allocator);
         }
     }
 
@@ -231,40 +229,40 @@ UNITTEST_SUITE_BEGIN(nobject)
         UNITTEST_TEST(test_init_shutdown)
         {
             nobject::ncomponents::pool_t pool;
-            pool.setup(Allocator, 32);
+            pool.setup(Allocator, 32, 64);
             pool.teardown();
         }
 
         UNITTEST_TEST(register_resource_types)
         {
             nobject::ncomponents::pool_t pool;
-            pool.setup(Allocator, 4);
+            pool.setup(Allocator, 4, 16);
 
-            CHECK_TRUE(pool.register_resource<nobject::component_a_t>(32));
-            CHECK_TRUE(pool.register_resource<nobject::component_b_t>(32));
-            CHECK_TRUE(pool.register_resource<nobject::component_c_t>(32));
+            CHECK_TRUE(pool.register_component<nobject::component_a_t>(32));
+            CHECK_TRUE(pool.register_component<nobject::component_b_t>(32));
+            CHECK_TRUE(pool.register_component<nobject::component_c_t>(32));
 
             nobject::handle_t h1 = pool.allocate<nobject::component_a_t>();
             CHECK_EQUAL(0, h1.index);
-            CHECK_EQUAL(0, h1.type[0]);
+            CHECK_EQUAL(0, h1.type[1]);
             nobject::handle_t h2 = pool.allocate<nobject::component_b_t>();
             CHECK_EQUAL(0, h2.index);
-            CHECK_EQUAL(1, h2.type[0]);
+            CHECK_EQUAL(1, h2.type[1]);
             nobject::handle_t h3 = pool.construct<nobject::component_c_t>();
             CHECK_EQUAL(0, h3.index);
-            CHECK_EQUAL(2, h3.type[0]);
+            CHECK_EQUAL(2, h3.type[1]);
 
-            CHECK_TRUE(pool.is_resource_type<nobject::component_a_t>(h1));
-            CHECK_FALSE(pool.is_resource_type<nobject::component_b_t>(h1));
-            CHECK_FALSE(pool.is_resource_type<nobject::component_c_t>(h1));
+            CHECK_TRUE(pool.is_component_type<nobject::component_a_t>(h1));
+            CHECK_FALSE(pool.is_component_type<nobject::component_b_t>(h1));
+            CHECK_FALSE(pool.is_component_type<nobject::component_c_t>(h1));
 
-            CHECK_TRUE(pool.is_resource_type<nobject::component_b_t>(h2));
-            CHECK_FALSE(pool.is_resource_type<nobject::component_a_t>(h2));
-            CHECK_FALSE(pool.is_resource_type<nobject::component_c_t>(h2));
+            CHECK_TRUE(pool.is_component_type<nobject::component_b_t>(h2));
+            CHECK_FALSE(pool.is_component_type<nobject::component_a_t>(h2));
+            CHECK_FALSE(pool.is_component_type<nobject::component_c_t>(h2));
 
-            CHECK_TRUE(pool.is_resource_type<nobject::component_c_t>(h3));
-            CHECK_FALSE(pool.is_resource_type<nobject::component_a_t>(h3));
-            CHECK_FALSE(pool.is_resource_type<nobject::component_b_t>(h3));
+            CHECK_TRUE(pool.is_component_type<nobject::component_c_t>(h3));
+            CHECK_FALSE(pool.is_component_type<nobject::component_a_t>(h3));
+            CHECK_FALSE(pool.is_component_type<nobject::component_b_t>(h3));
 
             pool.deallocate(h1);
             pool.deallocate(h2);

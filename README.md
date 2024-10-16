@@ -13,3 +13,7 @@ This package contains:
 * Frame allocator, per-frame allocator
 * Linear allocator, linear allocator designed for temporary memory
 * Object-Component allocator, allocator for managing objects that have components
+
+## Object Component Allocator
+
+The idea behind this allocator is that we can have objects that have components. This enables associating components (data) with objects in a dynamic way which means that you can add and remove components from objects at runtime. This is useful for example in game development where you have entities that have components like position, velocity, etc. But also for other 'systems' like a render graph 

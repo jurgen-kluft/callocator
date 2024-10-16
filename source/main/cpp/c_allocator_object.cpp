@@ -1,12 +1,13 @@
 #include "ccore/c_allocator.h"
 #include "ccore/c_memory.h"
-#include "callocator/c_resource_pool.h"
+#include "callocator/c_allocator_object.h"
 
 namespace ncore
 {
     namespace nobject
     {
-        array_t::array_t() : m_memory(nullptr), m_num_max(0), m_sizeof(0) {}
+        // ------------------------------------------------------------------------------------------------
+        // array
 
         void array_t::setup(alloc_t* allocator, u32 max_num_components, u32 sizeof_component)
         {
@@ -22,8 +23,7 @@ namespace ncore
         void array_t::teardown(alloc_t* allocator) { allocator->deallocate(m_memory); }
 
         // ------------------------------------------------------------------------------------------------
-
-        inventory_t::inventory_t() : m_bitarray(nullptr), m_array() {}
+        // inventory
 
         void inventory_t::setup(alloc_t* allocator, u32 max_num_components, u32 sizeof_component)
         {
@@ -43,17 +43,17 @@ namespace ncore
         void inventory_t::free_all() { nmem::memset(m_bitarray, 0, ((m_array.m_num_max + 31) / 32) * sizeof(u32)); }
 
         // ------------------------------------------------------------------------------------------------
-        pool_t::pool_t() : m_object_array(), m_free_resource_map() {}
+        // pool
 
-        void pool_t::setup(array_t* object_array, alloc_t* allocator)
+        void pool_t::setup(array_t& object_array, alloc_t* allocator)
         {
             m_object_array = object_array;
-            m_free_resource_map.init_all_free(object_array->m_num_max, allocator);
+            m_free_resource_map.init_all_free(object_array.m_num_max, allocator);
         }
 
         void pool_t::teardown(alloc_t* allocator)
         {
-            m_object_array = nullptr;
+            m_object_array.teardown(allocator);
             m_free_resource_map.release(allocator);
         }
 
@@ -72,67 +72,68 @@ namespace ncore
         {
             ASSERT(index != c_invalid_handle);
             ASSERTS(m_free_resource_map.is_used(index), "Error: resource is not marked as being in use!");
-            return &m_object_array->m_memory[index * m_object_array->m_sizeof];
+            return &m_object_array.m_memory[index * m_object_array.m_sizeof];
         }
 
         const void* pool_t::get_access(u32 index) const
         {
             ASSERT(index != c_invalid_handle);
             ASSERTS(m_free_resource_map.is_used(index), "Error: resource is not marked as being in use!");
-            return &m_object_array->m_memory[index * m_object_array->m_sizeof];
+            return &m_object_array.m_memory[index * m_object_array.m_sizeof];
         }
 
         namespace ncomponents
         {
+            // components pool
+
             const handle_t pool_t::c_invalid_handle = {0xFFFFFFFF, 0xFFFF, 0xFFFF};
 
-            void pool_t::setup(alloc_t* allocator, u16 max_types)
+            void pool_t::setup(alloc_t* allocator, u16 max_num_types_locally, u16 max_num_types_globally)
             {
                 m_allocator = allocator;
-                m_num_pools = max_types;
-                m_pools     = (nobject::pool_t**)g_allocate_and_memset(allocator, max_types * sizeof(nobject::pool_t*), 0);
+                m_num_pools = 0;
+                m_max_pools = max_num_types_locally;
+                m_a_map     = (u16*)g_allocate_and_memset(allocator, max_num_types_globally * sizeof(u16), 0xFFFFFFFF);
+                m_a_pool    = (nobject::pool_t*)g_allocate_and_memset(allocator, max_num_types_locally * sizeof(nobject::pool_t), 0);
             }
 
             void pool_t::teardown()
             {
                 for (u32 i = 0; i < m_num_pools; i++)
                 {
-                    if (m_pools[i] != nullptr)
-                    {
-                        m_pools[i]->m_object_array->teardown(m_allocator);
-                        m_allocator->deallocate(m_pools[i]->m_object_array);
-                        m_pools[i]->teardown(m_allocator);
-                        m_allocator->deallocate(m_pools[i]);
-                    }
+                    m_a_pool[i].teardown(m_allocator);
                 }
-                m_allocator->deallocate(m_pools);
+                m_allocator->deallocate(m_a_pool);
+                m_allocator->deallocate(m_a_map);
             }
 
             void* pool_t::get_access_raw(handle_t handle)
             {
-                u32 const type_index = get_object_type_index(handle);
-                ASSERT(type_index < m_num_pools);
-                u32 const index = get_object_index(handle);
-                return m_pools[type_index]->get_access(index);
+                u16 const type_index       = get_type_index(handle);
+                u16 const local_type_index = m_a_map[type_index];
+                ASSERT(local_type_index != 0xFFFF && local_type_index < m_num_pools);
+                u32 const index = get_index(handle);
+                return m_a_pool[local_type_index].get_access(index);
             }
 
             const void* pool_t::get_access_raw(handle_t handle) const
             {
-                u32 const type_index = get_object_type_index(handle);
-                ASSERT(type_index < m_num_pools);
-                u32 const index = get_object_index(handle);
-                return m_pools[type_index]->get_access(index);
+                u16 const type_index       = get_type_index(handle);
+                u16 const local_type_index = m_a_map[type_index];
+                ASSERT(local_type_index != 0xFFFF && local_type_index < m_num_pools);
+                u32 const index = get_index(handle);
+                return m_a_pool[local_type_index].get_access(index);
             }
 
-            bool pool_t::register_resource_pool(s16 type_index, u32 max_num_components, u32 sizeof_component)
+            bool pool_t::register_component_pool(u16 type_index, u32 max_num_components, u32 sizeof_component)
             {
-                if (m_pools[type_index] == nullptr)
+                if (m_a_map[type_index] == 0xFFFF && m_num_pools < m_max_pools)
                 {
-                    ASSERT(type_index < m_num_pools);
-                    nobject::array_t* array = m_allocator->construct<nobject::array_t>();
-                    array->setup(m_allocator, max_num_components, sizeof_component);
-                    m_pools[type_index] = m_allocator->construct<nobject::pool_t>();
-                    m_pools[type_index]->setup(array, m_allocator);
+                    u16 const local_type_index = m_num_pools++;
+                    m_a_map[type_index]        = local_type_index;
+                    nobject::array_t array;
+                    array.setup(m_allocator, max_num_components, sizeof_component);
+                    m_a_pool[local_type_index].setup(array, m_allocator);
                     return true;
                 }
                 return false;
@@ -141,6 +142,8 @@ namespace ncore
 
         namespace nobjects_with_components
         {
+            // objects with components pool
+
             const handle_t pool_t::c_invalid_handle = {0xFFFFFFFF, 0xFFFF, 0xFFFF};
 
             void pool_t::setup(alloc_t* allocator, u32 max_num_object_types, u32 max_num_resource_types)
