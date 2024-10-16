@@ -39,6 +39,22 @@ UNITTEST_SUITE_BEGIN(nstring)
             nstring::g_destroy_storage(storage);
             Allocator->deallocate(mem);
         }
+
+        UNITTEST_TEST(put_get_multiple)
+        {
+            void* mem = Allocator->allocate(1024 * 1024);
+            nstring::storage_t* storage = nstring::g_create_storage_utf8(mem, 1024 * 1024);
+
+            crunes_t str = make_crunes("Hello, World!", 0, 13, 13);
+            nstring::id_t id = storage->put(str);
+            CHECK_EQUAL(0, id);
+            crunes_t str2 = storage->get(id);
+            CHECK_EQUAL(0, nrunes::compare(str, str2));
+
+            nstring::g_destroy_storage(storage);
+            Allocator->deallocate(mem);
+        }
+
     }
 }
 UNITTEST_SUITE_END

@@ -2,6 +2,7 @@
 #include "ccore/c_allocator.h"
 #include "cbase/c_hash.h"
 #include "cbase/c_integer.h"
+#include "cbase/c_runes.h"
 #include "cbase/c_tree32.h"
 
 #include "callocator/c_allocator_string.h"
@@ -88,17 +89,22 @@ namespace ncore
                 id_t v_put(crunes_t const& str) override
                 {
                     // The incoming string can be of any type, we will convert it to UTF-8.
-                    utf8::prune dst8     = m_data.m_str_cursor;
-                    utf8::prune end8     = m_data.m_str_end;
-                    runes_t          dst = make_runes(dst8, 0, 0, end8 - dst8);
-                    nrunes::writer_t writer(dst);
-                    writer.write(str);
-                    dst  = writer.get_current();
-                    dst8 = dst.m_utf8;
-                    end8 = dst8 + dst.m_end;
+                    utf8::prune dst8    = m_data.m_str_cursor;
+                    utf8::prune end8    = m_data.m_str_end;
+                    u32         cursor8 = 0;
+                    u32         cursor  = str.m_str;
+                    switch (str.m_type)
+                    {
+                        case ascii::TYPE: utf::convert(str.m_ascii, cursor, str.m_end, dst8, cursor8, (u32)(end8 - dst8)); break;
+                        case ucs2::TYPE: utf::convert(str.m_ucs2, cursor, str.m_end, dst8, cursor8, (u32)(end8 - dst8)); break;
+                        case utf8::TYPE: utf::convert(str.m_utf8, cursor, str.m_end, dst8, cursor8, (u32)(end8 - dst8)); break;
+                        case utf16::TYPE: utf::convert(str.m_utf16, cursor, str.m_end, dst8, cursor8, (u32)(end8 - dst8)); break;
+                        case utf32::TYPE: utf::convert(str.m_utf32, cursor, str.m_end, dst8, cursor8, (u32)(end8 - dst8)); break;
+                    }
+                    end8 = dst8 + cursor8;
 
                     item_t* const item = m_data.m_items + m_data.m_size;
-                    item->m_str        = dst.m_utf8;
+                    item->m_str        = dst8;
                     item->m_hash       = nhash::strhash((const char*)dst8, (const char*)end8);
                     item->m_len        = (end8 - dst8);
 
