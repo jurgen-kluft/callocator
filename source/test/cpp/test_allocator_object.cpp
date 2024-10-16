@@ -15,22 +15,15 @@ namespace ncore
             kObjectB = 1,
         };
 
-        enum EResourceTypes
+        enum EComponentTypes
         {
             kComponentA = 0,
             kComponentB = 1,
             kComponentC = 2,
         };
 
-        enum ETagTypes
-        {
-            kTagA = 0,
-            kTagB = 1,
-        };
-
         struct object_a_t
         {
-            DECLARE_OBJECT_TYPE(kObjectA);
             int   a;
             int   b;
             float c;
@@ -38,7 +31,6 @@ namespace ncore
 
         struct object_b_t
         {
-            DECLARE_OBJECT_TYPE(kObjectB);
             int   a;
             int   b;
             float c;
@@ -46,7 +38,6 @@ namespace ncore
 
         struct component_a_t
         {
-            DECLARE_COMPONENT_TYPE(kComponentA);
             int   a;
             int   b;
             float c;
@@ -55,7 +46,6 @@ namespace ncore
 
         struct component_b_t
         {
-            DECLARE_COMPONENT_TYPE(kComponentB);
             int   a;
             int   b;
             float c;
@@ -64,21 +54,10 @@ namespace ncore
 
         struct component_c_t
         {
-            DECLARE_COMPONENT_TYPE(kComponentC);
             int   a;
             int   b;
             float c;
             DCORE_CLASS_PLACEMENT_NEW_DELETE
-        };
-
-        struct tag_a_t
-        {
-            DECLARE_TAG_TYPE(kTagA);
-        };
-
-        struct tag_b_t
-        {
-            DECLARE_TAG_TYPE(kTagB);
         };
 
     } // namespace nobject
@@ -165,7 +144,7 @@ UNITTEST_SUITE_BEGIN(nobject)
         }
     }
 
-    // Test the typed resource pool
+    // Test the typed pool
     UNITTEST_FIXTURE(types)
     {
         UNITTEST_ALLOCATOR;
@@ -173,7 +152,7 @@ UNITTEST_SUITE_BEGIN(nobject)
         UNITTEST_FIXTURE_SETUP() {}
         UNITTEST_FIXTURE_TEARDOWN() {}
 
-        struct myresource_t
+        struct myobject
         {
             int   a;
             int   b;
@@ -182,31 +161,31 @@ UNITTEST_SUITE_BEGIN(nobject)
 
         UNITTEST_TEST(test_init_shutdown)
         {
-            nobject::ntyped::pool_t<myresource_t> pool;
+            nobject::ntyped::pool_t<myobject> pool;
             pool.setup(Allocator, 32);
             pool.teardown();
         }
 
         UNITTEST_TEST(obtain_release)
         {
-            nobject::ntyped::pool_t<myresource_t> pool;
+            nobject::ntyped::pool_t<myobject> pool;
             pool.setup(Allocator, 32);
 
-            myresource_t* r1 = pool.obtain_access();
-            r1->a            = 1;
-            r1->b            = 2;
-            r1->c            = 3.14f;
-            myresource_t* r2 = pool.obtain_access();
-            r2->a            = 4;
-            r2->b            = 5;
-            r2->c            = 6.28f;
+            myobject* r1 = pool.obtain_access();
+            r1->a        = 1;
+            r1->b        = 2;
+            r1->c        = 3.14f;
+            myobject* r2 = pool.obtain_access();
+            r2->a        = 4;
+            r2->b        = 5;
+            r2->c        = 6.28f;
 
-            myresource_t* r11 = pool.get_access(0);
+            myobject* r11 = pool.get_access(0);
             CHECK_EQUAL(1, r11->a);
             CHECK_EQUAL(2, r11->b);
             CHECK_EQUAL(3.14f, r11->c);
 
-            myresource_t* r22 = pool.get_access(1);
+            myobject* r22 = pool.get_access(1);
             CHECK_EQUAL(4, r22->a);
             CHECK_EQUAL(5, r22->b);
             CHECK_EQUAL(6.28f, r22->c);
@@ -218,8 +197,8 @@ UNITTEST_SUITE_BEGIN(nobject)
         }
     }
 
-    // Test the resources pool
-    UNITTEST_FIXTURE(resources)
+    // Test the components pool
+    UNITTEST_FIXTURE(components_pool)
     {
         UNITTEST_ALLOCATOR;
 
@@ -233,42 +212,34 @@ UNITTEST_SUITE_BEGIN(nobject)
             pool.teardown();
         }
 
-        UNITTEST_TEST(register_resource_types)
+        UNITTEST_TEST(register_component_types)
         {
             nobject::ncomponents::pool_t pool;
             pool.setup(Allocator, 4, 16);
 
-            CHECK_TRUE(pool.register_component<nobject::component_a_t>(32));
-            CHECK_TRUE(pool.register_component<nobject::component_b_t>(32));
-            CHECK_TRUE(pool.register_component<nobject::component_c_t>(32));
+            CHECK_TRUE(pool.register_component<nobject::component_a_t>(nobject::kComponentA, 32));
+            CHECK_TRUE(pool.register_component<nobject::component_b_t>(nobject::kComponentB, 32));
+            CHECK_TRUE(pool.register_component<nobject::component_c_t>(nobject::kComponentC, 32));
 
-            nobject::handle_t h1 = pool.allocate<nobject::component_a_t>();
+            nobject::handle_t h1 = pool.allocate<nobject::component_a_t>(nobject::kComponentA);
             CHECK_EQUAL(0, h1.index);
             CHECK_EQUAL(0, h1.type[1]);
-            nobject::handle_t h2 = pool.allocate<nobject::component_b_t>();
+            nobject::handle_t h2 = pool.allocate<nobject::component_b_t>(nobject::kComponentB);
             CHECK_EQUAL(0, h2.index);
             CHECK_EQUAL(1, h2.type[1]);
-            nobject::handle_t h3 = pool.construct<nobject::component_c_t>();
+            nobject::handle_t h3 = pool.construct<nobject::component_c_t>(nobject::kComponentC);
             CHECK_EQUAL(0, h3.index);
             CHECK_EQUAL(2, h3.type[1]);
 
-            CHECK_TRUE(pool.is_component_type<nobject::component_a_t>(h1));
-            CHECK_FALSE(pool.is_component_type<nobject::component_b_t>(h1));
-            CHECK_FALSE(pool.is_component_type<nobject::component_c_t>(h1));
-
-            CHECK_TRUE(pool.is_component_type<nobject::component_b_t>(h2));
-            CHECK_FALSE(pool.is_component_type<nobject::component_a_t>(h2));
-            CHECK_FALSE(pool.is_component_type<nobject::component_c_t>(h2));
-
-            CHECK_TRUE(pool.is_component_type<nobject::component_c_t>(h3));
-            CHECK_FALSE(pool.is_component_type<nobject::component_a_t>(h3));
-            CHECK_FALSE(pool.is_component_type<nobject::component_b_t>(h3));
+            CHECK_TRUE(pool.is_component_type(h1));
+            CHECK_TRUE(pool.is_component_type(h2));
+            CHECK_TRUE(pool.is_component_type(h3));
 
             pool.deallocate(h1);
             pool.deallocate(h2);
             pool.destruct<nobject::component_c_t>(h3);
 
-            nobject::handle_t h4 = pool.construct<nobject::component_a_t>();
+            nobject::handle_t h4 = pool.construct<nobject::component_a_t>(nobject::kComponentA);
             CHECK_EQUAL(0, h4.index);
             CHECK_EQUAL(0, h4.type[0]);
             pool.destruct<nobject::component_a_t>(h4);
@@ -277,8 +248,8 @@ UNITTEST_SUITE_BEGIN(nobject)
         }
     }
 
-    // Test the object resources pool
-    UNITTEST_FIXTURE(object_resources)
+    // Test the object components pool
+    UNITTEST_FIXTURE(object_components)
     {
         UNITTEST_ALLOCATOR;
 
@@ -292,102 +263,67 @@ UNITTEST_SUITE_BEGIN(nobject)
             pool.teardown();
         }
 
-        UNITTEST_TEST(register_object_and_resource_types)
+        UNITTEST_TEST(register_object_and_component_types)
         {
             nobject::nobjects_with_components::pool_t pool;
             pool.setup(Allocator, 30, 30);
 
-            bool obj_a = pool.register_object_type<nobject::object_a_t>(40, 10);
+            bool obj_a = pool.register_object_type<nobject::object_a_t>(nobject::kObjectA, 40, 10);
             CHECK_TRUE(obj_a);
 
-            bool obj_b = pool.register_object_type<nobject::object_b_t>(40, 10);
+            bool obj_b = pool.register_object_type<nobject::object_b_t>(nobject::kObjectB, 40, 10);
             CHECK_TRUE(obj_b);
 
-            bool obj_a_res_a = pool.register_component_type<nobject::object_a_t, nobject::component_a_t>();
+            bool obj_a_res_a = pool.register_component_type<nobject::component_a_t>(nobject::kObjectA, nobject::kComponentA);
             CHECK_TRUE(obj_a_res_a);
 
-            bool obj_a_res_b = pool.register_component_type<nobject::object_a_t, nobject::component_b_t>();
+            bool obj_a_res_b = pool.register_component_type<nobject::component_b_t>(nobject::kObjectA, nobject::kComponentB);
             CHECK_TRUE(obj_a_res_b);
 
-            bool obj_a_res_c = pool.register_component_type<nobject::object_a_t, nobject::component_c_t>();
+            bool obj_a_res_c = pool.register_component_type<nobject::component_c_t>(nobject::kObjectA, nobject::kComponentC);
             CHECK_TRUE(obj_a_res_c);
 
-            nobject::handle_t oa1 = pool.allocate_object<nobject::object_a_t>();
+            nobject::handle_t oa1 = pool.allocate_object<nobject::object_a_t>(nobject::kObjectA);
             CHECK_EQUAL(0, oa1.index & 0x0FFFFFFF);
             CHECK_EQUAL(0, oa1.type[1]);
 
-            nobject::handle_t oa2 = pool.allocate_object<nobject::object_a_t>();
+            nobject::handle_t oa2 = pool.allocate_object<nobject::object_a_t>(nobject::kObjectA);
             CHECK_EQUAL(1, oa2.index & 0x0FFFFFFF);
             CHECK_EQUAL(0, oa2.type[1]);
 
-            nobject::handle_t ob1 = pool.allocate_object<nobject::object_b_t>();
+            nobject::handle_t ob1 = pool.allocate_object<nobject::object_b_t>(nobject::kObjectB);
             CHECK_EQUAL(0, ob1.index & 0x0FFFFFFF);
             CHECK_EQUAL(1, ob1.type[0]);
             CHECK_EQUAL(0, ob1.type[1]);
 
-            nobject::handle_t h1 = pool.allocate_component<nobject::component_a_t>(oa1);
+            nobject::handle_t h1 = pool.allocate_component<nobject::component_a_t>(oa1,nobject::kComponentA);
             CHECK_EQUAL(0, h1.index & 0x00FFFFFF);
             CHECK_EQUAL(0, h1.type[0]);
             CHECK_EQUAL(1, h1.type[1]);
-            nobject::handle_t h2 = pool.construct_component<nobject::component_b_t>(oa1);
+            nobject::handle_t h2 = pool.construct_component<nobject::component_b_t>(oa1, nobject::kComponentB);
             CHECK_EQUAL(0, h2.index & 0x00FFFFFF);
             CHECK_EQUAL(0, h2.type[0]);
             CHECK_EQUAL(2, h2.type[1]);
-            nobject::handle_t h3 = pool.allocate_component<nobject::component_c_t>(oa1);
+            nobject::handle_t h3 = pool.allocate_component<nobject::component_c_t>(oa1, nobject::kComponentC);
             CHECK_EQUAL(0, h3.index & 0x00FFFFFF);
             CHECK_EQUAL(3, h3.type[1]);
 
-            CHECK_TRUE(pool.is_object<nobject::object_a_t>(oa1));
-            CHECK_FALSE(pool.is_object<nobject::object_b_t>(oa1));
-            CHECK_TRUE(pool.is_object<nobject::object_b_t>(ob1));
-            CHECK_FALSE(pool.is_object<nobject::object_a_t>(ob1));
+            CHECK_TRUE(pool.is_object(oa1));
+            CHECK_TRUE(pool.is_object(ob1));
 
-            CHECK_TRUE(pool.is_component<nobject::component_a_t>(h1));
-            CHECK_FALSE(pool.is_component<nobject::component_b_t>(h1));
-            CHECK_FALSE(pool.is_component<nobject::component_c_t>(h1));
-
-            CHECK_TRUE(pool.is_component<nobject::component_b_t>(h2));
-            CHECK_FALSE(pool.is_component<nobject::component_a_t>(h2));
-            CHECK_FALSE(pool.is_component<nobject::component_c_t>(h2));
-
-            CHECK_TRUE(pool.is_component<nobject::component_c_t>(h3));
-            CHECK_FALSE(pool.is_component<nobject::component_a_t>(h3));
-            CHECK_FALSE(pool.is_component<nobject::component_b_t>(h3));
+            CHECK_TRUE(pool.is_component(h1));
+            CHECK_TRUE(pool.is_component(h2));
+            CHECK_TRUE(pool.is_component(h3));
 
             // You can get a component through the handle of the object or the handle of the component.
             // The handle of the component knows the type of the component but also the type of the object.
-            CHECK_TRUE(pool.has_component<nobject::component_a_t>(oa1));
-            CHECK_TRUE(pool.has_component<nobject::component_b_t>(oa1));
-            CHECK_TRUE(pool.has_component<nobject::component_c_t>(oa1));
+            CHECK_TRUE(pool.has_component(oa1, nobject::kComponentA));
+            CHECK_TRUE(pool.has_component(oa1, nobject::kComponentB));
+            CHECK_TRUE(pool.has_component(oa1, nobject::kComponentC));
             nobject::component_a_t* cpa1 = pool.get_component<nobject::component_a_t>(oa1);
-            CHECK_NOT_NULL(cpa1);
+            CHECK_NULL(cpa1);
             nobject::component_a_t* cpa2 = pool.get_component<nobject::component_a_t>(h1);
             CHECK_NOT_NULL(cpa2);
-            CHECK_EQUAL(cpa1, cpa2);
-
-            pool.add_tag<nobject::tag_a_t>(oa1);
-            pool.add_tag<nobject::tag_b_t>(oa1);
-            pool.add_tag<nobject::tag_b_t>(oa2);
-            pool.add_tag<nobject::tag_a_t>(ob1);
-
-            CHECK_TRUE(pool.has_tag<nobject::tag_a_t>(oa1));
-            CHECK_TRUE(pool.has_tag<nobject::tag_b_t>(oa1));
-            CHECK_FALSE(pool.has_tag<nobject::tag_a_t>(oa2));
-            CHECK_TRUE(pool.has_tag<nobject::tag_b_t>(oa2));
-            CHECK_TRUE(pool.has_tag<nobject::tag_a_t>(ob1));
-            CHECK_FALSE(pool.has_tag<nobject::tag_b_t>(ob1));
-
-            pool.rem_tag<nobject::tag_a_t>(oa1);
-            pool.rem_tag<nobject::tag_b_t>(oa1);
-            pool.rem_tag<nobject::tag_b_t>(oa2);
-            pool.rem_tag<nobject::tag_a_t>(ob1);
-
-            CHECK_FALSE(pool.has_tag<nobject::tag_a_t>(oa1));
-            CHECK_FALSE(pool.has_tag<nobject::tag_b_t>(oa1));
-            CHECK_FALSE(pool.has_tag<nobject::tag_a_t>(oa2));
-            CHECK_FALSE(pool.has_tag<nobject::tag_b_t>(oa2));
-            CHECK_FALSE(pool.has_tag<nobject::tag_a_t>(ob1));
-            CHECK_FALSE(pool.has_tag<nobject::tag_b_t>(ob1));
 
             pool.deallocate_component(h1);
             pool.destruct_component<nobject::component_b_t>(h2);

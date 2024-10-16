@@ -16,4 +16,5 @@ This package contains:
 
 ## Object Component Allocator
 
-The idea behind this allocator is that we can have objects that have components. This enables associating components (data) with objects in a dynamic way which means that you can add and remove components from objects at runtime. This is useful for example in game development where you have entities that have components like position, velocity, etc. But also for other 'systems' like a render graph 
+The idea behind this allocator is that we can have objects that have components. This enables associating components (data) with objects in a dynamic way which means that you can add and remove components from objects at runtime. This is useful for example in game development where you have entities that have components like position, velocity, etc. But also for other things like a graph with node and edges where you want the graph to use to optimize different 
+data sets, you can now create a GraphEdge as an object and decorate it with components that are part of your data-set.

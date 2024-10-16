@@ -19,7 +19,11 @@ namespace ncore
         {
             u32 index;
             u16 type[2];
+
+            inline bool operator==(const handle_t& other) const { return index == other.index && type[0] == other.type[0] && type[1] == other.type[1]; }
+            inline bool operator!=(const handle_t& other) const { return index != other.index || type[0] != other.type[0] || type[1] != other.type[1]; }
         };
+        const handle_t c_invalid_handle = {0xFFFFFFFF, 0xFFFF, 0xFFFF};
 
         struct array_t // 16 bytes
         {
@@ -127,8 +131,6 @@ namespace ncore
             void*       get_access(u32 index);
             const void* get_access(u32 index) const;
 
-            static const u32 c_invalid_handle = 0xFFFFFFFF;
-
             array_t  m_object_array;
             binmap_t m_free_resource_map;
         };
@@ -214,24 +216,24 @@ namespace ncore
                 void setup(alloc_t* allocator, u16 max_num_types_locally, u16 max_num_types_globally);
                 void teardown();
 
-                template <typename T> T* get(handle_t handle)
+                template <typename T> T* get(handle_t handle, u16 _component_type_index = 0xFFFF)
                 {
-                    handle.type[1] = T::s_component_type_index;
+                    handle.type[1] = (_component_type_index == 0xFFFF) ? handle.type[1] : _component_type_index;
                     return (T*)get_access_raw(handle);
                 }
-                template <typename T> const T* get(handle_t handle) const
+                template <typename T> const T* get(handle_t handle, u16 _component_type_index = 0xFFFF) const
                 {
-                    handle.type[1] = T::s_component_type_index;
+                    handle.type[1] = (_component_type_index == 0xFFFF) ? handle.type[1] : _component_type_index;
                     return (const T*)get_access_raw(handle);
                 }
 
                 // Register 'resource' by type
-                template <typename T> bool register_component(u32 max_num_components) { return register_component_pool(T::s_component_type_index, max_num_components, sizeof(T)); }
-                template <typename T> bool is_component_type(handle_t handle) const { return handle.type[1] == T::s_component_type_index; }
+                template <typename T> bool register_component(u16 _component_type_index, u32 max_num_components) { return register_component_pool(_component_type_index, max_num_components, sizeof(T)); }
+                bool                       is_component_type(handle_t handle) const { return handle != c_invalid_handle; }
 
-                template <typename T> handle_t allocate()
+                template <typename T> handle_t allocate(u16 _component_type_index)
                 {
-                    u16 const type_index       = T::s_component_type_index;
+                    u16 const type_index       = _component_type_index;
                     const u16 local_type_index = m_a_map[type_index];
                     u32 const index            = m_a_pool[local_type_index].allocate();
                     return make_handle(type_index, index);
@@ -245,9 +247,9 @@ namespace ncore
                     m_a_pool[local_type_index].deallocate(index);
                 }
 
-                template <typename T> handle_t construct()
+                template <typename T> handle_t construct(u16 _component_type_index)
                 {
-                    u16 const type_index       = T::s_component_type_index;
+                    u16 const type_index       = _component_type_index;
                     u16 const local_type_index = m_a_map[type_index];
                     u32 const index            = m_a_pool[local_type_index].allocate();
                     void*     ptr              = m_a_pool[local_type_index].get_access(index);
@@ -257,7 +259,7 @@ namespace ncore
 
                 template <typename T> void destruct(handle_t handle)
                 {
-                    const u16 type_index       = T::s_component_type_index;
+                    const u16 type_index       = get_type_index(handle);
                     u16 const local_type_index = m_a_map[type_index];
                     const u32 index            = get_index(handle);
                     void*     ptr              = m_a_pool[local_type_index].get_access(index);
@@ -265,14 +267,13 @@ namespace ncore
                     m_a_pool[local_type_index].deallocate(index);
                 }
 
-                static const handle_t c_invalid_handle;
-
             private:
                 static inline u32      get_index(handle_t handle) { return handle.index; }
                 static inline u16      get_type_index(handle_t handle) { return handle.type[1]; }
                 static inline handle_t make_handle(u16 type_index, u32 index)
                 {
                     handle_t handle;
+                    handle.type[0] = 0;
                     handle.type[1] = type_index;
                     handle.index   = index;
                     return handle;
@@ -313,34 +314,39 @@ namespace ncore
                     handle.type[1] = 0; // Objects have a component index of 0
                     return (T*)get_object_raw(handle);
                 }
-                template <typename T> const T* get_object(handle_t handle) const
+
+                template <typename T> T* get_object(handle_t handle) const
                 {
                     handle.type[1] = 0; // Objects have a component index of 0
                     return (const T*)get_object_raw(handle);
                 }
 
-                template <typename T> T* get_component(handle_t handle)
+                template <typename T> T* get_component(handle_t handle, u16 const _component_type_index = 0xFFFF)
                 {
                     // handle can be an object handle or any component handle, the user is
                     // asking here for a component of type T, so we need to set the component type index
-                    handle.type[1] = T::s_component_type_index + 1;
+                    handle.type[1] = (_component_type_index == 0xFFFF) ? handle.type[1] : (_component_type_index + 1);
+                    if (handle.type[1] == 0)
+                        return nullptr;
                     return (T*)get_object_raw(handle);
                 }
-                template <typename T> const T* get_component(handle_t handle) const
+                template <typename T> T* get_component(handle_t handle, u16 const _component_type_index = 0xFFFF) const
                 {
                     // handle can be an object handle or any component handle, the user is
                     // asking here for a component of type T, so we need to set the component type index
-                    handle.type[1] = T::s_component_type_index + 1;
+                    handle.type[1] = _component_type_index == 0xFFFF ? handle.type[1] : (_component_type_index + 1);
+                    if (handle.type[1] == 0)
+                        return nullptr;
                     return (const T*)get_object_raw(handle);
                 }
 
                 // Register 'object' by type
-                template <typename T> bool     register_object_type(u32 max_instances, u32 max_components) { return register_object_type(T::s_object_type_index, max_instances, sizeof(T), max_components, m_max_component_types); }
-                template <typename T> bool     is_object(handle_t handle) const { return is_handle_an_object(handle) && get_object_type_index(handle) == T::s_object_type_index; }
-                template <typename T> handle_t allocate_object() { return allocate_object(T::s_object_type_index); }
-                template <typename T> handle_t construct_object()
+                template <typename T> bool     register_object_type(u16 object_type_index, u32 max_instances, u32 max_components) { return register_object_type(object_type_index, max_instances, sizeof(T), max_components, m_max_component_types); }
+                bool                           is_object(handle_t handle) const { return is_handle_an_object(handle); }
+                template <typename T> handle_t allocate_object(u16 object_type_index) { return allocate_object(object_type_index); }
+                template <typename T> handle_t construct_object(u16 object_type_index)
                 {
-                    handle_t handle = allocate_object(T::s_object_type_index);
+                    handle_t handle = allocate_object(object_type_index);
                     void*    ptr    = get_object_raw(handle);
                     new (ptr) T();
                     return handle;
@@ -357,7 +363,6 @@ namespace ncore
                 template <typename T> void destruct_object(handle_t handle)
                 {
                     const u32 object_type_index = get_object_type_index(handle);
-                    ASSERT(object_type_index == T::s_object_type_index);
                     ASSERT(object_type_index < m_max_object_types);
                     const u32 object_index = get_object_index(handle);
                     void*     ptr          = m_objects[object_type_index].m_a_component[0].get_access(object_index);
@@ -366,11 +371,11 @@ namespace ncore
                 }
 
                 // Register 'component' by type
-                template <typename T, typename R> bool register_component_type() { return register_component_type(T::s_object_type_index, R::s_component_type_index + 1, sizeof(R)); }
-                template <typename T> bool             is_component(handle_t handle) const { return is_handle_a_component(handle) && get_component_type_index(handle) == T::s_component_type_index + 1; }
-                template <typename T> handle_t         allocate_component(handle_t object_handle)
+                template <typename T> bool     register_component_type(u16 const _type_index, u16 const _component_type_index) { return register_component_type(_type_index, _component_type_index + 1, sizeof(T)); }
+                bool                           is_component(handle_t handle) const { return is_handle_a_component(handle); }
+                template <typename T> handle_t allocate_component(handle_t object_handle, u16 _component_type_index)
                 {
-                    const u16 component_type_index  = T::s_component_type_index + 1;
+                    const u16 component_type_index  = _component_type_index + 1;
                     const u32 object_type_index     = get_object_type_index(object_handle);
                     const u32 object_index          = get_object_index(object_handle);
                     const u16 local_component_index = m_objects[object_type_index].m_a_component_map[component_type_index];
@@ -378,9 +383,9 @@ namespace ncore
                     m_objects[object_type_index].m_a_component[local_component_index].allocate(object_index);
                     return make_component_handle(object_type_index, component_type_index, object_index);
                 }
-                template <typename T> handle_t construct_component(handle_t object_handle)
+                template <typename T> handle_t construct_component(handle_t object_handle, u16 _component_type_index)
                 {
-                    const u16 component_type_index = T::s_component_type_index + 1;
+                    const u16 component_type_index = _component_type_index + 1;
                     const u32 object_type_index    = get_object_type_index(object_handle);
                     const u32 object_index         = get_object_index(object_handle);
                     ASSERT(m_objects[object_type_index].m_a_component[component_type_index] != nullptr);
@@ -414,53 +419,15 @@ namespace ncore
                     m_objects[object_type_index].m_a_component[local_component_index].destruct<T>(component_index);
                 }
 
-                template <typename T> bool has_component(handle_t object_handle) const
+                bool has_component(handle_t object_handle, u16 _component_type_index) const
                 {
-                    const u16 component_type_index = T::s_component_type_index + 1;
+                    const u16 component_type_index = _component_type_index + 1;
                     const u32 object_type_index    = get_object_type_index(object_handle);
                     ASSERT(object_type_index < m_max_object_types);
                     const u16 local_component_index = m_objects[object_type_index].m_a_component_map[component_type_index];
                     ASSERT(local_component_index != 0xFFFF); // component hasn't been registered
                     return local_component_index != 0xFFFF && m_objects[object_type_index].m_a_component[local_component_index].is_used(get_object_index(object_handle));
                 }
-
-                // Tags
-                template <typename T> bool add_tag(handle_t object_handle)
-                {
-                    const u16 tag_type_index = T::s_tag_type_index;
-                    if (tag_type_index < 128)
-                    {
-                        const u32 object_type_index = get_object_type_index(object_handle);
-                        const u32 object_index      = get_object_index(object_handle);
-                        ASSERT(m_objects[object_type_index].m_a_tags != nullptr);
-                        m_objects[object_type_index].m_a_tags[object_index].add_tag(tag_type_index);
-                        return true;
-                    }
-                    return false;
-                }
-
-                template <typename T> void rem_tag(handle_t object_handle)
-                {
-                    const u16 tag_type_index = T::s_tag_type_index;
-                    ASSERT(tag_type_index < 128);
-                    const u32 object_type_index = get_object_type_index(object_handle);
-                    const u32 object_index      = get_object_index(object_handle);
-                    ASSERT(m_objects[object_type_index].m_a_tags != nullptr);
-                    m_objects[object_type_index].m_a_tags[object_index].rem_tag(tag_type_index);
-                }
-
-                template <typename T> bool has_tag(handle_t object_handle) const
-                {
-                    ASSERT(is_handle_an_object(object_handle));
-                    ASSERT(tag_type_index < 128);
-                    const u16 tag_type_index    = T::s_tag_type_index;
-                    const u32 object_type_index = get_object_type_index(object_handle);
-                    const u32 object_index      = get_object_index(object_handle);
-                    ASSERT(m_objects[object_type_index].m_a_tags != nullptr);
-                    return m_objects[object_type_index].m_a_tags[object_index].has_tag(tag_type_index);
-                }
-
-                static const handle_t c_invalid_handle;
 
             private:
                 static D_FORCEINLINE handle_t make_object_handle(u16 object_type_index, u32 object_index)
@@ -518,20 +485,11 @@ namespace ncore
                     return m_objects[object_type_index].m_a_component[local_component_index].get_access(index);
                 }
 
-                struct tags_t
-                {
-                    inline bool has_tag(u16 tag_type_index) const { return m_a_tags[tag_type_index >> 6] & ((u64)1 << (tag_type_index & 63)); }
-                    inline void add_tag(u16 tag_type_index) { m_a_tags[tag_type_index >> 6] |= ((u64)1 << (tag_type_index & 63)); }
-                    inline void rem_tag(u16 tag_type_index) { m_a_tags[tag_type_index >> 6] &= ~((u64)1 << (tag_type_index & 63)); }
-                    u64         m_a_tags[2];
-                };
-
                 struct object_t
                 {
                     binmap_t              m_object_map;
                     nobject::inventory_t* m_a_component;     // m_a_component[max components for this object], first inventory_t is for object
                     u16*                  m_a_component_map; // m_a_component_map[m_max_components globally], index 0 is for object
-                    tags_t*               m_a_tags;          // m_a_tags, array of tags_t
                     u32                   m_max_components;  // max components for this object
                     u32                   m_num_components;  // current number of components for this object, excluding the object itself
                 };
@@ -542,8 +500,8 @@ namespace ncore
                 u16       m_max_component_types;
             };
 
-#define DECLARE_OBJECT_TYPE(N) static const u16 s_object_type_index = N;
-#define DECLARE_TAG_TYPE(N) static const u16 s_tag_type_index = N;
+#define DECLARE_OBJECT_TYPE(N) static const u16 s_object_type_index = N
+#define DECLARE_TAG_TYPE(N) static const u16 s_tag_type_index = N
 
         } // namespace nobjects_with_components
 

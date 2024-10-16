@@ -86,8 +86,6 @@ namespace ncore
         {
             // components pool
 
-            const handle_t pool_t::c_invalid_handle = {0xFFFFFFFF, 0xFFFF, 0xFFFF};
-
             void pool_t::setup(alloc_t* allocator, u16 max_num_types_locally, u16 max_num_types_globally)
             {
                 m_allocator = allocator;
@@ -144,8 +142,6 @@ namespace ncore
         {
             // objects with components pool
 
-            const handle_t pool_t::c_invalid_handle = {0xFFFFFFFF, 0xFFFF, 0xFFFF};
-
             void pool_t::setup(alloc_t* allocator, u32 max_num_object_types, u32 max_num_resource_types)
             {
                 m_allocator           = allocator;
@@ -164,7 +160,6 @@ namespace ncore
                         {
                             m_objects[i].m_a_component[j].teardown(m_allocator);
                         }
-                        m_allocator->deallocate(m_objects[i].m_a_tags);
                         m_allocator->deallocate(m_objects[i].m_a_component);
                         m_allocator->deallocate(m_objects[i].m_a_component_map);
                         m_objects[i].m_object_map.release(m_allocator);
@@ -180,7 +175,6 @@ namespace ncore
                 {
                     ASSERT(object_type_index < m_max_object_types);
                     m_objects[object_type_index].m_object_map.init_all_free(max_num_objects, m_allocator);
-                    m_objects[object_type_index].m_a_tags      = (tags_t*)g_allocate_and_memset(m_allocator, max_num_objects * sizeof(tags_t), 0);
                     m_objects[object_type_index].m_a_component = (nobject::inventory_t*)g_allocate_and_memset(m_allocator, (max_num_components_local + 1) * sizeof(nobject::inventory_t*), 0);
                     // Index zero is the inventory for the objects itself.
                     m_objects[object_type_index].m_a_component[0].setup(m_allocator, max_num_objects, sizeof_object);
