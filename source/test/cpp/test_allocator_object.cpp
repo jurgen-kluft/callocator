@@ -283,20 +283,20 @@ UNITTEST_SUITE_BEGIN(nobject)
             bool obj_a_res_c = pool.register_component_type<nobject::component_c_t>(nobject::kObjectA, nobject::kComponentC);
             CHECK_TRUE(obj_a_res_c);
 
-            nobject::handle_t oa1 = pool.allocate_object<nobject::object_a_t>(nobject::kObjectA);
+            nobject::handle_t oa1 = pool.allocate_object(nobject::kObjectA);
             CHECK_EQUAL(0, oa1.index & 0x0FFFFFFF);
             CHECK_EQUAL(0, oa1.type[1]);
 
-            nobject::handle_t oa2 = pool.allocate_object<nobject::object_a_t>(nobject::kObjectA);
+            nobject::handle_t oa2 = pool.allocate_object(nobject::kObjectA);
             CHECK_EQUAL(1, oa2.index & 0x0FFFFFFF);
             CHECK_EQUAL(0, oa2.type[1]);
 
-            nobject::handle_t ob1 = pool.allocate_object<nobject::object_b_t>(nobject::kObjectB);
+            nobject::handle_t ob1 = pool.allocate_object(nobject::kObjectB);
             CHECK_EQUAL(0, ob1.index & 0x0FFFFFFF);
             CHECK_EQUAL(1, ob1.type[0]);
             CHECK_EQUAL(0, ob1.type[1]);
 
-            nobject::handle_t h1 = pool.allocate_component<nobject::component_a_t>(oa1,nobject::kComponentA);
+            nobject::handle_t h1 = pool.allocate_component(oa1,nobject::kComponentA);
             CHECK_EQUAL(0, h1.index & 0x00FFFFFF);
             CHECK_EQUAL(0, h1.type[0]);
             CHECK_EQUAL(1, h1.type[1]);
@@ -304,7 +304,7 @@ UNITTEST_SUITE_BEGIN(nobject)
             CHECK_EQUAL(0, h2.index & 0x00FFFFFF);
             CHECK_EQUAL(0, h2.type[0]);
             CHECK_EQUAL(2, h2.type[1]);
-            nobject::handle_t h3 = pool.allocate_component<nobject::component_c_t>(oa1, nobject::kComponentC);
+            nobject::handle_t h3 = pool.allocate_component(oa1, nobject::kComponentC);
             CHECK_EQUAL(0, h3.index & 0x00FFFFFF);
             CHECK_EQUAL(3, h3.type[1]);
 

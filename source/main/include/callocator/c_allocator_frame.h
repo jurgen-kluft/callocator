@@ -1,5 +1,5 @@
-#ifndef __C_FORWARD_ALLOCATOR_H__
-#define __C_FORWARD_ALLOCATOR_H__
+#ifndef __C_FRAME_ALLOCATOR_H__
+#define __C_FRAME_ALLOCATOR_H__
 #include "ccore/c_target.h"
 #ifdef USE_PRAGMA_ONCE
 #    pragma once
@@ -27,8 +27,8 @@ namespace ncore
         DCORE_CLASS_PLACEMENT_NEW_DELETE
 
     private:
-        virtual void*         v_allocate(u32 size, u32 alignment);
-        virtual void          v_deallocate(void* ptr);
+        virtual void* v_allocate(u32 size, u32 alignment);
+        virtual void  v_deallocate(void* ptr);
 
         u8* m_buffer_begin;
         u8* m_buffer_cursor;
@@ -41,4 +41,4 @@ namespace ncore
 
 }; // namespace ncore
 
-#endif /// __C_FORWARD_ALLOCATOR_H__
+#endif

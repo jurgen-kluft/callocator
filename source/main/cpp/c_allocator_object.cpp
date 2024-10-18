@@ -48,7 +48,8 @@ namespace ncore
         void pool_t::setup(array_t& object_array, alloc_t* allocator)
         {
             m_object_array = object_array;
-            m_free_resource_map.init_all_free(object_array.m_num_max, allocator);
+            binmap_t::config_t cfg = binmap_t::config_t::compute(object_array.m_num_max);
+            m_free_resource_map.init_all_free(cfg, allocator);
         }
 
         void pool_t::teardown(alloc_t* allocator)
@@ -154,7 +155,7 @@ namespace ncore
             {
                 for (u32 i = 0; i < m_max_object_types; i++)
                 {
-                    if (m_objects[i].m_object_map.size() > 0)
+                    if (m_objects[i].m_objects_free_map.size() > 0)
                     {
                         for (u32 j = 0; j < m_objects[i].m_num_components; j++)
                         {
@@ -162,7 +163,7 @@ namespace ncore
                         }
                         m_allocator->deallocate(m_objects[i].m_a_component);
                         m_allocator->deallocate(m_objects[i].m_a_component_map);
-                        m_objects[i].m_object_map.release(m_allocator);
+                        m_objects[i].m_objects_free_map.release(m_allocator);
                     }
                 }
                 m_allocator->deallocate(m_objects);
@@ -170,11 +171,12 @@ namespace ncore
 
             bool pool_t::register_object_type(u16 object_type_index, u32 max_num_objects, u32 sizeof_object, u32 max_num_components_local, u32 max_num_components_global)
             {
-                ASSERT(m_objects[object_type_index].m_object_map.size() == 0);
-                if (m_objects[object_type_index].m_object_map.size() == 0)
+                ASSERT(m_objects[object_type_index].m_objects_free_map.size() == 0);
+                if (m_objects[object_type_index].m_objects_free_map.size() == 0)
                 {
                     ASSERT(object_type_index < m_max_object_types);
-                    m_objects[object_type_index].m_object_map.init_all_free(max_num_objects, m_allocator);
+                    binmap_t::config_t cfg = binmap_t::config_t::compute(max_num_objects);
+                    m_objects[object_type_index].m_objects_free_map.init_all_free(cfg, m_allocator);
                     m_objects[object_type_index].m_a_component = (nobject::inventory_t*)g_allocate_and_memset(m_allocator, (max_num_components_local + 1) * sizeof(nobject::inventory_t*), 0);
                     // Index zero is the inventory for the objects itself.
                     m_objects[object_type_index].m_a_component[0].setup(m_allocator, max_num_objects, sizeof_object);
@@ -194,7 +196,7 @@ namespace ncore
                 {
                     ASSERT(object_type_index < m_max_object_types);
                     ASSERT(component_type_index < m_max_component_types);
-                    const u32 max_num_objects                                            = m_objects[object_type_index].m_object_map.size();
+                    const u32 max_num_objects                                            = m_objects[object_type_index].m_objects_free_map.size();
                     u16 const local_component_index                                      = m_objects[object_type_index].m_num_components++;
                     m_objects[object_type_index].m_a_component_map[component_type_index] = local_component_index;
                     m_objects[object_type_index].m_a_component[local_component_index].setup(m_allocator, max_num_objects, sizeof_component);
@@ -203,24 +205,7 @@ namespace ncore
                 return false;
             }
 
-            handle_t pool_t::allocate_object(u16 object_type_index)
-            {
-                ASSERT(object_type_index < m_max_object_types);
-                const u32 object_index = m_objects[object_type_index].m_object_map.find_and_set();
-                return make_object_handle(object_type_index, object_index);
-            }
 
-            handle_t pool_t::allocate_component(handle_t object_handle, u16 component_type_index)
-            {
-                ASSERT(component_type_index > 0);
-                const u32 object_index      = get_object_index(object_handle);
-                const u16 object_type_index = get_object_type_index(object_handle);
-                ASSERT(object_type_index < m_max_object_types);
-                ASSERT(component_type_index < m_max_component_types);
-                u16 const local_component_index = m_objects[object_type_index].m_a_component_map[component_type_index];
-                m_objects[object_type_index].m_a_component[local_component_index].allocate(object_index);
-                return make_component_handle(object_type_index, component_type_index, object_index);
-            }
         } // namespace nobjects_with_components
     } // namespace nobject
 } // namespace ncore

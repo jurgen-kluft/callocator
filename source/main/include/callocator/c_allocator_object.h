@@ -7,7 +7,8 @@
 
 #include "ccore/c_debug.h"
 #include "ccore/c_allocator.h"
-#include "cbase/c_hbb.h"
+#include "cbase/c_binmap.h"
+#include "cbase/c_integer.h"
 
 namespace ncore
 {
@@ -39,6 +40,8 @@ namespace ncore
 
             void*       get_access(u32 index) { return &m_memory[index * m_sizeof]; }
             const void* get_access(u32 index) const { return &m_memory[index * m_sizeof]; }
+
+            inline u32 ptr_to_index(const void* ptr) const { return (u32)(((byte*)ptr - m_memory) / m_sizeof); }
 
             template <typename T> T* get_access_as(u32 index)
             {
@@ -72,6 +75,38 @@ namespace ncore
             {
                 ASSERT(is_used(index));
                 set_free(index);
+            }
+
+            void* find_next(void* ptr)
+            {
+                u32 const index = (ptr == nullptr) ? 0 : m_array.ptr_to_index(ptr) + 1;
+
+                const u32 nw = (m_array.m_num_max + 31) >> 5;
+                const u32 iw = index >> 5;
+                const u32 ib = index & 31;
+
+                // Check the first word directly since we require masking
+                u32 bits = m_bitarray[iw] & (0xffffffff << ib);
+                if (bits != 0)
+                {
+                    u32 bit = math::findFirstBit(bits);
+                    if (bit < m_array.m_num_max)
+                        return m_array.get_access(bit);
+                    return nullptr;
+                }
+
+                for (u32 i = iw + 1; i < nw; ++i)
+                {
+                    u32 bits = m_bitarray[i];
+                    if (bits != 0)
+                    {
+                        u32 bit = math::findFirstBit(bits);
+                        if (bit < m_array.m_num_max)
+                            return m_array.get_access(bit + (i << 5));
+                        return nullptr;
+                    }
+                }
+                return nullptr;
             }
 
             void free_all();
@@ -196,8 +231,7 @@ namespace ncore
                 m_object_pool.deallocate(index);
             }
 
-            template <typename T> inline T* pool_t<T>::get_access(u32 index) { return (T*)m_object_pool.get_access(index); }
-
+            template <typename T> inline T*       pool_t<T>::get_access(u32 index) { return (T*)m_object_pool.get_access(index); }
             template <typename T> inline const T* pool_t<T>::get_access(u32 index) const { return (const T*)m_object_pool.get_access(index); }
 
         } // namespace ntyped
@@ -341,9 +375,16 @@ namespace ncore
                 }
 
                 // Register 'object' by type
-                template <typename T> bool     register_object_type(u16 object_type_index, u32 max_instances, u32 max_components) { return register_object_type(object_type_index, max_instances, sizeof(T), max_components, m_max_component_types); }
-                bool                           is_object(handle_t handle) const { return is_handle_an_object(handle); }
-                template <typename T> handle_t allocate_object(u16 object_type_index) { return allocate_object(object_type_index); }
+                template <typename T> bool register_object_type(u16 object_type_index, u32 max_instances, u32 max_components) { return register_object_type(object_type_index, max_instances, sizeof(T), max_components, m_max_component_types); }
+                bool                       is_object(handle_t handle) const { return is_handle_an_object(handle); }
+
+                handle_t                   allocate_object(u16 object_type_index)
+                {
+                    ASSERT(object_type_index < m_max_object_types);
+                    const u32 object_index = m_objects[object_type_index].m_objects_free_map.find_and_set();
+                    return make_object_handle(object_type_index, object_index);
+                }
+
                 template <typename T> handle_t construct_object(u16 object_type_index)
                 {
                     handle_t handle = allocate_object(object_type_index);
@@ -357,7 +398,7 @@ namespace ncore
                     const u32 object_type_index = get_object_type_index(handle);
                     ASSERT(object_type_index < m_max_object_types);
                     const u32 object_index = get_object_index(handle);
-                    m_objects[object_type_index].m_object_map.set_free(object_index);
+                    m_objects[object_type_index].m_objects_free_map.set_free(object_index);
                 }
 
                 template <typename T> void destruct_object(handle_t handle)
@@ -367,13 +408,17 @@ namespace ncore
                     const u32 object_index = get_object_index(handle);
                     void*     ptr          = m_objects[object_type_index].m_a_component[0].get_access(object_index);
                     ((T*)ptr)->~T();
-                    m_objects[object_type_index].m_object_map.set_free(object_index);
+                    m_objects[object_type_index].m_objects_free_map.set_free(object_index);
                 }
 
+                // Iterate over objects or components, start with ptr = nullptr, and continue until nullptr is returned
+                template <typename T> T* iterate_object(u16 const object_type_index, T* ptr) { return m_objects[object_type_index].m_a_component[0].find_next(ptr); }
+                template <typename T> T* iterate_component(u16 const object_type_index, u16 const component_type_index, T* ptr) { return m_objects[object_type_index].m_a_component[component_type_index + 1].find_next(ptr); }
+
                 // Register 'component' by type
-                template <typename T> bool     register_component_type(u16 const _type_index, u16 const _component_type_index) { return register_component_type(_type_index, _component_type_index + 1, sizeof(T)); }
-                bool                           is_component(handle_t handle) const { return is_handle_a_component(handle); }
-                template <typename T> handle_t allocate_component(handle_t object_handle, u16 _component_type_index)
+                template <typename T> bool register_component_type(u16 const _type_index, u16 const _component_type_index) { return register_component_type(_type_index, _component_type_index + 1, sizeof(T)); }
+                bool                       is_component(handle_t handle) const { return is_handle_a_component(handle); }
+                handle_t                   allocate_component(handle_t object_handle, u16 _component_type_index)
                 {
                     const u16 component_type_index  = _component_type_index + 1;
                     const u32 object_type_index     = get_object_type_index(object_handle);
@@ -456,10 +501,8 @@ namespace ncore
                 static D_FORCEINLINE bool is_handle_an_object(handle_t handle) { return get_handle_type(handle) == 0; }
                 static D_FORCEINLINE bool is_handle_a_component(handle_t handle) { return get_handle_type(handle) == 1; }
 
-                bool     register_object_type(u16 object_type_index, u32 max_num_objects, u32 sizeof_object, u32 max_num_components_local, u32 max_num_components_global);
-                bool     register_component_type(u16 object_type_index, u16 component_type_index, u32 sizeof_component);
-                handle_t allocate_object(u16 object_type_index);
-                handle_t allocate_component(handle_t object_handle, u16 component_type_index);
+                bool register_object_type(u16 object_type_index, u32 max_num_objects, u32 sizeof_object, u32 max_num_components_local, u32 max_num_components_global);
+                bool register_component_type(u16 object_type_index, u16 component_type_index, u32 sizeof_component);
 
                 void* get_object_raw(handle_t handle)
                 {
@@ -487,11 +530,11 @@ namespace ncore
 
                 struct object_t
                 {
-                    binmap_t              m_object_map;
-                    nobject::inventory_t* m_a_component;     // m_a_component[max components for this object], first inventory_t is for object
-                    u16*                  m_a_component_map; // m_a_component_map[m_max_components globally], index 0 is for object
-                    u32                   m_max_components;  // max components for this object
-                    u32                   m_num_components;  // current number of components for this object, excluding the object itself
+                    binmap_t              m_objects_free_map; // tracks free objects
+                    nobject::inventory_t* m_a_component;      // m_a_component[max components for this object], first inventory_t is for object
+                    u16*                  m_a_component_map;  // m_a_component_map[m_max_components globally], index 0 is for object
+                    u32                   m_max_components;   // max components for this object
+                    u32                   m_num_components;   // current number of components for this object, excluding the object itself
                 };
 
                 object_t* m_objects;
