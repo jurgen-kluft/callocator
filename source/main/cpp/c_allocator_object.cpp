@@ -1,5 +1,7 @@
 #include "ccore/c_allocator.h"
 #include "ccore/c_memory.h"
+#include "cbase/c_duomap.h"
+
 #include "callocator/c_allocator_object.h"
 
 namespace ncore
@@ -47,7 +49,7 @@ namespace ncore
 
         void pool_t::setup(array_t& object_array, alloc_t* allocator)
         {
-            m_object_array = object_array;
+            m_object_array         = object_array;
             binmap_t::config_t cfg = binmap_t::config_t::compute(object_array.m_num_max);
             m_free_resource_map.init_all_free(cfg, allocator);
         }
@@ -108,20 +110,19 @@ namespace ncore
 
             void* pool_t::get_access_raw(handle_t handle)
             {
-                u16 const type_index       = get_type_index(handle);
-                u16 const local_type_index = m_a_map[type_index];
+                internal_t const& internal         = *(internal_t*)handle;
+                u16 const         type_index       = internal.m_type1_index;
+                u16 const         local_type_index = m_a_map[type_index];
                 ASSERT(local_type_index != 0xFFFF && local_type_index < m_num_pools);
-                u32 const index = get_index(handle);
-                return m_a_pool[local_type_index].get_access(index);
+                return m_a_pool[local_type_index].get_access(internal.m_index);
             }
 
             const void* pool_t::get_access_raw(handle_t handle) const
             {
-                u16 const type_index       = get_type_index(handle);
-                u16 const local_type_index = m_a_map[type_index];
+                internal_t const& internal         = *(internal_t*)handle;
+                u16 const         local_type_index = m_a_map[internal.m_type1_index];
                 ASSERT(local_type_index != 0xFFFF && local_type_index < m_num_pools);
-                u32 const index = get_index(handle);
-                return m_a_pool[local_type_index].get_access(index);
+                return m_a_pool[local_type_index].get_access(internal.m_index);
             }
 
             bool pool_t::register_component_pool(u16 type_index, u32 max_num_components, u32 sizeof_component)
@@ -146,7 +147,7 @@ namespace ncore
             void pool_t::setup(alloc_t* allocator, u32 max_num_object_types, u32 max_num_resource_types)
             {
                 m_allocator           = allocator;
-                m_objects             = (object_t*)g_allocate_and_memset(allocator, max_num_object_types * sizeof(object_t), 0);
+                m_object_types        = (object_type_t*)g_allocate_and_memset(allocator, max_num_object_types * sizeof(object_type_t), 0);
                 m_max_object_types    = max_num_object_types;
                 m_max_component_types = max_num_resource_types + 1; // +1 for object
             }
@@ -155,56 +156,123 @@ namespace ncore
             {
                 for (u32 i = 0; i < m_max_object_types; i++)
                 {
-                    if (m_objects[i].m_objects_free_map.size() > 0)
+                    if (m_object_types[i].m_max_objects > 0)
                     {
-                        for (u32 j = 0; j < m_objects[i].m_num_components; j++)
+                        for (u32 j = 0; j < m_object_types[i].m_num_components; j++)
                         {
-                            m_objects[i].m_a_component[j].teardown(m_allocator);
+                            m_object_types[i].m_a_component[j].teardown(m_allocator);
                         }
-                        m_allocator->deallocate(m_objects[i].m_a_component);
-                        m_allocator->deallocate(m_objects[i].m_a_component_map);
-                        m_objects[i].m_objects_free_map.release(m_allocator);
+                        m_allocator->deallocate(m_object_types[i].m_a_component);
+                        m_allocator->deallocate(m_object_types[i].m_a_component_map);
+                        m_object_types[i].m_objects_map.release(m_allocator);
                     }
                 }
-                m_allocator->deallocate(m_objects);
+                m_allocator->deallocate(m_object_types);
             }
 
             bool pool_t::register_object_type(u16 object_type_index, u32 max_num_objects, u32 sizeof_object, u32 max_num_components_local, u32 max_num_components_global)
             {
-                ASSERT(m_objects[object_type_index].m_objects_free_map.size() == 0);
-                if (m_objects[object_type_index].m_objects_free_map.size() == 0)
+                ASSERT(m_object_types[object_type_index].m_objects_map.size() == 0);
+                if (m_object_types[object_type_index].m_max_objects == 0)
                 {
                     ASSERT(object_type_index < m_max_object_types);
+                    object_type_t&     o   = m_object_types[object_type_index];
                     binmap_t::config_t cfg = binmap_t::config_t::compute(max_num_objects);
-                    m_objects[object_type_index].m_objects_free_map.init_all_free(cfg, m_allocator);
-                    m_objects[object_type_index].m_a_component = (nobject::inventory_t*)g_allocate_and_memset(m_allocator, (max_num_components_local + 1) * sizeof(nobject::inventory_t*), 0);
-                    // Index zero is the inventory for the objects itself.
-                    m_objects[object_type_index].m_a_component[0].setup(m_allocator, max_num_objects, sizeof_object);
-                    m_objects[object_type_index].m_a_component_map    = (u16*)g_allocate_and_memset(m_allocator, max_num_components_global * sizeof(u16), 0xFFFFFFFF);
-                    m_objects[object_type_index].m_a_component_map[0] = 0;
-                    m_objects[object_type_index].m_max_components     = max_num_components_local + 1;
-                    m_objects[object_type_index].m_num_components     = 1;
+                    o.m_objects_map.init_all_free(cfg, m_allocator);
+                    o.m_a_component = (nobject::inventory_t*)g_allocate_and_memset(m_allocator, (max_num_components_local + 1) * sizeof(nobject::inventory_t), 0);
+                    o.m_a_component[0].setup(m_allocator, max_num_objects, sizeof_object);
+                    o.m_a_component_map    = (u16*)g_allocate_and_memset(m_allocator, max_num_components_global * sizeof(u16), 0xFFFFFFFF);
+                    o.m_a_component_map[0] = 0;
+                    o.m_num_components     = 1;
+                    o.m_num_objects        = 0;
+                    o.m_max_components     = max_num_components_local + 1;
+                    o.m_max_objects        = max_num_objects;
                     return true;
                 }
+
+                // Object was already registered
                 return false;
             }
 
             bool pool_t::register_component_type(u16 object_type_index, u16 component_type_index, u32 sizeof_component)
             {
-                ASSERT(m_objects[object_type_index].m_a_component_map[component_type_index] == 0xFFFF);
-                if (m_objects[object_type_index].m_a_component_map[component_type_index] == 0xFFFF)
+                ASSERT(m_object_types[object_type_index].m_a_component_map[component_type_index] == 0xFFFF);
+                if (m_object_types[object_type_index].m_a_component_map[component_type_index] == 0xFFFF)
                 {
                     ASSERT(object_type_index < m_max_object_types);
                     ASSERT(component_type_index < m_max_component_types);
-                    const u32 max_num_objects                                            = m_objects[object_type_index].m_objects_free_map.size();
-                    u16 const local_component_index                                      = m_objects[object_type_index].m_num_components++;
-                    m_objects[object_type_index].m_a_component_map[component_type_index] = local_component_index;
-                    m_objects[object_type_index].m_a_component[local_component_index].setup(m_allocator, max_num_objects, sizeof_component);
+                    object_type_t& o                          = m_object_types[object_type_index];
+                    u16 const      local_component_index      = o.m_num_components++;
+                    o.m_a_component_map[component_type_index] = local_component_index;
+                    o.m_a_component[local_component_index].setup(m_allocator, o.m_max_objects, sizeof_component);
                     return true;
                 }
+
+                // Component was already registered
                 return false;
             }
 
+            s32 pool_t::get_number_of_objects(const u16 object_type_index) const { return m_object_types[object_type_index].m_num_objects; }
+
+            u32 pool_t::pop_free_object(u16 object_type_index)
+            {
+                s32 object_index = m_object_types[object_type_index].m_objects_map.find_free_and_set_used();
+                if (object_index < 0)
+                    return -1;
+                return object_index;
+            }
+
+            handle_t pool_t::iterate(const u16 object_type_index) const
+            {
+                object_type_t const* object_type  = &m_object_types[object_type_index];
+                s32 const            object_index = object_type->m_objects_map.find_used_upper();
+                return object_index >= 0 ? make_handle(object_type_index, 0, (u32)object_index) : c_invalid_handle;
+            }
+
+            handle_t pool_t::iterate(const u16 object_type_index, const u16 component_type_index) const
+            {
+                object_type_t const* object_type      = &m_object_types[object_type_index];
+                u16 const            local_type_index = object_type->m_a_component_map[component_type_index];
+                if (local_type_index == 0xFFFF)
+                    return c_invalid_handle;
+                s32                object_index = object_type->m_objects_map.find_used_upper();
+                inventory_t const* inventory    = &object_type->m_a_component[local_type_index];
+                while (object_index >= 0 && inventory->is_used(object_index) == false)
+                {
+                    object_index = object_type->m_objects_map.next_used_up(object_index + 1);
+                }
+
+                if (object_index < 0)
+                    return c_invalid_handle;
+
+                return make_handle(object_type_index, component_type_index, (u32)object_index);
+            }
+
+            handle_t pool_t::next(handle_t handle) const
+            {
+                if (handle == c_invalid_handle)
+                    return c_invalid_handle;
+
+                // determine the index of the current object, then find the next object from there
+                internal_t const&    internal    = *(internal_t*)handle;
+                object_type_t const* object_type = &m_object_types[internal.m_type0_index];
+                s32                  next_index  = m_object_types[internal.m_type0_index].m_objects_map.next_used_up(internal.m_index + 1);
+                if (internal.m_type1_index > 0)
+                {
+                    // Find the next object that has the component marked as used
+                    u16 const          local_type_index = object_type->m_a_component_map[internal.m_type1_index];
+                    inventory_t const* inventory        = &object_type->m_a_component[local_type_index];
+                    while (next_index >= 0 && inventory->is_used(next_index) == false)
+                    {
+                        next_index = object_type->m_objects_map.next_used_up(next_index + 1);
+                    }
+                }
+
+                if (next_index < 0)
+                    return c_invalid_handle;
+
+                return pool_t::make_handle(internal.m_type0_index, internal.m_type1_index, (u32)next_index);
+            }
 
         } // namespace nobjects_with_components
     } // namespace nobject
