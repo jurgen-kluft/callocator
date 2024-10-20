@@ -356,14 +356,15 @@ namespace ncore
                     inventory_t*   object_inventory = get_inventory(object_type, 0);
                     return object_inventory->get_access_as<T>(index);
                 }
-                template <typename T> T* next(nhandle_t handle) const
+                template <typename T> T* next(T const* iter) const
                 {
-                    s32 const index = iterate_next(T::NOBJECT_OBJECT_TYPE_INDEX, 0, handle);
-                    if (index < 0)
+                    object_type_t* object_type = get_object_type(T::NOBJECT_OBJECT_TYPE_INDEX);
+                    u32 const      index       = get_object_index(iter, T::NOBJECT_OBJECT_TYPE_INDEX);
+                    s32 const      next_index  = iterate_next(T::NOBJECT_OBJECT_TYPE_INDEX, 0, index);
+                    if (next_index < 0)
                         return nullptr;
-                    object_type_t* object_type      = get_object_type(T::NOBJECT_OBJECT_TYPE_INDEX);
-                    inventory_t*   object_inventory = get_inventory(object_type, 0);
-                    return object_inventory->get_access_as<T>(index);
+                    inventory_t* object_inventory = get_inventory(object_type, 0);
+                    return object_inventory->get_access_as<T>(next_index);
                 }
 
                 template <typename T, typename U> U* begin() const
