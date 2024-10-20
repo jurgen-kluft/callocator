@@ -73,14 +73,14 @@ namespace ncore
 
         void* pool_t::get_access(u32 index)
         {
-            ASSERT(index != c_invalid_handle);
+            ASSERT(index != c_invalid_nhandle);
             ASSERTS(m_free_resource_map.is_used(index), "Error: resource is not marked as being in use!");
             return &m_object_array.m_memory[index * m_object_array.m_sizeof];
         }
 
         const void* pool_t::get_access(u32 index) const
         {
-            ASSERT(index != c_invalid_handle);
+            ASSERT(index != c_invalid_nhandle);
             ASSERTS(m_free_resource_map.is_used(index), "Error: resource is not marked as being in use!");
             return &m_object_array.m_memory[index * m_object_array.m_sizeof];
         }
@@ -108,21 +108,18 @@ namespace ncore
                 m_allocator->deallocate(m_a_map);
             }
 
-            void* pool_t::get_access_raw(handle_t handle)
+            void* pool_t::get_access_raw(u16 global_type_index, nhandle_t handle)
             {
-                internal_t const& internal         = *(internal_t*)handle;
-                u16 const         type_index       = internal.m_type1_index;
-                u16 const         local_type_index = m_a_map[type_index];
+                u16 const local_type_index = m_a_map[global_type_index];
                 ASSERT(local_type_index != 0xFFFF && local_type_index < m_num_pools);
-                return m_a_pool[local_type_index].get_access(internal.m_index);
+                return m_a_pool[local_type_index].get_access(handle);
             }
 
-            const void* pool_t::get_access_raw(handle_t handle) const
+            const void* pool_t::get_access_raw(u16 global_type_index, nhandle_t handle) const
             {
-                internal_t const& internal         = *(internal_t*)handle;
-                u16 const         local_type_index = m_a_map[internal.m_type1_index];
+                u16 const local_type_index = m_a_map[global_type_index];
                 ASSERT(local_type_index != 0xFFFF && local_type_index < m_num_pools);
-                return m_a_pool[local_type_index].get_access(internal.m_index);
+                return m_a_pool[local_type_index].get_access(handle);
             }
 
             bool pool_t::register_component_pool(u16 type_index, u32 max_num_components, u32 sizeof_component)
@@ -212,8 +209,6 @@ namespace ncore
                 return false;
             }
 
-            s32 pool_t::get_number_of_objects(const u16 object_type_index) const { return m_object_types[object_type_index].m_num_objects; }
-
             u32 pool_t::pop_free_object(u16 object_type_index)
             {
                 s32 object_index = m_object_types[object_type_index].m_objects_map.find_free_and_set_used();
@@ -222,20 +217,20 @@ namespace ncore
                 return object_index;
             }
 
-            handle_t pool_t::iterate(const u16 object_type_index) const
+            s32 pool_t::iterate_begin(const u16 object_type_index) const
             {
                 object_type_t const* object_type  = &m_object_types[object_type_index];
-                s32 const            object_index = object_type->m_objects_map.find_used_upper();
-                return object_index >= 0 ? make_handle(object_type_index, 0, (u32)object_index) : c_invalid_handle;
+                s32 const            object_index = object_type->m_objects_map.find_used();
+                return object_index;
             }
 
-            handle_t pool_t::iterate(const u16 object_type_index, const u16 component_type_index) const
+            s32 pool_t::iterate_begin(const u16 object_type_index, const u16 component_type_index) const
             {
                 object_type_t const* object_type      = &m_object_types[object_type_index];
                 u16 const            local_type_index = object_type->m_a_component_map[component_type_index];
                 if (local_type_index == 0xFFFF)
-                    return c_invalid_handle;
-                s32                object_index = object_type->m_objects_map.find_used_upper();
+                    return c_invalid_nhandle;
+                s32                object_index = object_type->m_objects_map.find_used();
                 inventory_t const* inventory    = &object_type->m_a_component[local_type_index];
                 while (object_index >= 0 && inventory->is_used(object_index) == false)
                 {
@@ -243,24 +238,20 @@ namespace ncore
                 }
 
                 if (object_index < 0)
-                    return c_invalid_handle;
+                    return c_invalid_nhandle;
 
-                return make_handle(object_type_index, component_type_index, (u32)object_index);
+                return object_index;
             }
 
-            handle_t pool_t::next(handle_t handle) const
+            s32 pool_t::iterate_next(const u16 object_type_index, const u16 component_type_index, const u32 index) const
             {
-                if (handle == c_invalid_handle)
-                    return c_invalid_handle;
-
                 // determine the index of the current object, then find the next object from there
-                internal_t const&    internal    = *(internal_t*)handle;
-                object_type_t const* object_type = &m_object_types[internal.m_type0_index];
-                s32                  next_index  = m_object_types[internal.m_type0_index].m_objects_map.next_used_up(internal.m_index + 1);
-                if (internal.m_type1_index > 0)
+                object_type_t const* object_type = &m_object_types[object_type_index];
+                s32                  next_index  = object_type->m_objects_map.next_used_up(index + 1);
+                if (component_type_index > 0)
                 {
                     // Find the next object that has the component marked as used
-                    u16 const          local_type_index = object_type->m_a_component_map[internal.m_type1_index];
+                    u16 const          local_type_index = object_type->m_a_component_map[component_type_index];
                     inventory_t const* inventory        = &object_type->m_a_component[local_type_index];
                     while (next_index >= 0 && inventory->is_used(next_index) == false)
                     {
@@ -269,9 +260,9 @@ namespace ncore
                 }
 
                 if (next_index < 0)
-                    return c_invalid_handle;
+                    return c_invalid_nhandle;
 
-                return pool_t::make_handle(internal.m_type0_index, internal.m_type1_index, (u32)next_index);
+                return next_index;
             }
 
         } // namespace nobjects_with_components

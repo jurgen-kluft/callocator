@@ -14,10 +14,10 @@ namespace ncore
 {
     class alloc_t;
 
+    typedef u32     nhandle_t;
+    const nhandle_t c_invalid_nhandle = 0xFFFFFFFF;
     namespace nobject
     {
-        const handle_t c_invalid_handle = (void*)D_CONSTANT_U64(0xffffffffffffffff);
-
         struct array_t // 16 bytes
         {
             inline array_t() : m_memory(nullptr), m_num_max(0), m_sizeof(0) {}
@@ -65,6 +65,13 @@ namespace ncore
 
             inline void deallocate(u32 index)
             {
+                ASSERT(is_used(index));
+                set_free(index);
+            }
+
+            inline void deallocate(void* ptr)
+            {
+                u32 index = m_array.ptr_to_index(ptr);
                 ASSERT(is_used(index));
                 set_free(index);
             }
@@ -170,6 +177,7 @@ namespace ncore
 
             void*       get_access(u32 index);
             const void* get_access(u32 index) const;
+            inline u32  ptr_to_index(const void* ptr) const { return m_object_array.ptr_to_index(ptr); }
 
             array_t  m_object_array;
             binmap_t m_free_resource_map;
@@ -249,82 +257,54 @@ namespace ncore
         {
             struct pool_t // 32 bytes
             {
-                struct internal_t
-                {
-                    u16 m_type0_index;
-                    u16 m_type1_index;
-                    u32 m_index;
-                };
-
                 inline pool_t() : m_a_map(nullptr), m_a_pool(nullptr), m_num_pools(0), m_max_pools(0), m_allocator(nullptr) {}
                 DCORE_CLASS_PLACEMENT_NEW_DELETE
 
                 void setup(alloc_t* allocator, u16 max_num_types_locally, u16 max_num_types_globally);
                 void teardown();
 
-                template <typename T> T* get(handle_t handle)
-                {
-                    if (handle == c_invalid_handle)
-                        return nullptr;
-                    return (T*)get_access_raw(handle);
-                }
-
-                template <typename T> const T* get(handle_t handle) const
-                {
-                    if (handle == c_invalid_handle)
-                        return nullptr;
-                    return (const T*)get_access_raw(handle);
-                }
-
                 // Register 'resource' by type
-                template <typename T> bool register_component(u16 _component_type_index, u32 max_num_components) { return register_component_pool(_component_type_index, max_num_components, sizeof(T)); }
-                bool                       is_component_type(handle_t handle) const { return handle != c_invalid_handle; }
+                template <typename T> bool register_component(u32 max_num_components) { return register_component_pool(T::NOBJECT_COMPONENT_TYPE_INDEX, max_num_components, sizeof(T)); }
+                template <typename T> bool is_component_registered() const { return m_a_map[T::NOBJECT_COMPONENT_TYPE_INDEX] != 0xFFFF; }
 
-                template <typename T> handle_t allocate(u16 _component_type_index)
+                template <typename T> T* allocate()
                 {
-                    u16 const global_type_index = _component_type_index;
+                    u16 const global_type_index = T::NOBJECT_COMPONENT_TYPE_INDEX;
                     const u16 local_type_index  = m_a_map[global_type_index];
                     u32 const index             = m_a_pool[local_type_index].allocate();
-                    return make_handle(global_type_index, local_type_index, index);
+                    return (T*)m_a_pool[local_type_index].get_access(index);
                 }
 
-                void deallocate(handle_t handle)
+                template <typename T> void deallocate(T* cp)
                 {
-                    internal_t const& internal = *(internal_t*)&handle;
-                    m_a_pool[internal.m_type0_index].deallocate(internal.m_index);
+                    u32 const index = m_a_pool[T::NOBJECT_COMPONENT_TYPE_INDEX].ptr_to_index(cp);
+                    m_a_pool[T::NOBJECT_COMPONENT_TYPE_INDEX].deallocate(index);
                 }
 
-                template <typename T> handle_t construct(u16 _component_type_index)
+                template <typename T> T* construct()
                 {
-                    u16 const global_type_index = _component_type_index;
+                    u16 const global_type_index = T::NOBJECT_COMPONENT_TYPE_INDEX;
                     u16 const local_type_index  = m_a_map[global_type_index];
                     u32 const index             = m_a_pool[local_type_index].allocate();
                     void*     ptr               = m_a_pool[local_type_index].get_access(index);
-                    new (ptr) T();
-                    return make_handle(global_type_index, local_type_index, index);
+                    T*        obj               = new (ptr) T();
+                    return obj;
                 }
 
-                template <typename T> void destruct(handle_t handle)
+                template <typename T> void destruct(T* cp)
                 {
-                    internal_t const& internal         = *(internal_t*)&handle;
-                    u16 const         local_type_index = m_a_map[internal.m_type0_index];
-                    void*             ptr              = m_a_pool[local_type_index].get_access(internal.m_index);
-                    ((T*)ptr)->~T();
-                    m_a_pool[local_type_index].deallocate(internal.m_index);
+                    u16 const global_type_index = T::NOBJECT_COMPONENT_TYPE_INDEX;
+                    u16 const local_type_index  = m_a_map[global_type_index];
+                    cp->~T();
+                    u32 const index = m_a_pool[T::NOBJECT_COMPONENT_TYPE_INDEX].ptr_to_index(cp);
+                    m_a_pool[local_type_index].deallocate(index);
                 }
 
             private:
-                inline handle_t make_handle(u16 global_type_index, u16 local_type_index, u32 index)
-                {
-                    internal_t internal;
-                    internal.m_type0_index = global_type_index;
-                    internal.m_type1_index = local_type_index;
-                    internal.m_index       = index;
-                    return *(handle_t*)&internal;
-                }
-                void*       get_access_raw(handle_t handle);
-                const void* get_access_raw(handle_t handle) const;
-                bool        register_component_pool(u16 type_index, u32 max_num_components, u32 sizeof_component);
+                inline nhandle_t make_handle(u16 global_type_index, u16 local_type_index, u32 index) { return index; }
+                void*            get_access_raw(u16 global_type_index, nhandle_t handle);
+                const void*      get_access_raw(u16 global_type_index, nhandle_t handle) const;
+                bool             register_component_pool(u16 type_index, u32 max_num_components, u32 sizeof_component);
 
                 u16*             m_a_map;
                 array_t*         m_a_objects;
@@ -338,6 +318,17 @@ namespace ncore
 
         namespace nobjects_with_components
         {
+#define D_DECLARE_OBJECT_TYPE(_index)      \
+    enum                                   \
+    {                                      \
+        NOBJECT_OBJECT_TYPE_INDEX = _index \
+    }
+#define D_DECLARE_COMPONENT_TYPE(_index)          \
+    enum                                          \
+    {                                             \
+        NOBJECT_COMPONENT_TYPE_INDEX = _index + 1 \
+    }
+
             // Limitations:
             // - more than 60.000 object_type types (0 to 65535)
             // - more than 60.000 resource types (0 to 65535-1)
@@ -351,98 +342,102 @@ namespace ncore
 
                 DCORE_CLASS_PLACEMENT_NEW_DELETE
 
-                struct internal_t
-                {
-                    u16 m_type0_index;
-                    u16 m_type1_index;
-                    u32 m_index;
-                };
-
                 // --------------------------------------------------------------------------------------------------
                 // objects
 
-                template <typename T> T* get_object(handle_t handle)
-                {
-                    if (handle == c_invalid_handle)
-                        return nullptr;
-                    internal_t const& internal    = *(internal_t const*)&handle;
-                    object_type_t*    object_type = &m_object_types[internal.m_type0_index];
-                    inventory_t*      inventory   = get_inventory(object_type, 0);
-                    return (T const*)inventory->get_access(internal.m_index);
-                }
-
-                template <typename T> T const* get_object(handle_t handle) const
-                {
-                    if (handle == c_invalid_handle)
-                        return nullptr;
-                    internal_t const&    internal    = *(internal_t const*)&handle;
-                    object_type_t const* object_type = &m_object_types[internal.m_type0_index];
-                    inventory_t const*   inventory   = get_inventory(object_type, 0);
-                    return (T const*)inventory->get_access(internal.m_index);
-                }
-
                 // Iterate over objects, start with ptr = nullptr, and continue until nullptr is returned
-                s32 get_number_of_objects(const u16 object_type_index) const;
+                template <typename T> s32 get_number_of_objects() const { return m_object_types[T::NOBJECT_OBJECT_TYPE_INDEX].m_num_objects; }
+                template <typename T> T*  begin() const
+                {
+                    s32 const index = iterate_begin(T::NOBJECT_OBJECT_TYPE_INDEX);
+                    if (index < 0)
+                        return nullptr;
+                    object_type_t* object_type      = get_object_type(T::NOBJECT_OBJECT_TYPE_INDEX);
+                    inventory_t*   object_inventory = get_inventory(object_type, 0);
+                    return object_inventory->get_access_as<T>(index);
+                }
+                template <typename T> T* next(nhandle_t handle) const
+                {
+                    s32 const index = iterate_next(T::NOBJECT_OBJECT_TYPE_INDEX, 0, handle);
+                    if (index < 0)
+                        return nullptr;
+                    object_type_t* object_type      = get_object_type(T::NOBJECT_OBJECT_TYPE_INDEX);
+                    inventory_t*   object_inventory = get_inventory(object_type, 0);
+                    return object_inventory->get_access_as<T>(index);
+                }
 
-                handle_t iterate(const u16 object_type_index) const;
-                handle_t iterate(const u16 object_type_index, const u16 component_type_index) const;
-                handle_t next(handle_t handle) const;
+                template <typename T, typename U> U* begin() const
+                {
+                    s32 const index = iterate_begin(T::NOBJECT_OBJECT_TYPE_INDEX, U::NOBJECT_COMPONENT_TYPE_INDEX);
+                    if (index < 0)
+                        return nullptr;
+                    object_type_t* object_type         = get_object_type(T::NOBJECT_OBJECT_TYPE_INDEX);
+                    inventory_t*   component_inventory = get_inventory(object_type, U::NOBJECT_COMPONENT_TYPE_INDEX);
+                    return component_inventory->get_access_as<U>(index);
+                }
+                template <typename T, typename U> U* next(U* component) const
+                {
+                    object_type_t* object_type         = get_object_type(T::NOBJECT_OBJECT_TYPE_INDEX);
+                    inventory_t*   component_inventory = get_inventory(object_type, U::NOBJECT_COMPONENT_TYPE_INDEX);
+                    u32 const      current_index       = component_inventory->ptr_to_index(component);
+                    s32 const      next_index          = iterate_next(T::NOBJECT_OBJECT_TYPE_INDEX, U::NOBJECT_COMPONENT_TYPE_INDEX, current_index);
+                    if (next_index < 0)
+                        return nullptr;
+                    return component_inventory->get_access_as<U>(next_index);
+                }
 
                 // Register 'object_type' by type
-                template <typename T> bool register_object_type(u16 object_type_index, u32 max_instances, u32 max_components) { return register_object_type(object_type_index, max_instances, sizeof(T), max_components, m_max_component_types); }
-                bool                       is_object(handle_t handle) const
-                {
-                    internal_t const& internal = *(internal_t const*)&handle;
-                    return internal.m_type1_index == 0 && internal.m_type0_index < m_max_object_types;
-                }
+                template <typename T> bool register_object(u32 max_instances, u32 max_components) { return register_object_type(T::NOBJECT_OBJECT_TYPE_INDEX, max_instances, sizeof(T), max_components, m_max_component_types); }
+                template <typename T> bool is_object_registered() const { return m_object_types[T::NOBJECT_OBJECT_TYPE_INDEX].m_max_objects > 0; }
 
-                handle_t allocate_object(u16 object_type_index)
+                template <typename T> T* allocate_object()
                 {
-                    const s32 object_index = pop_free_object(object_type_index);
+                    u16 const object_type_index = T::NOBJECT_OBJECT_TYPE_INDEX;
+                    const s32 object_index      = pop_free_object(object_type_index);
                     if (object_index < 0)
-                        return c_invalid_handle;
+                        return nullptr;
                     object_type_t* object_type = get_object_type(object_type_index);
                     inventory_t*   inventory   = get_inventory(object_type, 0);
                     inventory->allocate(object_index);
                     object_type->m_num_objects++;
-                    return make_handle(object_type_index, 0, object_index);
+                    return inventory->get_access_as<T>(object_index);
                 }
 
-                template <typename T> handle_t construct_object(u16 object_type_index)
+                template <typename T> T* construct_object()
                 {
-                    const s32 object_index = pop_free_object(object_type_index);
+                    u16 const object_type_index = T::NOBJECT_OBJECT_TYPE_INDEX;
+                    const s32 object_index      = pop_free_object(object_type_index);
                     if (object_index < 0)
-                        return c_invalid_handle;
+                        return nullptr;
                     object_type_t* object_type = get_object_type(object_type_index);
                     inventory_t*   inventory   = get_inventory(object_type, 0);
                     inventory->allocate(object_index);
                     void* ptr = inventory->get_access(object_index);
-                    new (ptr) T();
+                    T*    obj = new (ptr) T();
                     object_type->m_num_objects++;
-                    return make_handle(object_type_index, 0, object_index);
+                    return obj;
                 }
 
-                void deallocate_object(handle_t handle)
+                template <typename T> void deallocate_object(T* obj)
                 {
-                    if (handle != c_invalid_handle)
+                    if (obj != nullptr)
                     {
-                        internal_t const& internal    = *(internal_t const*)&handle;
-                        object_type_t*    object_type = get_object_type(internal.m_type0_index);
-                        inventory_t*      inventory   = get_inventory(object_type, 0);
-                        inventory->deallocate(internal.m_index);
+                        u16 const      object_type_index = T::NOBJECT_OBJECT_TYPE_INDEX;
+                        object_type_t* object_type       = get_object_type(object_type_index);
+                        inventory_t*   inventory         = get_inventory(object_type, 0);
+                        inventory->deallocate(obj);
                     }
                 }
 
-                template <typename T> void destruct_object(handle_t handle)
+                template <typename T> void destruct_object(T* obj)
                 {
-                    if (handle != c_invalid_handle)
+                    if (obj != nullptr)
                     {
-                        internal_t const& internal    = *(internal_t const*)&handle;
-                        object_type_t*    object_type = get_object_type(internal.m_type0_index);
-                        inventory_t*      inventory   = get_inventory(object_type, 0);
-                        void*             ptr         = inventory->get_access(internal.m_index);
-                        ((T*)ptr)->~T();
-                        inventory->deallocate(internal.m_index);
+                        u16 const      object_type_index = T::NOBJECT_OBJECT_TYPE_INDEX;
+                        object_type_t* object_type       = get_object_type(object_type_index);
+                        inventory_t*   inventory         = get_inventory(object_type, 0);
+                        obj->~T();
+                        inventory->deallocate(obj);
                         object_type->m_num_objects--;
                     }
                 }
@@ -451,69 +446,85 @@ namespace ncore
                 // components
 
                 // Register 'component' by type
-                template <typename T> bool register_component_type(u16 const _object_type_index, u16 const _component_type_index) { return register_component_type(_object_type_index, _component_type_index + 1, sizeof(T)); }
-                bool                       is_component(handle_t handle) const
+                template <typename T, typename U> bool register_component() { return register_component_type(T::NOBJECT_OBJECT_TYPE_INDEX, U::NOBJECT_COMPONENT_TYPE_INDEX, sizeof(U)); }
+                template <typename T, typename U> bool is_component_registered() const
                 {
-                    internal_t const& internal = *(internal_t const*)&handle;
-                    return internal.m_type1_index > 0 && internal.m_type1_index < m_max_component_types;
+                    u16 const            object_type_index    = T::NOBJECT_OBJECT_TYPE_INDEX;
+                    u16 const            component_type_index = U::NOBJECT_COMPONENT_TYPE_INDEX;
+                    object_type_t const* object_type          = get_object_type(object_type_index);
+                    return object_type->m_a_component_map[component_type_index] != 0xFFFF;
                 }
 
-                template <typename T> T* get_component(handle_t handle, u16 const _component_type_index)
+                template <typename U, typename T> U* get_component(T const* obj)
                 {
-                    internal_t const& internal    = *(internal_t const*)&handle;
-                    object_type_t*    object_type = get_object_type(handle);
-                    inventory_t*      inventory   = get_inventory(object_type, _component_type_index + 1);
-                    return inventory->get_access_as<T>(internal.m_index);
+                    object_type_t* object_type = get_object_type(T::NOBJECT_OBJECT_TYPE_INDEX);
+                    if (object_type->m_a_component_map[U::NOBJECT_COMPONENT_TYPE_INDEX] == 0xFFFF)
+                        return nullptr;
+                    inventory_t* component_inventory = get_inventory(object_type, U::NOBJECT_COMPONENT_TYPE_INDEX);
+                    u32 const    index               = get_object_index(obj, T::NOBJECT_OBJECT_TYPE_INDEX);
+                    return component_inventory->get_access_as<U>(index);
                 }
 
-                template <typename T> T const* get_component(handle_t handle, u16 const _component_type_index) const
+                template <typename U, typename T> U const* get_component(T const* obj) const
                 {
-                    internal_t const& internal    = *(internal_t const*)&handle;
-                    object_type_t*    object_type = get_object_type(handle);
-                    inventory_t*      inventory   = get_inventory(object_type, _component_type_index + 1);
-                    return inventory->get_access_as<T>(internal.m_index);
+                    object_type_t* object_type = get_object_type(T::NOBJECT_OBJECT_TYPE_INDEX);
+                    if (object_type->m_a_component_map[U::NOBJECT_COMPONENT_TYPE_INDEX] == 0xFFFF)
+                        return nullptr;
+                    inventory_t* component_inventory = get_inventory(object_type, U::NOBJECT_COMPONENT_TYPE_INDEX);
+                    u32 const    index               = get_object_index(obj, T::NOBJECT_OBJECT_TYPE_INDEX);
+                    return component_inventory->get_access_as<U>(index);
                 }
 
-                handle_t allocate_component(handle_t handle, u16 _component_type_index)
+                template <typename U, typename T> U* allocate_component(T const* obj)
                 {
-                    internal_t const& internal    = *(internal_t const*)&handle;
-                    object_type_t*    object_type = get_object_type(internal.m_type0_index);
-                    inventory_t*      inventory   = get_inventory(object_type, _component_type_index + 1);
-                    inventory->allocate(internal.m_index);
-                    return make_handle(internal.m_type0_index, _component_type_index + 1, internal.m_index);
+                    object_type_t* object_type = get_object_type(T::NOBJECT_OBJECT_TYPE_INDEX);
+                    if (object_type->m_a_component_map[U::NOBJECT_COMPONENT_TYPE_INDEX] == 0xFFFF)
+                        return nullptr;
+                    inventory_t* component_inventory = get_inventory(object_type, U::NOBJECT_COMPONENT_TYPE_INDEX);
+                    u32 const    index               = get_object_index(obj, T::NOBJECT_OBJECT_TYPE_INDEX);
+                    component_inventory->allocate(index);
+                    return component_inventory->get_access_as<U>(index);
                 }
 
-                template <typename T> handle_t construct_component(handle_t handle, u16 _component_type_index)
+                template <typename U, typename T> U* construct_component(T const* obj)
                 {
-                    internal_t const& internal    = *(internal_t const*)&handle;
-                    object_type_t*    object_type = get_object_type(internal.m_type0_index);
-                    inventory_t*      inventory   = get_inventory(object_type, _component_type_index + 1);
-                    inventory->construct<T>(internal.m_index);
-                    return make_handle(internal.m_type0_index, _component_type_index + 1, internal.m_index);
+                    object_type_t* object_type = get_object_type(T::NOBJECT_OBJECT_TYPE_INDEX);
+                    if (object_type->m_a_component_map[U::NOBJECT_COMPONENT_TYPE_INDEX] == 0xFFFF)
+                        return nullptr;
+                    inventory_t* component_inventory = get_inventory(object_type, U::NOBJECT_COMPONENT_TYPE_INDEX);
+                    u32 const    index               = get_object_index(obj, T::NOBJECT_OBJECT_TYPE_INDEX);
+                    component_inventory->construct<U>(index);
+                    return component_inventory->get_access_as<U>(index);
                 }
 
-                void deallocate_component(handle_t handle, u16 _component_type_index)
+                template <typename U, typename T> void deallocate_component(T const* obj)
                 {
-                    internal_t const& internal    = *(internal_t const*)&handle;
-                    object_type_t*    object_type = get_object_type(internal.m_type0_index);
-                    inventory_t*      inventory   = get_inventory(object_type, _component_type_index + 1);
-                    inventory->deallocate(internal.m_index);
+                    object_type_t* object_type = get_object_type(T::NOBJECT_OBJECT_TYPE_INDEX);
+                    if (object_type->m_a_component_map[U::NOBJECT_COMPONENT_TYPE_INDEX] == 0xFFFF)
+                        return;
+                    inventory_t* component_inventory = get_inventory(object_type, U::NOBJECT_COMPONENT_TYPE_INDEX);
+                    u32 const    index               = get_object_index(obj, T::NOBJECT_OBJECT_TYPE_INDEX);
+                    component_inventory->deallocate(index);
                 }
 
-                template <typename T> void destruct_component(handle_t handle, u16 _component_type_index)
+                template <typename U, typename T> void destruct_component(T const* obj)
                 {
-                    internal_t const& internal    = *(internal_t const*)&handle;
-                    object_type_t*    object_type = get_object_type(internal.m_type0_index);
-                    inventory_t*      inventory   = get_inventory(object_type, _component_type_index + 1);
-                    inventory->destruct<T>(internal.m_index);
+                    object_type_t* object_type = get_object_type(T::NOBJECT_OBJECT_TYPE_INDEX);
+                    if (object_type->m_a_component_map[U::NOBJECT_COMPONENT_TYPE_INDEX] == 0xFFFF)
+                        return;
+                    inventory_t* component_inventory = get_inventory(object_type, U::NOBJECT_COMPONENT_TYPE_INDEX);
+                    u32 const    index               = get_object_index(obj, T::NOBJECT_OBJECT_TYPE_INDEX);
+                    component_inventory->destruct<U>(index);
                 }
 
-                bool has_component(handle_t handle, u16 _component_type_index) const
+                template <typename U, typename T> bool has_component(T const* obj) const
                 {
-                    internal_t const& internal    = *(internal_t const*)&handle;
-                    object_type_t*    object_type = get_object_type(internal.m_type0_index);
-                    inventory_t*      inventory   = get_inventory(object_type, _component_type_index + 1);
-                    return inventory->is_used(internal.m_index);
+                    object_type_t* object_type = get_object_type(T::NOBJECT_OBJECT_TYPE_INDEX);
+                    if (object_type->m_a_component_map[U::NOBJECT_COMPONENT_TYPE_INDEX] == 0xFFFF)
+                        return false;
+                    inventory_t* component_inventory = get_inventory(object_type, U::NOBJECT_COMPONENT_TYPE_INDEX);
+                    u32 const    index               = get_object_index(obj, T::NOBJECT_OBJECT_TYPE_INDEX);
+                    return component_inventory->is_used(index);
                 }
 
             private:
@@ -531,29 +542,32 @@ namespace ncore
                     u32                   m_num_components;  // current number of components for this object_type, excluding the object_type itself
                 };
 
-                static D_FORCEINLINE handle_t make_handle(u16 object_type_index, u16 component_type_index, u32 index)
-                {
-                    internal_t internal;
-                    internal.m_type0_index = object_type_index;
-                    internal.m_type1_index = component_type_index;
-                    internal.m_index       = index;
-                    return *(handle_t*)&internal;
-                }
-
                 u32                   pop_free_object(u16 object_type_index);
-                inline object_type_t* get_object_type(u16 const object_type_index) const { return &m_object_types[object_type_index]; }
-                inline object_type_t* get_object_type(handle_t handle) const
+                inline object_type_t* get_object_type(u16 const object_type_index) const
                 {
-                    internal_t const& internal = *(internal_t const*)&handle;
-                    return &m_object_types[internal.m_type0_index];
+                    ASSERT(object_type_index < m_max_object_types);
+                    return &m_object_types[object_type_index];
                 }
-
                 static inline inventory_t* get_inventory(object_type_t const* object_type, u16 const component_type_index)
                 {
                     const u16 local_component_index = object_type->m_a_component_map[component_type_index];
                     ASSERT(local_component_index != 0xFFFF && local_component_index < object_type->m_num_components);
                     return &object_type->m_a_component[local_component_index];
                 }
+                inline u32 get_object_index(void const* ptr, u16 object_type_index) const
+                {
+                    object_type_t const* object_type = &m_object_types[object_type_index];
+                    return object_type->m_a_component[0].ptr_to_index(ptr);
+                }
+                inline u32 get_component_index(void const* ptr, u16 object_type_index, u16 component_type_index) const
+                {
+                    object_type_t const* object_type = &m_object_types[object_type_index];
+                    return object_type->m_a_component[component_type_index].ptr_to_index(ptr);
+                }
+
+                s32 iterate_begin(const u16 object_type_index) const;
+                s32 iterate_begin(const u16 object_type_index, const u16 component_type_index) const;
+                s32 iterate_next(const u16 object_type_index, const u16 component_type_index, const u32 index) const;
 
                 object_type_t* m_object_types;
                 alloc_t*       m_allocator;

@@ -24,6 +24,7 @@ namespace ncore
 
         struct object_a_t
         {
+            D_DECLARE_OBJECT_TYPE(kObjectA);
             int   a;
             int   b;
             float c;
@@ -31,6 +32,7 @@ namespace ncore
 
         struct object_b_t
         {
+            D_DECLARE_OBJECT_TYPE(kObjectB);
             int   a;
             int   b;
             float c;
@@ -38,6 +40,7 @@ namespace ncore
 
         struct component_a_t
         {
+            D_DECLARE_COMPONENT_TYPE(kComponentA);
             int   a;
             int   b;
             float c;
@@ -46,6 +49,7 @@ namespace ncore
 
         struct component_b_t
         {
+            D_DECLARE_COMPONENT_TYPE(kComponentB);
             int   a;
             int   b;
             float c;
@@ -54,6 +58,7 @@ namespace ncore
 
         struct component_c_t
         {
+            D_DECLARE_COMPONENT_TYPE(kComponentC);
             int   a;
             int   b;
             float c;
@@ -217,29 +222,28 @@ UNITTEST_SUITE_BEGIN(nobject)
             nobject::ncomponents::pool_t pool;
             pool.setup(Allocator, 4, 16);
 
-            CHECK_TRUE(pool.register_component<nobject::component_a_t>(nobject::kComponentA, 32));
-            CHECK_TRUE(pool.register_component<nobject::component_b_t>(nobject::kComponentB, 32));
-            CHECK_TRUE(pool.register_component<nobject::component_c_t>(nobject::kComponentC, 32));
+            CHECK_TRUE(pool.register_component<nobject::component_a_t>(32));
+            CHECK_TRUE(pool.register_component<nobject::component_b_t>(32));
+            CHECK_TRUE(pool.register_component<nobject::component_c_t>(32));
 
-            handle_t h1 = pool.allocate<nobject::component_a_t>(nobject::kComponentA);
-            CHECK_NOT_EQUAL(nobject::c_invalid_handle, h1);
-            handle_t h2 = pool.allocate<nobject::component_b_t>(nobject::kComponentB);
-            CHECK_NOT_EQUAL(nobject::c_invalid_handle, h2);
-            handle_t h3 = pool.construct<nobject::component_c_t>(nobject::kComponentC);
-            CHECK_NOT_EQUAL(nobject::c_invalid_handle, h3);
+            nobject::component_a_t* oaca = pool.allocate<nobject::component_a_t>();
+            CHECK_NOT_NULL(oaca);
+            nobject::component_b_t* oacb = pool.allocate<nobject::component_b_t>();
+            CHECK_NOT_NULL(oacb);
+            nobject::component_c_t* oacc = pool.construct<nobject::component_c_t>();
+            CHECK_NOT_NULL(oacc);
 
-            CHECK_TRUE(pool.is_component_type(h1));
-            CHECK_TRUE(pool.is_component_type(h2));
-            CHECK_TRUE(pool.is_component_type(h3));
+            CHECK_TRUE(pool.is_component_registered<nobject::component_a_t>());
+            CHECK_TRUE(pool.is_component_registered<nobject::component_b_t>());
+            CHECK_TRUE(pool.is_component_registered<nobject::component_c_t>());
 
-            pool.deallocate(h1);
-            pool.deallocate(h2);
-            pool.destruct<nobject::component_c_t>(h3);
+            pool.deallocate<>(oaca);
+            pool.deallocate<nobject::component_b_t>(oacb);
+            pool.destruct<nobject::component_c_t>(oacc);
 
-            handle_t h4 = pool.construct<nobject::component_a_t>(nobject::kComponentA);
-            CHECK_NOT_EQUAL(nobject::c_invalid_handle, h4);
-
-            pool.destruct<nobject::component_a_t>(h4);
+            nobject::component_a_t* h4 = pool.construct<nobject::component_a_t>();
+            CHECK_NOT_NULL(h4);
+            pool.destruct(h4);
 
             pool.teardown();
         }
@@ -265,52 +269,75 @@ UNITTEST_SUITE_BEGIN(nobject)
             nobject::nobjects_with_components::pool_t pool;
             pool.setup(Allocator, 30, 30);
 
-            bool obj_a = pool.register_object_type<nobject::object_a_t>(nobject::kObjectA, 40, 10);
+            bool obj_a = pool.register_object<nobject::object_a_t>(40, 10);
             CHECK_TRUE(obj_a);
 
-            bool obj_b = pool.register_object_type<nobject::object_b_t>(nobject::kObjectB, 40, 10);
+            bool obj_b = pool.register_object<nobject::object_b_t>(40, 10);
             CHECK_TRUE(obj_b);
 
-            bool obj_a_res_a = pool.register_component_type<nobject::component_a_t>(nobject::kObjectA, nobject::kComponentA);
+            CHECK_TRUE(pool.is_object_registered<nobject::object_a_t>());
+            CHECK_TRUE(pool.is_object_registered<nobject::object_b_t>());
+
+            bool obj_a_res_a = pool.register_component<nobject::object_a_t, nobject::component_a_t>();
             CHECK_TRUE(obj_a_res_a);
 
-            bool obj_a_res_b = pool.register_component_type<nobject::component_b_t>(nobject::kObjectA, nobject::kComponentB);
+            bool obj_a_res_b = pool.register_component<nobject::object_a_t, nobject::component_b_t>();
             CHECK_TRUE(obj_a_res_b);
 
-            bool obj_a_res_c = pool.register_component_type<nobject::component_c_t>(nobject::kObjectA, nobject::kComponentC);
+            bool obj_a_res_c = pool.register_component<nobject::object_a_t, nobject::component_c_t>();
             CHECK_TRUE(obj_a_res_c);
 
-            handle_t oa1 = pool.allocate_object(nobject::kObjectA);
-            handle_t oa2 = pool.allocate_object(nobject::kObjectA);
-            handle_t ob1 = pool.allocate_object(nobject::kObjectB);
+            bool obj_b_res_a = pool.register_component<nobject::object_b_t, nobject::component_a_t>();
+            CHECK_TRUE(obj_b_res_a);
 
-            handle_t h1 = pool.allocate_component(oa1,nobject::kComponentA);
-            handle_t h2 = pool.construct_component<nobject::component_b_t>(oa1, nobject::kComponentB);
-            handle_t h3 = pool.allocate_component(oa1, nobject::kComponentC);
+            // bool obj_b_res_b = pool.register_component<nobject::object_b_t, nobject::component_b_t>();
+            // CHECK_TRUE(obj_b_res_b);
 
-            CHECK_TRUE(pool.is_object(oa1));
-            CHECK_TRUE(pool.is_object(ob1));
+            bool obj_a_cp_a_registered = pool.is_component_registered<nobject::object_a_t, nobject::component_a_t>();
+            CHECK_TRUE(obj_a_cp_a_registered);
+            bool obj_a_cp_b_registered = pool.is_component_registered<nobject::object_a_t, nobject::component_b_t>();
+            CHECK_TRUE(obj_a_cp_b_registered);
+            bool obj_a_cp_c_registered = pool.is_component_registered<nobject::object_a_t, nobject::component_c_t>();
+            CHECK_TRUE(obj_a_cp_c_registered);
 
-            CHECK_TRUE(pool.is_component(h1));
-            CHECK_TRUE(pool.is_component(h2));
-            CHECK_TRUE(pool.is_component(h3));
+            nobject::object_a_t* oa1 = pool.allocate_object<nobject::object_a_t>();
+            nobject::object_a_t* oa2 = pool.allocate_object<nobject::object_a_t>();
+            nobject::object_b_t* ob1 = pool.allocate_object<nobject::object_b_t>();
+
+            nobject::component_a_t* oaca = pool.allocate_component<nobject::component_a_t>(oa1);
+            nobject::component_b_t* oacb = pool.construct_component<nobject::component_b_t>(oa1);
+            nobject::component_c_t* oacc = pool.allocate_component<nobject::component_c_t>(oa1);
+
+            nobject::component_a_t* obca = pool.allocate_component<nobject::component_a_t>(ob1);
+            nobject::component_b_t* obcb = pool.construct_component<nobject::component_b_t>(ob1);
+
+            nobject::object_b_t*    objb   = pool.allocate_object<nobject::object_b_t>();
+            nobject::component_a_t* objbca = pool.allocate_component<nobject::component_a_t>(objb);
+            nobject::component_b_t* objbcb = pool.allocate_component<nobject::component_b_t>(objb);
+            pool.deallocate_component<nobject::component_a_t>(objb);
+            pool.deallocate_component<nobject::component_b_t>(objb);
+            pool.deallocate_object<nobject::object_b_t>(objb);
 
             // You can get a component through the handle of the object or the handle of the component.
             // The handle of the component knows the type of the component but also the type of the object.
-            CHECK_TRUE(pool.has_component(oa1, nobject::kComponentA));
-            CHECK_TRUE(pool.has_component(oa1, nobject::kComponentB));
-            CHECK_TRUE(pool.has_component(oa1, nobject::kComponentC));
-            nobject::component_a_t* cpa1 = pool.get_component<nobject::component_a_t>(oa1, nobject::kComponentA);
+            bool obj_a_has_cp_a = pool.has_component<nobject::component_a_t>(oa1);
+            CHECK_TRUE(obj_a_has_cp_a);
+            bool obj_a_has_cp_b = pool.has_component<nobject::component_b_t>(oa1);
+            CHECK_TRUE(obj_a_has_cp_b);
+            bool obj_a_has_cp_c = pool.has_component<nobject::component_c_t>(oa1);
+            CHECK_TRUE(obj_a_has_cp_c);
+            nobject::component_a_t* cpa1 = pool.get_component<nobject::component_a_t>(oa1);
             CHECK_NOT_NULL(cpa1);
-            nobject::component_a_t* cpa2 = pool.get_component<nobject::component_a_t>(h1, nobject::kComponentA);
-            CHECK_NOT_NULL(cpa2);
 
-            pool.deallocate_component(h1, nobject::kComponentA);
-            pool.destruct_component<nobject::component_b_t>(h2, nobject::kComponentB);
-            pool.deallocate_component(h3, nobject::kComponentC);
+            pool.deallocate_component<nobject::component_a_t>(oa1);
+            pool.destruct_component<nobject::component_b_t>(oa1);
+            pool.deallocate_component<nobject::component_c_t>(oa1);
 
-            pool.deallocate_object(oa1);
-            pool.deallocate_object(oa2);
+            pool.deallocate_component<nobject::component_a_t>(ob1);
+            pool.destruct_component<nobject::component_b_t>(ob1);
+
+            pool.deallocate_object<nobject::object_a_t>(oa1);
+            pool.deallocate_object<nobject::object_a_t>(oa2);
             pool.destruct_object<nobject::object_b_t>(ob1);
 
             pool.teardown();
