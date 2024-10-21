@@ -30,18 +30,17 @@ namespace ncore
             void setup(alloc_t* allocator, u32 max_num_components, u32 sizeof_component);
             void teardown(alloc_t* allocator);
 
-            void*       get_access(u32 index) { return &m_memory[index * m_sizeof]; }
-            const void* get_access(u32 index) const { return &m_memory[index * m_sizeof]; }
+            D_INLINE void*       get_access(u32 index) { return &m_memory[index * m_sizeof]; }
+            D_INLINE const void* get_access(u32 index) const { return &m_memory[index * m_sizeof]; }
+            D_INLINE u32         ptr_to_index(const void* ptr) const { return (u32)(((byte*)ptr - m_memory) / m_sizeof); }
 
-            inline u32 ptr_to_index(const void* ptr) const { return (u32)(((byte*)ptr - m_memory) / m_sizeof); }
-
-            template <typename T> T* get_access_as(u32 index)
+            template <typename T> D_INLINE T* get_access_as(u32 index)
             {
                 ASSERT(sizeof(T) <= m_sizeof);
                 return (T*)get_access(index);
             }
 
-            template <typename T> const T* get_access_as(u32 index) const
+            template <typename T> D_INLINE const T* get_access_as(u32 index) const
             {
                 ASSERT(sizeof(T) <= m_sizeof);
                 return (const T*)get_access(index);
@@ -51,94 +50,62 @@ namespace ncore
         // An inventory is using array_t but it has an additional bit array to mark if an item is used or free.
         struct inventory_t // 24 bytes
         {
-            inline inventory_t() : m_bitarray(nullptr), m_array() {}
+            D_INLINE inventory_t() : m_bitarray(nullptr), m_array() {}
             DCORE_CLASS_PLACEMENT_NEW_DELETE
 
             void setup(alloc_t* allocator, u32 max_num_components, u32 sizeof_component);
             void teardown(alloc_t* allocator);
 
-            inline void allocate(u32 index)
+            D_INLINE void allocate(u32 index)
             {
                 ASSERT(is_free(index));
                 set_used(index);
             }
 
-            inline void deallocate(u32 index)
+            D_INLINE void deallocate(u32 index)
             {
                 ASSERT(is_used(index));
                 set_free(index);
             }
 
-            inline void deallocate(void* ptr)
+            D_INLINE void deallocate(void* ptr)
             {
                 u32 index = m_array.ptr_to_index(ptr);
                 ASSERT(is_used(index));
                 set_free(index);
             }
 
-            void* find_next(void* ptr)
-            {
-                u32 const index = (ptr == nullptr) ? 0 : m_array.ptr_to_index(ptr) + 1;
-
-                const u32 nw = (m_array.m_num_max + 31) >> 5;
-                const u32 iw = index >> 5;
-                const u32 ib = index & 31;
-
-                // Check the first word directly since we require masking
-                u32 bits = m_bitarray[iw] & (0xffffffff << ib);
-                if (bits != 0)
-                {
-                    u32 bit = math::findFirstBit(bits);
-                    if (bit < m_array.m_num_max)
-                        return m_array.get_access(bit);
-                    return nullptr;
-                }
-
-                for (u32 i = iw + 1; i < nw; ++i)
-                {
-                    u32 bits = m_bitarray[i];
-                    if (bits != 0)
-                    {
-                        u32 bit = math::findFirstBit(bits);
-                        if (bit < m_array.m_num_max)
-                            return m_array.get_access(bit + (i << 5));
-                        return nullptr;
-                    }
-                }
-                return nullptr;
-            }
-
             void free_all();
 
-            template <typename T> void construct(u32 index)
+            template <typename T> D_INLINE void construct(u32 index)
             {
                 allocate(index);
                 void* ptr = get_access(index);
                 new (ptr) T();
             }
 
-            template <typename T> void destruct(u32 index)
+            template <typename T> D_INLINE void destruct(u32 index)
             {
                 deallocate(index);
                 void* ptr = get_access(index);
                 ((T*)ptr)->~T();
             }
 
-            inline bool        is_free(u32 index) const { return (m_bitarray[index >> 5] & (1 << (index & 31))) == 0; }
-            inline bool        is_used(u32 index) const { return (m_bitarray[index >> 5] & (1 << (index & 31))) != 0; }
-            inline void        set_free(u32 index) { m_bitarray[index >> 5] &= ~(1 << (index & 31)); }
-            inline void        set_used(u32 index) { m_bitarray[index >> 5] |= (1 << (index & 31)); }
-            inline void*       get_access(u32 index) { return m_array.get_access(index); }
-            inline const void* get_access(u32 index) const { return m_array.get_access(index); }
-            inline u32         ptr_to_index(const void* ptr) const { return m_array.ptr_to_index(ptr); }
+            D_INLINE bool        is_free(u32 index) const { return (m_bitarray[index >> 5] & (1 << (index & 31))) == 0; }
+            D_INLINE bool        is_used(u32 index) const { return (m_bitarray[index >> 5] & (1 << (index & 31))) != 0; }
+            D_INLINE void        set_free(u32 index) { m_bitarray[index >> 5] &= ~(1 << (index & 31)); }
+            D_INLINE void        set_used(u32 index) { m_bitarray[index >> 5] |= (1 << (index & 31)); }
+            D_INLINE void*       get_access(u32 index) { return m_array.get_access(index); }
+            D_INLINE const void* get_access(u32 index) const { return m_array.get_access(index); }
+            D_INLINE u32         ptr_to_index(const void* ptr) const { return m_array.ptr_to_index(ptr); }
 
-            template <typename T> T* get_access_as(u32 index)
+            template <typename T> D_INLINE T* get_access_as(u32 index)
             {
                 ASSERT(sizeof(T) <= m_array.m_sizeof);
                 return (T*)get_access(index);
             }
 
-            template <typename T> T* get_access_as(u32 index) const
+            template <typename T> D_INLINE T* get_access_as(u32 index) const
             {
                 ASSERT(sizeof(T) <= m_array.m_sizeof);
                 return (T const*)get_access(index);
@@ -155,12 +122,18 @@ namespace ncore
 
             void setup(array_t& object_array, alloc_t* allocator);
             void teardown(alloc_t* allocator);
-
-            u32  allocate(); //
-            void deallocate(u32 index);
             void free_all();
 
-            template <typename T> u32 construct()
+            D_INLINE u32 allocate()
+            {
+                s32 const index = m_free_resource_map.find_and_set();
+                ASSERTS(index >= 0, "Error: no more resources left!");
+                return index;
+            }
+
+            void deallocate(u32 index) { m_free_resource_map.set_free(index); }
+
+            template <typename T> D_INLINE u32 construct()
             {
                 const u32 index = allocate();
                 void*     ptr   = get_access(index);
@@ -168,16 +141,28 @@ namespace ncore
                 return index;
             }
 
-            template <typename T> void destruct(u32 index)
+            template <typename T> D_INLINE void destruct(u32 index)
             {
                 void* ptr = get_access(index);
                 ((T*)ptr)->~T();
                 deallocate(index);
             }
 
-            void*       get_access(u32 index);
-            const void* get_access(u32 index) const;
-            inline u32  ptr_to_index(const void* ptr) const { return m_object_array.ptr_to_index(ptr); }
+            D_INLINE u32 ptr_to_index(const void* ptr) const { return m_object_array.ptr_to_index(ptr); }
+
+            D_INLINE void* get_access(u32 index)
+            {
+                ASSERT(index != c_invalid_nhandle);
+                ASSERTS(m_free_resource_map.is_used(index), "Error: resource is not marked as being in use!");
+                return &m_object_array.m_memory[index * m_object_array.m_sizeof];
+            }
+
+            D_INLINE const void* get_access(u32 index) const
+            {
+                ASSERT(index != c_invalid_nhandle);
+                ASSERTS(m_free_resource_map.is_used(index), "Error: resource is not marked as being in use!");
+                return &m_object_array.m_memory[index * m_object_array.m_sizeof];
+            }
 
             array_t  m_object_array;
             binmap_t m_free_resource_map;
@@ -345,7 +330,7 @@ namespace ncore
                 // --------------------------------------------------------------------------------------------------
                 // objects
 
-                // Iterate over objects, start with ptr = nullptr, and continue until nullptr is returned
+                // Iterate over objects, first call 'begin' and then 'next' until 'next' returns nullptr
                 template <typename T> s32 get_number_of_objects() const { return m_object_types[T::NOBJECT_OBJECT_TYPE_INDEX].m_num_objects; }
                 template <typename T> T*  begin() const
                 {
@@ -367,6 +352,7 @@ namespace ncore
                     return object_inventory->get_access_as<T>(next_index);
                 }
 
+                // Iterate over components of an object type, first call 'begin' and then 'next' until 'next' returns nullptr
                 template <typename T, typename U> U* begin() const
                 {
                     s32 const index = iterate_begin(T::NOBJECT_OBJECT_TYPE_INDEX, U::NOBJECT_COMPONENT_TYPE_INDEX);
@@ -543,24 +529,30 @@ namespace ncore
                     u32                   m_num_components;  // current number of components for this object_type, excluding the object_type itself
                 };
 
-                u32                   pop_free_object(u16 object_type_index);
-                inline object_type_t* get_object_type(u16 const object_type_index) const
+                D_INLINE u32 pop_free_object(u16 object_type_index)
+                {
+                    s32 object_index = m_object_types[object_type_index].m_objects_map.find_free_and_set_used();
+                    if (object_index < 0)
+                        return -1;
+                    return object_index;
+                }
+                D_INLINE object_type_t* get_object_type(u16 const object_type_index) const
                 {
                     ASSERT(object_type_index < m_max_object_types);
                     return &m_object_types[object_type_index];
                 }
-                static inline inventory_t* get_inventory(object_type_t const* object_type, u16 const component_type_index)
+                static D_INLINE inventory_t* get_inventory(object_type_t const* object_type, u16 const component_type_index)
                 {
                     const u16 local_component_index = object_type->m_a_component_map[component_type_index];
                     ASSERT(local_component_index != 0xFFFF && local_component_index < object_type->m_num_components);
                     return &object_type->m_a_component[local_component_index];
                 }
-                inline u32 get_object_index(void const* ptr, u16 object_type_index) const
+                D_INLINE u32 get_object_index(void const* ptr, u16 object_type_index) const
                 {
                     object_type_t const* object_type = &m_object_types[object_type_index];
                     return object_type->m_a_component[0].ptr_to_index(ptr);
                 }
-                inline u32 get_component_index(void const* ptr, u16 object_type_index, u16 component_type_index) const
+                D_INLINE u32 get_component_index(void const* ptr, u16 object_type_index, u16 component_type_index) const
                 {
                     object_type_t const* object_type = &m_object_types[object_type_index];
                     return object_type->m_a_component[component_type_index].ptr_to_index(ptr);

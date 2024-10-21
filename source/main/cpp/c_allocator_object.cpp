@@ -62,29 +62,6 @@ namespace ncore
 
         void pool_t::free_all() { m_free_resource_map.init_all_free(); }
 
-        u32 pool_t::allocate()
-        {
-            s32 const index = m_free_resource_map.find_and_set();
-            ASSERTS(index >= 0, "Error: no more resources left!");
-            return index;
-        }
-
-        void pool_t::deallocate(u32 index) { m_free_resource_map.set_free(index); }
-
-        void* pool_t::get_access(u32 index)
-        {
-            ASSERT(index != c_invalid_nhandle);
-            ASSERTS(m_free_resource_map.is_used(index), "Error: resource is not marked as being in use!");
-            return &m_object_array.m_memory[index * m_object_array.m_sizeof];
-        }
-
-        const void* pool_t::get_access(u32 index) const
-        {
-            ASSERT(index != c_invalid_nhandle);
-            ASSERTS(m_free_resource_map.is_used(index), "Error: resource is not marked as being in use!");
-            return &m_object_array.m_memory[index * m_object_array.m_sizeof];
-        }
-
         namespace ncomponents
         {
             // components pool
@@ -207,14 +184,6 @@ namespace ncore
 
                 // Component was already registered
                 return false;
-            }
-
-            u32 pool_t::pop_free_object(u16 object_type_index)
-            {
-                s32 object_index = m_object_types[object_type_index].m_objects_map.find_free_and_set_used();
-                if (object_index < 0)
-                    return -1;
-                return object_index;
             }
 
             s32 pool_t::iterate_begin(const u16 object_type_index) const
