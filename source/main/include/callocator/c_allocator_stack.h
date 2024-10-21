@@ -15,15 +15,16 @@ namespace ncore
     // a JSON parser that will allocate a lot of small blocks and then deallocate them all at once.
     // This allocator is very very fast in allocations O(1) and deallocations O(1).
     class stack_alloc_scope_t;
-    class stack_alloc_t : public alloc_t
+    class stack_alloc_t : protected alloc_t
     {
     public:
         stack_alloc_t();
         virtual ~stack_alloc_t() {}
 
-        void setup(void* beginAddress, u32 size);
-        bool is_valid() const { return m_buffer_begin != nullptr; }
-        void reset();
+        void          setup(void* beginAddress, u32 size);
+        D_INLINE bool is_valid() const { return m_buffer_begin != nullptr; }
+        D_INLINE bool is_empty() const { return m_allocation_count == 0; }
+        void          reset();
 
         DCORE_CLASS_PLACEMENT_NEW_DELETE
 
@@ -49,6 +50,23 @@ namespace ncore
     public:
         stack_alloc_scope_t(stack_alloc_t* allocator) : m_allocator(allocator), m_buffer_cursor(allocator->m_buffer_cursor), m_allocation_count(allocator->m_allocation_count) {}
         ~stack_alloc_scope_t() { m_allocator->v_restore_cursor(m_buffer_cursor, m_allocation_count); }
+
+        D_INLINE void* allocate(u32 size, u32 alignment) { return m_allocator->v_allocate(size, alignment); }
+        D_INLINE void  deallocate(void* ptr) { m_allocator->v_deallocate(ptr); }
+        D_INLINE bool  is_empty() const { return m_allocator->m_allocation_count == 0; }
+
+        template <typename T, typename... Args> T* construct(Args... args)
+        {
+            void* mem    = allocate(sizeof(T), sizeof(void*));
+            T*    object = new (mem) T(args...);
+            return object;
+        }
+
+        template <typename T> void destruct(T* p)
+        {
+            p->~T();
+            deallocate(p);
+        }
     };
 
 }; // namespace ncore
