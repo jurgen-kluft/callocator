@@ -193,7 +193,7 @@ namespace ncore
                 return index;
             }
 
-            static u32 g_instance_index(object_t* object, void* object_ptr)
+            static u32 g_instance_index(object_t const* object, void const* object_ptr)
             {
                 u32 const index = ((byte const*)object_ptr - object->m_per_object_instance) / object->m_bytes_per_object;
                 return index;
@@ -301,6 +301,21 @@ namespace ncore
                 return nullptr;
             }
 
+            static void const* g_get_cp(object_t const* object, u32 instance_index, u32 cp_index)
+            {
+                if (cp_index >= object->m_max_components)
+                    return nullptr;
+
+                components* container = &object->m_components[cp_index];
+                if (container->m_sizeof_component == 0)
+                    return nullptr;
+
+                u32 const entity_index = instance_index;
+                if (container->m_redirect[entity_index] >= 0)
+                    return &container->m_component_data[container->m_redirect[entity_index] * container->m_sizeof_component];
+                return nullptr;
+            }
+
             static bool g_has_tag(object_t* object, u32 instance_index, s16 tg_index)
             {
                 if (tg_index >= object->m_max_tags)
@@ -371,7 +386,7 @@ namespace ncore
 
             bool pool_t::register_component(u32 object_index, u32 max_components, u32 cp_index, s32 cp_sizeof, s32 cp_alignof, const char* cp_name)
             {
-                object_t* object = (object_index < m_max_object_types ) ? m_objects[object_index] : nullptr;
+                object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
                 if (object == nullptr)
                     return false;
                 g_register_component(object, max_components, cp_index, cp_sizeof, cp_alignof, cp_name);
@@ -380,33 +395,42 @@ namespace ncore
 
             bool pool_t::is_component_registered(u32 object_index, u32 cp_index) const
             {
-                object_t* object = (object_index < m_max_object_types ) ? m_objects[object_index] : nullptr;
+                object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
                 if (object == nullptr)
                     return false;
                 return object->m_components[cp_index].m_sizeof_component > 0;
             }
 
-            bool pool_t::has_cp(u32 object_index, void* object_ptr, u32 cp_index) const
+            bool pool_t::has_cp(u32 object_index, void const* object_ptr, u32 cp_index) const
             {
-                object_t* object = (object_index < m_max_object_types ) ? m_objects[object_index] : nullptr;
+                object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
                 if (object == nullptr)
                     return false;
                 u32 const instance_index = g_instance_index(object, object_ptr);
                 return g_has_cp(object, instance_index, cp_index);
             }
 
-            void* pool_t::add_cp(u32 object_index, void* object_ptr, u32 cp_index)
+            void* pool_t::add_cp(u32 object_index, void * object_ptr, u32 cp_index)
             {
-                object_t* object = (object_index < m_max_object_types ) ? m_objects[object_index] : nullptr;
+                object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
                 if (object == nullptr)
                     return nullptr;
                 u32 const instance_index = g_instance_index(object, object_ptr);
                 return g_add_cp(object, instance_index, cp_index);
             }
 
-            void pool_t::rem_cp(u32 object_index, void* object_ptr, u32 cp_index)
+            void* pool_t::add_cp(u32 object_index, void const * object_ptr, u32 cp_index) const
             {
-                object_t* object = (object_index < m_max_object_types ) ? m_objects[object_index] : nullptr;
+                object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
+                if (object == nullptr)
+                    return nullptr;
+                u32 const instance_index = g_instance_index(object, object_ptr);
+                return g_add_cp(object, instance_index, cp_index);
+            }
+
+            void pool_t::rem_cp(u32 object_index, void const* object_ptr, u32 cp_index)
+            {
+                object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
                 if (object == nullptr)
                     return;
                 u32 const instance_index = g_instance_index(object, object_ptr);
@@ -415,38 +439,64 @@ namespace ncore
 
             void* pool_t::get_cp(u32 object_index, void* object_ptr, u32 cp_index)
             {
-                object_t* object = (object_index < m_max_object_types ) ? m_objects[object_index] : nullptr;
+                object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
                 if (object == nullptr)
                     return nullptr;
                 u32 const instance_index = g_instance_index(object, object_ptr);
                 return g_get_cp(object, instance_index, cp_index);
             }
 
-            bool pool_t::has_tag(u32 object_index, void* object_ptr, s16 tg_index) const
+            void const* pool_t::get_cp(u32 object_index, void const* object_ptr, u32 cp_index) const
             {
-                object_t* object = (object_index < m_max_object_types ) ? m_objects[object_index] : nullptr;
+                object_t const* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
+                if (object == nullptr)
+                    return nullptr;
+                u32 const instance_index = g_instance_index(object, object_ptr);
+                return g_get_cp(object, instance_index, cp_index);
+            }
+
+            bool pool_t::has_tag(u32 object_index, void const* object_ptr, s16 tg_index) const
+            {
+                object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
                 if (object == nullptr)
                     return false;
                 u32 const instance_index = g_instance_index(object, object_ptr);
                 return g_has_tag(object, instance_index, tg_index);
             }
 
-            void pool_t::add_tag(u32 object_index, void* object_ptr, s16 tg_index)
+            void pool_t::add_tag(u32 object_index, void const* object_ptr, s16 tg_index)
             {
-                object_t* object = (object_index < m_max_object_types ) ? m_objects[object_index] : nullptr;
+                object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
                 if (object == nullptr)
                     return;
                 u32 const instance_index = g_instance_index(object, object_ptr);
                 g_add_tag(object, instance_index, tg_index);
             }
 
-            void pool_t::rem_tag(u32 object_index, void* object_ptr, s16 tg_index)
+            void pool_t::rem_tag(u32 object_index, void const* object_ptr, s16 tg_index)
             {
-                object_t* object = (object_index < m_max_object_types ) ? m_objects[object_index] : nullptr;
+                object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
                 if (object == nullptr)
                     return;
                 u32 const instance_index = g_instance_index(object, object_ptr);
                 g_rem_tag(object, instance_index, tg_index);
+            }
+
+            void* pool_t::iterate_objects_begin(u32 object_index) const
+            {
+                object_t const* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
+                s32 const       index  = (object != nullptr) ? object->m_entity_state.find_used() : -1;
+                return (index >= 0) ? &object->m_per_object_instance[index * object->m_bytes_per_object] : nullptr;
+            }
+
+            void* pool_t::iterate_objects_next(u32 object_index, void const* object_ptr) const
+            {
+                object_t const* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
+                if (object == nullptr)
+                    return nullptr;
+                u32 const instance_index = g_instance_index(object, object_ptr);
+                s32 const next_index     = object->m_entity_state.next_used_up(instance_index + 1);
+                return (next_index >= 0) ? &object->m_per_object_instance[next_index * object->m_bytes_per_object] : nullptr;
             }
 
         } // namespace nobjects_with_components

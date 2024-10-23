@@ -260,29 +260,16 @@ namespace ncore
                 // objects
 
                 // Iterate over objects, first call 'begin' and then 'next' until 'next' returns nullptr
-                template <typename T> T* begin() const
-                {
-                    // todo
-                }
-                template <typename T> T* next(T const* iter) const
-                {
-                    // todo
-                }
-
-                // Iterate over components of an object type, first call 'begin' and then 'next' until 'next' returns nullptr
-                template <typename T, typename U> U* begin() const
-                {
-                    // todo
-                }
-                template <typename T, typename U> U* next(U* component) const
-                {
-                    // todo
-                }
+                template <typename T> T* begin() const { return (T*)iterate_objects_begin(T::NOBJECT_OBJECT_INDEX); }
+                template <typename T> T* next(T const* iter) const { return (T*)iterate_objects_next(T::NOBJECT_OBJECT_INDEX, iter); }
 
                 // Register object / component
                 template <typename T> bool             register_object(u32 max_object_instances, u32 max_components, u32 max_tags) { return register_object(T::NOBJECT_OBJECT_INDEX, sizeof(T), max_object_instances, max_components, max_tags); }
                 template <typename T> bool             is_object_registered() const { return T::NOBJECT_OBJECT_INDEX < m_max_object_types && m_objects[T::NOBJECT_OBJECT_INDEX] != nullptr; }
-                template <typename T, typename C> bool register_component(u32 max_component_instances, const char* name) { return register_component(T::NOBJECT_OBJECT_INDEX, max_component_instances, C::NOBJECT_COMPONENT_INDEX, sizeof(C), alignof(C), name); }
+                template <typename T, typename C> bool register_component(u32 max_component_instances, const char* name)
+                {
+                    return register_component(T::NOBJECT_OBJECT_INDEX, max_component_instances, C::NOBJECT_COMPONENT_INDEX, sizeof(C), alignof(C), name);
+                }
                 template <typename T, typename C> bool is_component_registered() const { return is_component_registered(T::NOBJECT_OBJECT_INDEX, C::NOBJECT_COMPONENT_INDEX); }
 
                 // Create and destroy objects
@@ -293,15 +280,17 @@ namespace ncore
                 template <typename T> u32 get_number_of_instances() const { return get_number_of_instances(T::NOBJECT_OBJECT_INDEX); }
 
                 // Components
-                template <typename C, typename T> bool has_component(T* object) const { return has_cp(T::NOBJECT_OBJECT_INDEX, object, C::NOBJECT_COMPONENT_INDEX); }
-                template <typename C, typename T> C*   add_component(T* object) { return (C*)add_cp(T::NOBJECT_OBJECT_INDEX, object, C::NOBJECT_COMPONENT_INDEX); }
-                template <typename C, typename T> C*   get_component(T* object) { return (C*)get_cp(T::NOBJECT_OBJECT_INDEX, object, C::NOBJECT_COMPONENT_INDEX); }
-                template <typename C, typename T> void rem_component(T* object) { rem_cp(T::NOBJECT_OBJECT_INDEX, object, C::NOBJECT_COMPONENT_INDEX); }
+                template <typename C, typename T> bool     has_component(T const* object) const { return has_cp(T::NOBJECT_OBJECT_INDEX, object, C::NOBJECT_COMPONENT_INDEX); }
+                template <typename C, typename T> C*       add_component(T* object) { return (C*)add_cp(T::NOBJECT_OBJECT_INDEX, object, C::NOBJECT_COMPONENT_INDEX); }
+                template <typename C, typename T> C*       add_component(T const* object) const { return (C*)add_cp(T::NOBJECT_OBJECT_INDEX, object, C::NOBJECT_COMPONENT_INDEX); }
+                template <typename C, typename T> C*       get_component(T* object) { return (C*)get_cp(T::NOBJECT_OBJECT_INDEX, object, C::NOBJECT_COMPONENT_INDEX); }
+                template <typename C, typename T> C const* get_component(T const* object) const { return (C*)get_cp(T::NOBJECT_OBJECT_INDEX, object, C::NOBJECT_COMPONENT_INDEX); }
+                template <typename C, typename T> void     rem_component(T const* object) { rem_cp(T::NOBJECT_OBJECT_INDEX, object, C::NOBJECT_COMPONENT_INDEX); }
 
                 // Tags
-                template <typename T> bool has_tag(T* object, s16 tg_index) const { return has_tg(T::NOBJECT_OBJECT_INDEX, object, tg_index); }
-                template <typename T> void add_tag(T* object, s16 tg_index) { return add_tg(T::NOBJECT_OBJECT_INDEX, object, tg_index); }
-                template <typename T> void rem_tag(T* object, s16 tg_index) { return rem_tg(T::NOBJECT_OBJECT_INDEX, object, tg_index); }
+                template <typename T> bool has_tag(T const* object, s16 tg_index) const { return has_tag(T::NOBJECT_OBJECT_INDEX, object, tg_index); }
+                template <typename T> void add_tag(T const* object, s16 tg_index) { add_tag(T::NOBJECT_OBJECT_INDEX, object, tg_index); }
+                template <typename T> void rem_tag(T const* object, s16 tg_index) { rem_tag(T::NOBJECT_OBJECT_INDEX, object, tg_index); }
 
                 struct object_t;
 
@@ -318,14 +307,19 @@ namespace ncore
                 void  destroy_object(s16 cp_index, void* object);
                 u32   get_number_of_instances(s16 cp_index) const;
 
-                bool  has_cp(u32 object_index, void* object, u32 cp_index) const;
-                void* add_cp(u32 object_index, void* object, u32 cp_index);
-                void  rem_cp(u32 object_index, void* object, u32 cp_index);
-                void* get_cp(u32 object_index, void* object, u32 cp_index);
+                void* iterate_objects_begin(u32 object_index) const;
+                void* iterate_objects_next(u32 object_index, void const* object_ptr) const;
 
-                bool has_tag(u32 object_index, void* object, s16 tg_index) const;
-                void add_tag(u32 object_index, void* object, s16 tg_index);
-                void rem_tag(u32 object_index, void* object, s16 tg_index);
+                bool        has_cp(u32 object_index, void const* object, u32 cp_index) const;
+                void*       add_cp(u32 object_index, void* object, u32 cp_index);
+                void*       add_cp(u32 object_index, void const* object, u32 cp_index) const;
+                void        rem_cp(u32 object_index, void const* object, u32 cp_index);
+                void*       get_cp(u32 object_index, void* object, u32 cp_index);
+                void const* get_cp(u32 object_index, void const* object, u32 cp_index) const;
+
+                bool has_tag(u32 object_index, void const* object, s16 tg_index) const;
+                void add_tag(u32 object_index, void const* object, s16 tg_index);
+                void rem_tag(u32 object_index, void const* object, s16 tg_index);
             };
 
         } // namespace nobjects_with_components
