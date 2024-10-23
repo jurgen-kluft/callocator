@@ -202,53 +202,6 @@ UNITTEST_SUITE_BEGIN(nobject)
         }
     }
 
-    // Test the components pool
-    UNITTEST_FIXTURE(components_pool)
-    {
-        UNITTEST_ALLOCATOR;
-
-        UNITTEST_FIXTURE_SETUP() {}
-        UNITTEST_FIXTURE_TEARDOWN() {}
-
-        UNITTEST_TEST(test_init_shutdown)
-        {
-            nobject::ncomponents::pool_t pool;
-            pool.setup(Allocator, 32, 64);
-            pool.teardown();
-        }
-
-        UNITTEST_TEST(register_component_types)
-        {
-            nobject::ncomponents::pool_t pool;
-            pool.setup(Allocator, 4, 16);
-
-            CHECK_TRUE(pool.register_component<nobject::component_a_t>(32));
-            CHECK_TRUE(pool.register_component<nobject::component_b_t>(32));
-            CHECK_TRUE(pool.register_component<nobject::component_c_t>(32));
-
-            nobject::component_a_t* oaca = pool.allocate<nobject::component_a_t>();
-            CHECK_NOT_NULL(oaca);
-            nobject::component_b_t* oacb = pool.allocate<nobject::component_b_t>();
-            CHECK_NOT_NULL(oacb);
-            nobject::component_c_t* oacc = pool.construct<nobject::component_c_t>();
-            CHECK_NOT_NULL(oacc);
-
-            CHECK_TRUE(pool.is_component_registered<nobject::component_a_t>());
-            CHECK_TRUE(pool.is_component_registered<nobject::component_b_t>());
-            CHECK_TRUE(pool.is_component_registered<nobject::component_c_t>());
-
-            pool.deallocate<>(oaca);
-            pool.deallocate<nobject::component_b_t>(oacb);
-            pool.destruct<nobject::component_c_t>(oacc);
-
-            nobject::component_a_t* h4 = pool.construct<nobject::component_a_t>();
-            CHECK_NOT_NULL(h4);
-            pool.destruct(h4);
-
-            pool.teardown();
-        }
-    }
-
     // Test the object components pool
     UNITTEST_FIXTURE(object_components)
     {
@@ -260,38 +213,35 @@ UNITTEST_SUITE_BEGIN(nobject)
         UNITTEST_TEST(test_init_shutdown)
         {
             nobject::nobjects_with_components::pool_t pool;
-            pool.setup(Allocator, 32, 4);
+            pool.setup(Allocator, 32);
             pool.teardown();
         }
 
         UNITTEST_TEST(register_object_and_component_types)
         {
             nobject::nobjects_with_components::pool_t pool;
-            pool.setup(Allocator, 30, 30);
+            pool.setup(Allocator, 30);
 
-            bool obj_a = pool.register_object<nobject::object_a_t>(40, 10);
+            bool obj_a = pool.register_object<nobject::object_a_t>(40, 10, 10);
             CHECK_TRUE(obj_a);
 
-            bool obj_b = pool.register_object<nobject::object_b_t>(40, 10);
+            bool obj_b = pool.register_object<nobject::object_b_t>(40, 10, 10);
             CHECK_TRUE(obj_b);
 
             CHECK_TRUE(pool.is_object_registered<nobject::object_a_t>());
             CHECK_TRUE(pool.is_object_registered<nobject::object_b_t>());
 
-            bool obj_a_res_a = pool.register_component<nobject::object_a_t, nobject::component_a_t>();
+            bool obj_a_res_a = pool.register_component<nobject::object_a_t, nobject::component_a_t>(10, "a");
             CHECK_TRUE(obj_a_res_a);
 
-            bool obj_a_res_b = pool.register_component<nobject::object_a_t, nobject::component_b_t>();
+            bool obj_a_res_b = pool.register_component<nobject::object_a_t, nobject::component_b_t>(10, "b");
             CHECK_TRUE(obj_a_res_b);
 
-            bool obj_a_res_c = pool.register_component<nobject::object_a_t, nobject::component_c_t>();
+            bool obj_a_res_c = pool.register_component<nobject::object_a_t, nobject::component_c_t>(10, "c");
             CHECK_TRUE(obj_a_res_c);
 
-            bool obj_b_res_a = pool.register_component<nobject::object_b_t, nobject::component_a_t>();
+            bool obj_b_res_a = pool.register_component<nobject::object_b_t, nobject::component_a_t>(10, "a");
             CHECK_TRUE(obj_b_res_a);
-
-            // bool obj_b_res_b = pool.register_component<nobject::object_b_t, nobject::component_b_t>();
-            // CHECK_TRUE(obj_b_res_b);
 
             bool obj_a_cp_a_registered = pool.is_component_registered<nobject::object_a_t, nobject::component_a_t>();
             CHECK_TRUE(obj_a_cp_a_registered);
@@ -300,26 +250,24 @@ UNITTEST_SUITE_BEGIN(nobject)
             bool obj_a_cp_c_registered = pool.is_component_registered<nobject::object_a_t, nobject::component_c_t>();
             CHECK_TRUE(obj_a_cp_c_registered);
 
-            nobject::object_a_t* oa1 = pool.allocate_object<nobject::object_a_t>();
-            nobject::object_a_t* oa2 = pool.allocate_object<nobject::object_a_t>();
-            nobject::object_b_t* ob1 = pool.allocate_object<nobject::object_b_t>();
+            nobject::object_a_t* oa1 = pool.create_object<nobject::object_a_t>();
+            nobject::object_a_t* oa2 = pool.create_object<nobject::object_a_t>();
+            nobject::object_b_t* ob1 = pool.create_object<nobject::object_b_t>();
 
-            nobject::component_a_t* oaca = pool.allocate_component<nobject::component_a_t>(oa1);
-            nobject::component_b_t* oacb = pool.construct_component<nobject::component_b_t>(oa1);
-            nobject::component_c_t* oacc = pool.allocate_component<nobject::component_c_t>(oa1);
+            nobject::component_a_t* oaca = pool.add_component<nobject::component_a_t>(oa1);
+            nobject::component_b_t* oacb = pool.add_component<nobject::component_b_t>(oa1);
+            nobject::component_c_t* oacc = pool.add_component<nobject::component_c_t>(oa1);
 
-            nobject::component_a_t* obca = pool.allocate_component<nobject::component_a_t>(ob1);
-            nobject::component_b_t* obcb = pool.construct_component<nobject::component_b_t>(ob1);
+            nobject::component_a_t* obca = pool.add_component<nobject::component_a_t>(ob1);
+            nobject::component_b_t* obcb = pool.add_component<nobject::component_b_t>(ob1);
 
-            nobject::object_b_t*    objb   = pool.allocate_object<nobject::object_b_t>();
-            nobject::component_a_t* objbca = pool.allocate_component<nobject::component_a_t>(objb);
-            nobject::component_b_t* objbcb = pool.allocate_component<nobject::component_b_t>(objb);
-            pool.deallocate_component<nobject::component_a_t>(objb);
-            pool.deallocate_component<nobject::component_b_t>(objb);
-            pool.deallocate_object<nobject::object_b_t>(objb);
+            nobject::object_b_t*    objb   = pool.create_object<nobject::object_b_t>();
+            nobject::component_a_t* objbca = pool.add_component<nobject::component_a_t>(objb);
+            nobject::component_b_t* objbcb = pool.add_component<nobject::component_b_t>(objb);
+            pool.rem_component<nobject::component_a_t>(objb);
+            pool.rem_component<nobject::component_b_t>(objb);
+            pool.destroy_object<nobject::object_b_t>(objb);
 
-            // You can get a component through the handle of the object or the handle of the component.
-            // The handle of the component knows the type of the component but also the type of the object.
             bool obj_a_has_cp_a = pool.has_component<nobject::component_a_t>(oa1);
             CHECK_TRUE(obj_a_has_cp_a);
             bool obj_a_has_cp_b = pool.has_component<nobject::component_b_t>(oa1);
@@ -329,16 +277,16 @@ UNITTEST_SUITE_BEGIN(nobject)
             nobject::component_a_t* cpa1 = pool.get_component<nobject::component_a_t>(oa1);
             CHECK_NOT_NULL(cpa1);
 
-            pool.deallocate_component<nobject::component_a_t>(oa1);
-            pool.destruct_component<nobject::component_b_t>(oa1);
-            pool.deallocate_component<nobject::component_c_t>(oa1);
+            pool.rem_component<nobject::component_a_t>(oa1);
+            pool.rem_component<nobject::component_b_t>(oa1);
+            pool.rem_component<nobject::component_c_t>(oa1);
 
-            pool.deallocate_component<nobject::component_a_t>(ob1);
-            pool.destruct_component<nobject::component_b_t>(ob1);
+            pool.rem_component<nobject::component_a_t>(ob1);
+            pool.rem_component<nobject::component_b_t>(ob1);
 
-            pool.deallocate_object<nobject::object_a_t>(oa1);
-            pool.deallocate_object<nobject::object_a_t>(oa2);
-            pool.destruct_object<nobject::object_b_t>(ob1);
+            pool.destroy_object<nobject::object_a_t>(oa1);
+            pool.destroy_object<nobject::object_a_t>(oa2);
+            pool.destroy_object<nobject::object_b_t>(ob1);
 
             pool.teardown();
         }
