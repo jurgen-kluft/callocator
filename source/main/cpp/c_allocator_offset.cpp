@@ -553,7 +553,10 @@ namespace ncore
                 }
             }
 
-            return {.totalFreeSpace = freeStorage, .largestFreeRegion = largestFreeRegion};
+            storage_report_t report;
+            report.totalFreeSpace = freeStorage;
+            report.largestFreeRegion = largestFreeRegion;
+            return report;
         }
 
         full_storage_report_t allocator_t::storageReportFull() const
@@ -568,7 +571,8 @@ namespace ncore
                     nodeIndex = m_nodes[nodeIndex].binListNext;
                     count++;
                 }
-                report.freeRegions[i] = {.size = nfloat::floatToUint(i), .count = count};
+                report.freeRegions[i].size = nfloat::floatToUint(i);
+                report.freeRegions[i].count = count;
             }
             return report;
         }
