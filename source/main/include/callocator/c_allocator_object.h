@@ -287,6 +287,9 @@ namespace ncore
                 template <typename C, typename T> C const* get_component(T const* object) const { return (C*)get_cp(T::NOBJECT_OBJECT_INDEX, object, C::NOBJECT_COMPONENT_INDEX); }
                 template <typename C, typename T> void     rem_component(T const* object) { rem_cp(T::NOBJECT_OBJECT_INDEX, object, C::NOBJECT_COMPONENT_INDEX); }
 
+                // Get component name
+                const char* get_component_name(u32 cp_index) const;
+
                 // Tags
                 template <typename T> bool has_tag(T const* object, s16 tg_index) const { return has_tag(T::NOBJECT_OBJECT_INDEX, object, tg_index); }
                 template <typename T> void add_tag(T const* object, s16 tg_index) { add_tag(T::NOBJECT_OBJECT_INDEX, object, tg_index); }

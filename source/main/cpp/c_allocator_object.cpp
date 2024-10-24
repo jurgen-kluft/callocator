@@ -66,30 +66,30 @@ namespace ncore
         {
             struct components
             {
-                u32         m_free_index;
-                u32         m_sizeof_component;
-                byte*       m_component_data;
-                s32*        m_redirect;
-                binmap_t    m_occupancy;
-                const char* m_name;
+                u32      m_free_index;
+                u32      m_sizeof_component;
+                byte*    m_component_data;
+                s32*     m_redirect;
+                binmap_t m_occupancy; // 32 bytes
             };
 
             struct pool_t::object_t
             {
                 DCORE_CLASS_PLACEMENT_NEW_DELETE
-                alloc_t*    m_allocator;
-                u32         m_num_objects;
-                u32         m_max_objects;
-                u32         m_max_components;
-                u32         m_max_tags;
-                u32         m_component_words_per_object;
-                u32         m_tag_words_per_entity;
-                u32         m_bytes_per_object;
-                u32*        m_per_object_component_occupancy;
-                u32*        m_per_object_tags;
-                byte*       m_per_object_instance;
-                components* m_components;
-                duomap_t    m_entity_state;
+                alloc_t*     m_allocator;
+                u32          m_num_objects;
+                u32          m_max_objects;
+                u32          m_max_components;
+                u32          m_max_tags;
+                u32          m_component_words_per_object;
+                u32          m_tag_words_per_entity;
+                u32          m_bytes_per_object;
+                u32*         m_per_object_component_occupancy;
+                u32*         m_per_object_tags;
+                byte*        m_per_object_instance;
+                components*  m_components;
+                const char** m_component_names;
+                duomap_t     m_entity_state;
             };
             typedef pool_t::object_t object_t;
 
@@ -117,7 +117,8 @@ namespace ncore
                 object->m_per_object_component_occupancy = g_allocate_array_and_memset<u32>(allocator, max_objects * object->m_component_words_per_object, 0);
                 object->m_per_object_tags                = g_allocate_array_and_memset<u32>(allocator, max_objects * object->m_tag_words_per_entity, 0);
 
-                object->m_components = g_allocate_array_and_memset<components>(allocator, max_components, 0);
+                object->m_components      = g_allocate_array_and_memset<components>(allocator, max_components, 0);
+                object->m_component_names = g_allocate_array_and_memset<const char*>(allocator, max_components, 0);
 
                 object->m_bytes_per_object    = sizeof_object;
                 object->m_per_object_instance = g_allocate_array<byte>(allocator, max_objects * sizeof_object);
@@ -138,6 +139,8 @@ namespace ncore
                     if (container->m_sizeof_component > 0)
                         s_teardown(allocator, container);
                 }
+
+                allocator->deallocate(object->m_component_names);
                 allocator->deallocate(object->m_components);
                 allocator->deallocate(object->m_per_object_tags);
                 allocator->deallocate(object->m_per_object_component_occupancy);
@@ -215,7 +218,9 @@ namespace ncore
                     container->m_sizeof_component = cp_sizeof;
                     container->m_component_data   = g_allocate_array<byte>(object->m_allocator, cp_sizeof * max_components);
                     container->m_redirect         = g_allocate_array_and_memset<s32>(object->m_allocator, object->m_max_objects, -1);
-                    container->m_name             = cp_name;
+
+                    if (object->m_component_names != nullptr)
+                        object->m_component_names[cp_index] = cp_name;
 
                     binmap_t::config_t const cfg = binmap_t::config_t::compute(max_components);
                     container->m_occupancy.init_all_free_lazy(cfg, object->m_allocator);
@@ -410,7 +415,7 @@ namespace ncore
                 return g_has_cp(object, instance_index, cp_index);
             }
 
-            void* pool_t::add_cp(u32 object_index, void * object_ptr, u32 cp_index)
+            void* pool_t::add_cp(u32 object_index, void* object_ptr, u32 cp_index)
             {
                 object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
                 if (object == nullptr)
@@ -419,7 +424,7 @@ namespace ncore
                 return g_add_cp(object, instance_index, cp_index);
             }
 
-            void* pool_t::add_cp(u32 object_index, void const * object_ptr, u32 cp_index) const
+            void* pool_t::add_cp(u32 object_index, void const* object_ptr, u32 cp_index) const
             {
                 object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
                 if (object == nullptr)
@@ -453,6 +458,14 @@ namespace ncore
                     return nullptr;
                 u32 const instance_index = g_instance_index(object, object_ptr);
                 return g_get_cp(object, instance_index, cp_index);
+            }
+
+            const char* pool_t::get_component_name(u32 cp_index) const
+            {
+                object_t* object = (cp_index < m_max_object_types) ? m_objects[cp_index] : nullptr;
+                if (object != nullptr && object->m_component_names != nullptr)
+                    return object->m_component_names[cp_index];
+                return "";
             }
 
             bool pool_t::has_tag(u32 object_index, void const* object_ptr, s16 tg_index) const
