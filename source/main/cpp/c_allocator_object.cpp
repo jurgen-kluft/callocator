@@ -11,15 +11,15 @@ namespace ncore
         // ------------------------------------------------------------------------------------------------
         // array
 
-        void array_t::setup(alloc_t* allocator, u32 max_num_components, u32 sizeof_component)
+        void array_t::setup(alloc_t* allocator, u32 max_num_items, u32 sizeof_item)
         {
-            ASSERT(sizeof_component >= sizeof(u32)); // Resource size must be at least the size of a u32 since we use it as a linked list.
+            ASSERT(sizeof_item >= sizeof(u32)); // Resource size must be at least the size of a u32 since we use it as a linked list.
 
             u32 const alignment = (u32)sizeof(void*);
-            m_sizeof            = (sizeof_component + alignment - 1) & ~(alignment - 1);
-            m_memory            = (byte*)allocator->allocate(max_num_components * m_sizeof);
-            m_num_max           = max_num_components;
-            m_sizeof            = sizeof_component;
+            m_sizeof            = (sizeof_item + alignment - 1) & ~(alignment - 1);
+            m_memory            = (byte*)allocator->allocate(max_num_items * m_sizeof);
+            m_num_max           = max_num_items;
+            m_sizeof            = sizeof_item;
         }
 
         void array_t::teardown(alloc_t* allocator) { allocator->deallocate(m_memory); }
@@ -27,10 +27,10 @@ namespace ncore
         // ------------------------------------------------------------------------------------------------
         // inventory
 
-        void inventory_t::setup(alloc_t* allocator, u32 max_num_components, u32 sizeof_component)
+        void inventory_t::setup(alloc_t* allocator, u32 max_num_items, u32 sizeof_item)
         {
-            m_array.setup(allocator, max_num_components, sizeof_component);
-            m_bitarray = (u32*)g_allocate_and_memset(allocator, ((max_num_components + 31) / 32) * sizeof(u32), 0);
+            m_array.setup(allocator, max_num_items, sizeof_item);
+            m_bitarray = (u32*)g_allocate_and_memset(allocator, ((max_num_items + 31) / 32) * sizeof(u32), 0);
         }
 
         void inventory_t::teardown(alloc_t* allocator)
