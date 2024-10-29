@@ -57,7 +57,7 @@ namespace ncore
             m_node_next[0]           = 0;              // Link the node to itself
             m_node_prev[0]           = 0;              // Link the node to itself
 
-            u32 const size_list_count = base_size_range;
+            u32 const size_list_count = base_size_range + 1;
             m_size_lists              = g_allocate_array_and_clear<node_t>(allocator, size_list_count);
             for (u32 i = 0; i < size_list_count; ++i)
                 m_size_lists[i] = (node_t)c_null;
