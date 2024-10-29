@@ -20,14 +20,14 @@ namespace ncore
     {
         struct array_t // 16 bytes
         {
-            inline array_t() : m_memory(nullptr), m_num_max(0), m_sizeof(0) {}
+            inline array_t() : m_memory(nullptr), m_capacity(0), m_sizeof(0) {}
             DCORE_CLASS_PLACEMENT_NEW_DELETE
 
             byte* m_memory;
             u32   m_sizeof;
-            u32   m_num_max;
+            u32   m_capacity;
 
-            void setup(alloc_t* allocator, u32 max_num_components, u32 sizeof_component);
+            void setup(alloc_t* allocator, u32 max_num_items, u32 sizeof_item);
             void teardown(alloc_t* allocator);
 
             D_INLINE void*       get_access(u32 index) { return &m_memory[index * m_sizeof]; }
@@ -53,7 +53,7 @@ namespace ncore
             D_INLINE inventory_t() : m_bitarray(nullptr), m_array() {}
             DCORE_CLASS_PLACEMENT_NEW_DELETE
 
-            void setup(alloc_t* allocator, u32 max_num_components, u32 sizeof_component);
+            void setup(alloc_t* allocator, u32 max_num_items, u32 sizeof_item);
             void teardown(alloc_t* allocator);
 
             D_INLINE void allocate(u32 index)
@@ -117,7 +117,7 @@ namespace ncore
 
         struct pool_t // 48 bytes
         {
-            inline pool_t() : m_object_array(), m_free_resource_map() {}
+            inline pool_t() : m_object_array(), m_free_object_map() {}
             DCORE_CLASS_PLACEMENT_NEW_DELETE
 
             void setup(array_t& object_array, alloc_t* allocator);
@@ -126,12 +126,12 @@ namespace ncore
 
             D_INLINE u32 allocate()
             {
-                s32 const index = m_free_resource_map.find_and_set();
+                s32 const index = m_free_object_map.find_and_set();
                 ASSERTS(index >= 0, "Error: no more resources left!");
                 return index;
             }
 
-            void deallocate(u32 index) { m_free_resource_map.set_free(index); }
+            void deallocate(u32 index) { m_free_object_map.set_free(index); }
 
             template <typename T> D_INLINE u32 construct()
             {
@@ -153,26 +153,26 @@ namespace ncore
             D_INLINE void* get_access(u32 index)
             {
                 ASSERT(index != c_invalid_nhandle);
-                ASSERTS(m_free_resource_map.is_used(index), "Error: resource is not marked as being in use!");
+                ASSERTS(m_free_object_map.is_used(index), "Error: resource is not marked as being in use!");
                 return &m_object_array.m_memory[index * m_object_array.m_sizeof];
             }
 
             D_INLINE const void* get_access(u32 index) const
             {
                 ASSERT(index != c_invalid_nhandle);
-                ASSERTS(m_free_resource_map.is_used(index), "Error: resource is not marked as being in use!");
+                ASSERTS(m_free_object_map.is_used(index), "Error: resource is not marked as being in use!");
                 return &m_object_array.m_memory[index * m_object_array.m_sizeof];
             }
 
             array_t  m_object_array;
-            binmap_t m_free_resource_map;
+            binmap_t m_free_object_map;
         };
 
         namespace ntyped
         {
             template <typename T> struct pool_t
             {
-                void setup(alloc_t* allocator, u32 max_num_components);
+                void setup(alloc_t* allocator, u32 max_num_items);
                 void teardown();
 
                 u32  allocate();
@@ -196,11 +196,11 @@ namespace ncore
                 alloc_t*        m_allocator = nullptr;
             };
 
-            template <typename T> inline void pool_t<T>::setup(alloc_t* allocator, u32 max_num_components)
+            template <typename T> inline void pool_t<T>::setup(alloc_t* allocator, u32 max_num_items)
             {
                 m_allocator = allocator;
                 array_t array;
-                array.setup(m_allocator, max_num_components, sizeof(T));
+                array.setup(m_allocator, max_num_items, sizeof(T));
                 m_object_pool.setup(array, m_allocator);
             }
 

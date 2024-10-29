@@ -18,7 +18,7 @@ namespace ncore
             u32 const alignment = (u32)sizeof(void*);
             m_sizeof            = (sizeof_item + alignment - 1) & ~(alignment - 1);
             m_memory            = (byte*)allocator->allocate(max_num_items * m_sizeof);
-            m_num_max           = max_num_items;
+            m_capacity          = max_num_items;
             m_sizeof            = sizeof_item;
         }
 
@@ -42,7 +42,7 @@ namespace ncore
             }
         }
 
-        void inventory_t::free_all() { nmem::memset(m_bitarray, 0, ((m_array.m_num_max + 31) / 32) * sizeof(u32)); }
+        void inventory_t::free_all() { nmem::memset(m_bitarray, 0, ((m_array.m_capacity + 31) / 32) * sizeof(u32)); }
 
         // ------------------------------------------------------------------------------------------------
         // pool
@@ -50,21 +50,21 @@ namespace ncore
         void pool_t::setup(array_t& object_array, alloc_t* allocator)
         {
             m_object_array         = object_array;
-            binmap_t::config_t cfg = binmap_t::config_t::compute(object_array.m_num_max);
-            m_free_resource_map.init_all_free(cfg, allocator);
+            binmap_t::config_t cfg = binmap_t::config_t::compute(object_array.m_capacity);
+            m_free_object_map.init_all_free(cfg, allocator);
         }
 
         void pool_t::teardown(alloc_t* allocator)
         {
             m_object_array.teardown(allocator);
-            m_free_resource_map.release(allocator);
+            m_free_object_map.release(allocator);
         }
 
-        void pool_t::free_all() { m_free_resource_map.init_all_free(); }
+        void pool_t::free_all() { m_free_object_map.init_all_free(); }
 
         namespace nobjects_with_components
         {
-            struct components
+            struct component_container_t
             {
                 u32      m_free_index;
                 u32      m_sizeof_component;
@@ -76,24 +76,24 @@ namespace ncore
             struct pool_t::object_t
             {
                 DCORE_CLASS_PLACEMENT_NEW_DELETE
-                alloc_t*     m_allocator;
-                u32          m_num_objects;
-                u32          m_max_objects;
-                u32          m_max_components;
-                u32          m_max_tags;
-                u32          m_component_words_per_object;
-                u32          m_tag_words_per_entity;
-                u32          m_bytes_per_object;
-                u32*         m_per_object_component_occupancy;
-                u32*         m_per_object_tags;
-                byte*        m_per_object_instance;
-                components*  m_components;
-                const char** m_component_names;
-                duomap_t     m_entity_state;
+                alloc_t*               m_allocator;
+                u32                    m_num_objects;
+                u32                    m_max_objects;
+                u32                    m_max_components;
+                u32                    m_max_tags;
+                u32                    m_component_sizeof; // number of u32s
+                u32                    m_tag_sizeof;       // number of u32s
+                u32                    m_instance_sizeof;  // number of u32s
+                u32*                   m_per_object_component_occupancy;
+                u32*                   m_per_object_tag_data;
+                u32*                   m_per_object_instance_data;
+                component_container_t* m_a_component;
+                const char**           m_a_component_name;
+                duomap_t               m_object_state;
             };
             typedef pool_t::object_t object_t;
 
-            static void s_teardown(alloc_t* allocator, components* container)
+            static void s_teardown(alloc_t* allocator, component_container_t* container)
             {
                 allocator->deallocate(container->m_component_data);
                 allocator->deallocate(container->m_redirect);
@@ -106,25 +106,25 @@ namespace ncore
             {
                 object_t* object = allocator->construct<object_t>();
 
-                object->m_allocator                  = allocator;
-                object->m_num_objects                = 0;
-                object->m_max_objects                = max_objects;
-                object->m_max_components             = max_components;
-                object->m_max_tags                   = max_tags;
-                object->m_component_words_per_object = (max_components + 31) >> 5;
-                object->m_tag_words_per_entity       = (max_tags + 31) >> 5;
+                object->m_allocator        = allocator;
+                object->m_num_objects      = 0;
+                object->m_max_objects      = max_objects;
+                object->m_max_components   = max_components;
+                object->m_max_tags         = max_tags;
+                object->m_component_sizeof = (max_components + 31) >> 5;
+                object->m_tag_sizeof       = (max_tags + 31) >> 5;
 
-                object->m_per_object_component_occupancy = g_allocate_array_and_memset<u32>(allocator, max_objects * object->m_component_words_per_object, 0);
-                object->m_per_object_tags                = g_allocate_array_and_memset<u32>(allocator, max_objects * object->m_tag_words_per_entity, 0);
+                object->m_per_object_component_occupancy = g_allocate_array_and_memset<u32>(allocator, max_objects * object->m_component_sizeof, 0);
+                object->m_per_object_tag_data            = g_allocate_array_and_memset<u32>(allocator, max_objects * object->m_tag_sizeof, 0);
 
-                object->m_components      = g_allocate_array_and_memset<components>(allocator, max_components, 0);
-                object->m_component_names = g_allocate_array_and_memset<const char*>(allocator, max_components, 0);
+                object->m_a_component      = g_allocate_array_and_memset<component_container_t>(allocator, max_components, 0);
+                object->m_a_component_name = g_allocate_array_and_memset<const char*>(allocator, max_components, 0);
 
-                object->m_bytes_per_object    = sizeof_object;
-                object->m_per_object_instance = g_allocate_array<byte>(allocator, max_objects * sizeof_object);
+                object->m_instance_sizeof          = (sizeof_object + 3) >> 2;
+                object->m_per_object_instance_data = g_allocate_array<u32>(allocator, max_objects * object->m_instance_sizeof);
 
                 duomap_t::config_t cfg = duomap_t::config_t::compute(max_objects);
-                object->m_entity_state.init_all_free(cfg, allocator);
+                object->m_object_state.init_all_free(cfg, allocator);
 
                 return object;
             }
@@ -135,18 +135,18 @@ namespace ncore
 
                 for (u32 i = 0; i < object->m_max_components; ++i)
                 {
-                    components* container = &object->m_components[i];
+                    component_container_t* container = &object->m_a_component[i];
                     if (container->m_sizeof_component > 0)
                         s_teardown(allocator, container);
                 }
 
-                allocator->deallocate(object->m_component_names);
-                allocator->deallocate(object->m_components);
-                allocator->deallocate(object->m_per_object_tags);
+                allocator->deallocate(object->m_a_component_name);
+                allocator->deallocate(object->m_a_component);
+                allocator->deallocate(object->m_per_object_tag_data);
                 allocator->deallocate(object->m_per_object_component_occupancy);
-                allocator->deallocate(object->m_per_object_instance);
+                allocator->deallocate(object->m_per_object_instance_data);
 
-                object->m_entity_state.release(allocator);
+                object->m_object_state.release(allocator);
 
                 allocator->deallocate(object);
             }
@@ -178,18 +178,18 @@ namespace ncore
 
             static s32 g_create_instance(object_t* object)
             {
-                s32 const index = object->m_entity_state.find_free_and_set_used();
+                s32 const index = object->m_object_state.find_free_and_set_used();
                 if (index >= 0)
                 {
                     // Clear the component occupancy
-                    u32 const offset = index * object->m_component_words_per_object;
-                    for (u32 i = 0; i < object->m_component_words_per_object; ++i)
+                    u32 const offset = index * object->m_component_sizeof;
+                    for (u32 i = 0; i < object->m_component_sizeof; ++i)
                         object->m_per_object_component_occupancy[offset + i] = 0;
 
                     // Clear the tag occupancy
-                    u32 const tag_offset = index * object->m_tag_words_per_entity;
-                    for (u32 i = 0; i < object->m_tag_words_per_entity; ++i)
-                        object->m_per_object_tags[tag_offset + i] = 0;
+                    u32 const tag_offset = index * object->m_tag_sizeof;
+                    for (u32 i = 0; i < object->m_tag_sizeof; ++i)
+                        object->m_per_object_tag_data[tag_offset + i] = 0;
 
                     object->m_num_objects++;
                 }
@@ -198,29 +198,29 @@ namespace ncore
 
             static u32 g_instance_index(object_t const* object, void const* object_ptr)
             {
-                u32 const index = ((byte const*)object_ptr - object->m_per_object_instance) / object->m_bytes_per_object;
+                u32 const index = ((u32 const*)object_ptr - (u32 const*)object->m_per_object_instance_data) / object->m_instance_sizeof;
                 return index;
             }
 
             static void g_destroy_instance(object_t* object, u32 instance_index)
             {
-                if (object->m_entity_state.set_free(instance_index))
+                if (object->m_object_state.set_free(instance_index))
                     object->m_num_objects--;
             }
 
             static void g_register_component(object_t* object, u32 max_components, u32 cp_index, s32 cp_sizeof, s32 cp_alignof, const char* cp_name)
             {
                 // See if the component container is present, if not we need to initialize it
-                if (object->m_components[cp_index].m_sizeof_component == 0)
+                if (object->m_a_component[cp_index].m_sizeof_component == 0)
                 {
-                    components* container         = &object->m_components[cp_index];
-                    container->m_free_index       = 0;
-                    container->m_sizeof_component = cp_sizeof;
-                    container->m_component_data   = g_allocate_array<byte>(object->m_allocator, cp_sizeof * max_components);
-                    container->m_redirect         = g_allocate_array_and_memset<s32>(object->m_allocator, object->m_max_objects, -1);
+                    component_container_t* container = &object->m_a_component[cp_index];
+                    container->m_free_index          = 0;
+                    container->m_sizeof_component    = cp_sizeof;
+                    container->m_component_data      = g_allocate_array<byte>(object->m_allocator, cp_sizeof * max_components);
+                    container->m_redirect            = g_allocate_array_and_memset<s32>(object->m_allocator, object->m_max_objects, -1);
 
-                    if (object->m_component_names != nullptr)
-                        object->m_component_names[cp_index] = cp_name;
+                    if (object->m_a_component_name != nullptr)
+                        object->m_a_component_name[cp_index] = cp_name;
 
                     binmap_t::config_t const cfg = binmap_t::config_t::compute(max_components);
                     container->m_occupancy.init_all_free_lazy(cfg, object->m_allocator);
@@ -229,14 +229,14 @@ namespace ncore
 
             static void g_unregister_component(object_t* object, u32 cp_index)
             {
-                components* container = &object->m_components[cp_index];
+                component_container_t* container = &object->m_a_component[cp_index];
                 if (container->m_sizeof_component > 0)
                     s_teardown(object->m_allocator, container);
             }
 
             static bool g_has_cp(object_t* object, u32 instance_index, u32 cp_index)
             {
-                u32 const* component_occupancy = &object->m_per_object_component_occupancy[instance_index * object->m_component_words_per_object];
+                u32 const* component_occupancy = &object->m_per_object_component_occupancy[instance_index * object->m_component_sizeof];
                 return (component_occupancy[cp_index >> 5] & (1 << (cp_index & 31))) != 0;
             }
 
@@ -245,7 +245,7 @@ namespace ncore
                 if (cp_index >= object->m_max_components)
                     return nullptr;
 
-                components* container = &object->m_components[cp_index];
+                component_container_t* container = &object->m_a_component[cp_index];
                 if (container->m_sizeof_component == 0)
                     return nullptr;
 
@@ -262,7 +262,7 @@ namespace ncore
                     container->m_occupancy.set_used(local_component_index);
 
                     container->m_redirect[instance_index] = local_component_index;
-                    u32* component_occupancy              = &object->m_per_object_component_occupancy[instance_index * object->m_component_words_per_object];
+                    u32* component_occupancy              = &object->m_per_object_component_occupancy[instance_index * object->m_component_sizeof];
                     component_occupancy[cp_index >> 5] |= (1 << (cp_index & 31));
                     return &container->m_component_data[local_component_index * container->m_sizeof_component];
                 }
@@ -277,7 +277,7 @@ namespace ncore
             {
                 if (cp_index >= object->m_max_components)
                     return;
-                components* container = &object->m_components[cp_index];
+                component_container_t* container = &object->m_a_component[cp_index];
                 if (container->m_sizeof_component == 0)
                     return;
                 if (container->m_redirect[instance_index] >= 0)
@@ -286,7 +286,7 @@ namespace ncore
                     container->m_redirect[instance_index] = -1;
                     container->m_occupancy.set_free(local_component_index);
 
-                    u32* component_occupancy = &object->m_per_object_component_occupancy[instance_index * object->m_component_words_per_object];
+                    u32* component_occupancy = &object->m_per_object_component_occupancy[instance_index * object->m_component_sizeof];
                     component_occupancy[cp_index >> 5] &= ~(1 << (cp_index & 31));
                 }
             }
@@ -296,7 +296,7 @@ namespace ncore
                 if (cp_index >= object->m_max_components)
                     return nullptr;
 
-                components* container = &object->m_components[cp_index];
+                component_container_t* container = &object->m_a_component[cp_index];
                 if (container->m_sizeof_component == 0)
                     return nullptr;
 
@@ -311,7 +311,7 @@ namespace ncore
                 if (cp_index >= object->m_max_components)
                     return nullptr;
 
-                components* container = &object->m_components[cp_index];
+                component_container_t* container = &object->m_a_component[cp_index];
                 if (container->m_sizeof_component == 0)
                     return nullptr;
 
@@ -325,7 +325,7 @@ namespace ncore
             {
                 if (tg_index >= object->m_max_tags)
                     return false;
-                u32 const* tag_occupancy = &object->m_per_object_tags[instance_index * object->m_tag_words_per_entity];
+                u32 const* tag_occupancy = &object->m_per_object_tag_data[instance_index * object->m_tag_sizeof];
                 return (tag_occupancy[tg_index >> 5] & (1 << (tg_index & 31))) != 0;
             }
 
@@ -333,7 +333,7 @@ namespace ncore
             {
                 if (tg_index >= object->m_max_tags)
                     return;
-                u32* tag_occupancy = &object->m_per_object_tags[instance_index * object->m_tag_words_per_entity];
+                u32* tag_occupancy = &object->m_per_object_tag_data[instance_index * object->m_tag_sizeof];
                 tag_occupancy[tg_index >> 5] |= (1 << (tg_index & 31));
             }
 
@@ -341,7 +341,7 @@ namespace ncore
             {
                 if (tg_index >= object->m_max_tags)
                     return;
-                u32* tag_occupancy = &object->m_per_object_tags[instance_index * object->m_tag_words_per_entity];
+                u32* tag_occupancy = &object->m_per_object_tag_data[instance_index * object->m_tag_sizeof];
                 tag_occupancy[tg_index >> 5] &= ~(1 << (tg_index & 31));
             }
 
@@ -364,7 +364,7 @@ namespace ncore
                     if (object == nullptr)
                         return nullptr;
                     s32 instance_index = g_create_instance(object);
-                    return instance_index >= 0 ? &object->m_per_object_instance[instance_index * object->m_bytes_per_object] : nullptr;
+                    return instance_index >= 0 ? &object->m_per_object_instance_data[instance_index * object->m_instance_sizeof] : nullptr;
                 }
                 return nullptr;
             }
@@ -403,7 +403,7 @@ namespace ncore
                 object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
                 if (object == nullptr)
                     return false;
-                return object->m_components[cp_index].m_sizeof_component > 0;
+                return object->m_a_component[cp_index].m_sizeof_component > 0;
             }
 
             bool pool_t::has_cp(u32 object_index, void const* object_ptr, u32 cp_index) const
@@ -463,8 +463,8 @@ namespace ncore
             const char* pool_t::get_component_name(u32 cp_index) const
             {
                 object_t* object = (cp_index < m_max_object_types) ? m_objects[cp_index] : nullptr;
-                if (object != nullptr && object->m_component_names != nullptr)
-                    return object->m_component_names[cp_index];
+                if (object != nullptr && object->m_a_component_name != nullptr)
+                    return object->m_a_component_name[cp_index];
                 return "";
             }
 
@@ -498,8 +498,8 @@ namespace ncore
             void* pool_t::iterate_objects_begin(u32 object_index) const
             {
                 object_t const* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
-                s32 const       index  = (object != nullptr) ? object->m_entity_state.find_used() : -1;
-                return (index >= 0) ? &object->m_per_object_instance[index * object->m_bytes_per_object] : nullptr;
+                s32 const       index  = (object != nullptr) ? object->m_object_state.find_used() : -1;
+                return (index >= 0) ? &object->m_per_object_instance_data[index * object->m_instance_sizeof] : nullptr;
             }
 
             void* pool_t::iterate_objects_next(u32 object_index, void const* object_ptr) const
@@ -508,8 +508,8 @@ namespace ncore
                 if (object == nullptr)
                     return nullptr;
                 u32 const instance_index = g_instance_index(object, object_ptr);
-                s32 const next_index     = object->m_entity_state.next_used_up(instance_index + 1);
-                return (next_index >= 0) ? &object->m_per_object_instance[next_index * object->m_bytes_per_object] : nullptr;
+                s32 const next_index     = object->m_object_state.next_used_up(instance_index + 1);
+                return (next_index >= 0) ? &object->m_per_object_instance_data[next_index * object->m_instance_sizeof] : nullptr;
             }
 
         } // namespace nobjects_with_components
