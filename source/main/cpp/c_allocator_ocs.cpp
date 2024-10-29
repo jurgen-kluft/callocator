@@ -2,7 +2,7 @@
 #include "ccore/c_memory.h"
 #include "cbase/c_duomap.h"
 
-#include "callocator/c_allocator_object.h"
+#include "callocator/c_allocator_ocs.h"
 
 namespace ncore
 {

@@ -1,5 +1,5 @@
 #include "ccore/c_allocator.h"
-#include "callocator/c_allocator_object.h"
+#include "callocator/c_allocator_ocs.h"
 
 #include "cunittest/cunittest.h"
 
@@ -142,7 +142,7 @@ UNITTEST_SUITE_BEGIN(nocs)
             CHECK_TRUE(obj_a_has_cp_b);
             bool obj_a_has_cp_c = pool.has_component<nocs::component_c_t>(oa1);
             CHECK_TRUE(obj_a_has_cp_c);
-            nobject::component_a_t* cpa1 = pool.get_component<nocs::component_a_t>(oa1);
+            nocs::component_a_t* cpa1 = pool.get_component<nocs::component_a_t>(oa1);
             CHECK_NOT_NULL(cpa1);
 
             pool.rem_component<nocs::component_a_t>(oa1);
