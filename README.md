@@ -18,19 +18,19 @@ This package contains:
 
 ## TLSF Allocator
 
-todo: description
+This is an implementation of the TLSF allocator, Two-Level Segregate Fit, which is a memory allocator that is designed to be fast and efficient for real-time systems. It is a general-purpose memory allocator that can be used in embedded systems, game development, and other applications where performance is critical.
 
 ## Frame Allocator
 
-todo: description
+This allocator is designed to be used as a per-frame allocator. It is useful for allocating temporary memory that is only needed for the duration of a single frame. This can be useful for things like rendering, physics, or other systems that need to allocate temporary memory for a single frame and then free it at the end of the frame.
 
 ## Linear Allocator
 
-todo: description
+This allocator is allocating forward and merges free memory, it is bounded and very fast, it is not multithread safe. It is useful for allocating memory that is only needed for a short period of time and can be deallocated all at once. This can be useful for things like loading assets, parsing data, or other tasks where you need to allocate a bunch of memory and then free it all at once.
 
 ## Stack Allocator
 
-todo: description
+This allocator is a stack-based allocator that can only be used through the use of a 'scope'. It is useful for allocating memory similar to stack memory, all allocated memory will be released when the scope is destroyed. This can be useful for things like temporary memory that is only needed for a short period of time and can be deallocated all at once.
 
 ## Object Component Allocator
 

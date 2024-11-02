@@ -29,17 +29,13 @@ namespace ncore
         DCORE_CLASS_PLACEMENT_NEW_DELETE
 
         struct node_t;
+        node_t* m_buffer_begin;
+        node_t* m_buffer_cursor;
+        node_t* m_buffer_end;
 
     private:
         virtual void* v_allocate(u32 size, u32 alignment) final;
         virtual void  v_deallocate(void* ptr) final;
-
-        node_t*         m_buffer_begin;
-        node_t*         m_buffer_cursor;
-        node_t*         m_buffer_end;
-
-        linear_alloc_t(const linear_alloc_t&)            = delete;
-        linear_alloc_t& operator=(const linear_alloc_t&) = delete;
     };
 
 }; // namespace ncore

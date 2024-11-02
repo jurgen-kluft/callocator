@@ -106,7 +106,7 @@ namespace ncore
         return cursor == end;
     }
 
-    linear_alloc_t::linear_alloc_t() : m_buffer_begin(nullptr), m_buffer_cursor(nullptr) {}
+    linear_alloc_t::linear_alloc_t() : m_buffer_begin(nullptr), m_buffer_cursor(nullptr), m_buffer_end(nullptr) {}
     linear_alloc_t::~linear_alloc_t() {}
 
     void linear_alloc_t::setup(void* _beginAddress, u32 _size)
