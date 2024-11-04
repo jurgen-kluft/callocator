@@ -98,8 +98,8 @@ namespace ncore
 
                     str_t* const item = m_data.m_items + m_data.m_size;
                     item->m_str       = dst8;
-                    item->m_hash      = nhash::strhash((const char*)dst8, (const char*)end8);
-                    item->m_len       = (end8 - dst8);
+                    item->m_hash      = (u32)nhash::strhash((const char*)dst8, (const char*)end8);
+                    item->m_len       = (u32)(end8 - dst8);
 
                     ntree32::node_t key_node = m_data.m_size;
                     ntree32::node_t found_node;
@@ -127,8 +127,8 @@ namespace ncore
 
                     str_t* const item = m_data.m_items + m_data.m_size;
                     item->m_str       = dst8;
-                    item->m_hash      = nhash::strhash((const char*)dst8, (const char*)end8);
-                    item->m_len       = (end8 - dst8);
+                    item->m_hash      = (u32)nhash::strhash((const char*)dst8, (const char*)end8);
+                    item->m_len       = (u32)(end8 - dst8);
 
                     ntree32::node_t key_node = m_data.m_size;
                     ntree32::node_t found_node;
@@ -249,8 +249,8 @@ namespace ncore
 
                     str_t* const item = m_data.m_items + m_data.m_size;
                     item->m_str       = (utf8::prune)dst8;
-                    item->m_hash      = nhash::strhash((const char*)dst8, (const char*)end8);
-                    item->m_len       = (end8 - dst8);
+                    item->m_hash      = (u32)nhash::strhash((const char*)dst8, (const char*)end8);
+                    item->m_len       = (u32)(end8 - dst8);
 
                     ntree32::node_t key_node = m_data.m_size;
                     ntree32::node_t found_node;
@@ -278,8 +278,8 @@ namespace ncore
 
                     str_t* const item = m_data.m_items + m_data.m_size;
                     item->m_str       = (utf8::prune)dst8;
-                    item->m_hash      = nhash::strhash((const char*)dst8, (const char*)end8);
-                    item->m_len       = (end8 - dst8);
+                    item->m_hash      = (u32)nhash::strhash((const char*)dst8, (const char*)end8);
+                    item->m_len       = (u32)(end8 - dst8);
 
                     ntree32::node_t key_node = m_data.m_size;
                     ntree32::node_t found_node;

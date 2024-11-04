@@ -51,7 +51,7 @@ UNITTEST_SUITE_BEGIN(tlfs)
 
             alloc_t* tlsf = g_create_tlsf(gBlock, gBlockSize);
 
-            for (s32 i = 0; i < g_array_size(sizes); i++)
+            for (u32 i = 0; i < g_array_size(sizes); i++)
             {
                 s32 n = 1024;
 
@@ -70,13 +70,13 @@ UNITTEST_SUITE_BEGIN(tlfs)
                         // Allocate random sizes up to the cap threshold.
                         // Track them in an array.
                         s64 rest = (s64)spacelen * (s_rand() % 6 + 1);
-                        s32 i    = 0;
+                        s32 p    = 0;
                         while (rest > 0)
                         {
                             uint_t len = ((uint_t)s_rand() % cap) + 1;
                             if (s_rand() % 2 == 0)
                             {
-                                pointers[i] = tlsf->allocate((u32)(len));
+                                pointers[p] = tlsf->allocate((u32)(len));
                             }
                             else
                             {
@@ -85,36 +85,36 @@ UNITTEST_SUITE_BEGIN(tlfs)
                                     align = 0;
                                 else
                                     len = align * (((uint_t)s_rand() % (cap / align)) + 1);
-                                pointers[i] = !align || !len ? tlsf->allocate((u32)len) : tlsf->allocate((u32)(len), align);
+                                pointers[p] = !align || !len ? tlsf->allocate((u32)len) : tlsf->allocate((u32)(len), align);
                                 if (align)
                                 {
-                                    uint_t const aligned = ((uint_t)pointers[i] & (align - 1));
+                                    uint_t const aligned = ((uint_t)pointers[p] & (align - 1));
                                     CHECK_EQUAL(0, aligned);
                                 }
                             }
-                            CHECK_NOT_NULL(pointers[i]);
+                            CHECK_NOT_NULL(pointers[p]);
                             rest -= (s64)len;
 
                             if (s_rand() % 10 == 0)
                             {
                                 uint_t newlen = ((uint_t)s_rand() % cap) + 1;
-                                pointers[i]          = g_reallocate(tlsf, pointers[i], (u32)len, (u32)newlen);
-                                CHECK_NOT_NULL(pointers[i]);
+                                pointers[p]          = g_reallocate(tlsf, pointers[p], (u32)len, (u32)newlen);
+                                CHECK_NOT_NULL(pointers[p]);
                                 len = newlen;
                             }
 
                             // tlsf check();
 
                             // Fill with magic (only when testing up to 1MB).
-                            u8* data = (u8*)pointers[i];
+                            u8* data = (u8*)pointers[p];
                             if (spacelen <= 1024 * 1024)
                                 nmem::memset(data, 0, len);
                             data[0] = 0xa5;
 
-                            ++i;
-                            if (i == maxitems)
+                            ++p;
+                            if (p == maxitems)
                             {
-                                --i;
+                                --p;
                                 break;
                             }
                         }

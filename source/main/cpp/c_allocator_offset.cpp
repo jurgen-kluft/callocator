@@ -8,7 +8,7 @@ namespace ncore
     {
         inline u32 lzcnt_nonzero(u32 v)
         {
-#ifdef _MSC_VER
+#ifdef CC_COMPILER_MSVC
             unsigned long retVal;
             _BitScanReverse(&retVal, v);
             return 31 - retVal;
@@ -19,7 +19,7 @@ namespace ncore
 
         inline u32 tzcnt_nonzero(u32 v)
         {
-#ifdef _MSC_VER
+#ifdef CC_COMPILER_MSVC
             unsigned long retVal;
             _BitScanForward(&retVal, v);
             return retVal;

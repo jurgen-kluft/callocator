@@ -17,7 +17,7 @@ namespace ncore
 
         static inline uint32_t s_ffs(uint32_t x)
         {
-#ifdef CC_PLATFORM_WINDOWS
+#ifdef CC_COMPILER_MSVC
             unsigned long r = 0;
             _BitScanForward(&r, x);
             return (uint32_t)r;
@@ -119,7 +119,7 @@ namespace ncore
             ASSERTS(x > 0, "log2 of zero");
 #ifdef TARGET_64BIT
             //return (uint32_t)(63 - (uint32_t)__builtin_clzll((unsigned long long)x));
-#    ifdef CC_PLATFORM_WINDOWS
+#    ifdef CC_COMPILER_MSVC
             unsigned long r = 0;
             _BitScanReverse64(&r, x);
             return (uint32_t)r;
@@ -129,7 +129,7 @@ namespace ncore
 
 #else
             //return (uint32_t)(31 - (uint32_t)__builtin_clzl((unsigned long)x));
-#    ifdef CC_PLATFORM_WINDOWS
+#    ifdef CC_COMPILER_MSVC
             unsigned long r = 0;
             _BitScanReverse(&r, x);
             return (uint32_t)r;

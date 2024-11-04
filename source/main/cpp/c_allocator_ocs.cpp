@@ -96,7 +96,7 @@ namespace ncore
             allocator->deallocate(object);
         }
 
-        bool allocator_t::setup(alloc_t* allocator, u32 max_object_types)
+        bool allocator_t::setup(alloc_t* allocator, u16 max_object_types)
         {
             if (m_objects != nullptr)
                 return false;
@@ -143,7 +143,7 @@ namespace ncore
 
         static u32 g_instance_index(object_t const* object, void const* object_ptr)
         {
-            u32 const index = ((u32 const*)object_ptr - (u32 const*)object->m_per_object_instance_data) / object->m_instance_data_sizeof;
+            u32 const index = (u32)(((u32 const*)object_ptr - (u32 const*)object->m_per_object_instance_data) / object->m_instance_data_sizeof);
             return index;
         }
 
@@ -153,7 +153,7 @@ namespace ncore
                 object->m_num_objects--;
         }
 
-        static void g_register_component(object_t* object, u32 max_components, u32 cp_index, s32 cp_sizeof, s32 cp_alignof, const char* cp_name)
+        static void g_register_component(object_t* object, u32 max_components, u16 cp_index, s32 cp_sizeof, s32 cp_alignof, const char* cp_name)
         {
             // See if the component container is present, if not we need to initialize it
             if (object->m_a_component[cp_index].m_sizeof_component == 0)
@@ -172,20 +172,20 @@ namespace ncore
             }
         }
 
-        static void g_unregister_component(object_t* object, u32 cp_index)
+        static void g_unregister_component(object_t* object, u16 cp_index)
         {
             component_container_t* container = &object->m_a_component[cp_index];
             if (container->m_sizeof_component > 0)
                 s_teardown(object->m_allocator, container);
         }
 
-        static bool g_has_cp(object_t* object, u32 instance_index, u32 cp_index)
+        static bool g_has_cp(object_t* object, u32 instance_index, u16 cp_index)
         {
             u32 const* component_occupancy = &object->m_per_object_component_occupancy[instance_index * object->m_component_occupancy_sizeof];
             return (component_occupancy[cp_index >> 5] & (1 << (cp_index & 31))) != 0;
         }
 
-        static void* g_add_cp(object_t* object, u32 instance_index, u32 cp_index)
+        static void* g_add_cp(object_t* object, u32 instance_index, u16 cp_index)
         {
             if (cp_index >= object->m_max_component_types)
                 return nullptr;
@@ -218,7 +218,7 @@ namespace ncore
             }
         }
 
-        static void g_rem_cp(object_t* object, u32 instance_index, u32 cp_index)
+        static void g_rem_cp(object_t* object, u32 instance_index, u16 cp_index)
         {
             if (cp_index >= object->m_max_component_types)
                 return;
@@ -236,7 +236,7 @@ namespace ncore
             }
         }
 
-        static void* g_get_cp(object_t* object, u32 instance_index, u32 cp_index)
+        static void* g_get_cp(object_t* object, u16 instance_index, u16 cp_index)
         {
             if (cp_index >= object->m_max_component_types)
                 return nullptr;
@@ -251,7 +251,7 @@ namespace ncore
             return nullptr;
         }
 
-        static void const* g_get_cp(object_t const* object, u32 instance_index, u32 cp_index)
+        static void const* g_get_cp(object_t const* object, u16 instance_index, u16 cp_index)
         {
             if (cp_index >= object->m_max_component_types)
                 return nullptr;
@@ -266,7 +266,7 @@ namespace ncore
             return nullptr;
         }
 
-        static bool g_has_tag(object_t* object, u32 instance_index, s16 tg_index)
+        static bool g_has_tag(object_t* object, u16 instance_index, u16 tg_index)
         {
             if (tg_index >= object->m_max_tag_types)
                 return false;
@@ -274,7 +274,7 @@ namespace ncore
             return (tag_occupancy[tg_index >> 5] & (1 << (tg_index & 31))) != 0;
         }
 
-        static void g_add_tag(object_t* object, u32 instance_index, s16 tg_index)
+        static void g_add_tag(object_t* object, u16 instance_index, u16 tg_index)
         {
             if (tg_index >= object->m_max_tag_types)
                 return;
@@ -282,7 +282,7 @@ namespace ncore
             tag_occupancy[tg_index >> 5] |= (1 << (tg_index & 31));
         }
 
-        static void g_rem_tag(object_t* object, u32 instance_index, s16 tg_index)
+        static void g_rem_tag(object_t* object, u16 instance_index, u16 tg_index)
         {
             if (tg_index >= object->m_max_tag_types)
                 return;
@@ -290,7 +290,7 @@ namespace ncore
             tag_occupancy[tg_index >> 5] &= ~(1 << (tg_index & 31));
         }
 
-        bool allocator_t::register_object(u32 object_index, u32 sizeof_object, u32 max_object_instances, u32 max_components, u32 max_tags)
+        bool allocator_t::register_object(u16 object_index, u32 sizeof_object, u16 max_object_instances, u16 max_components, u16 max_tags)
         {
             if (object_index < m_max_object_types && m_objects[object_index] == nullptr)
             {
@@ -301,7 +301,7 @@ namespace ncore
             return false;
         }
 
-        void* allocator_t::create_object(s16 index)
+        void* allocator_t::create_object(u16 index)
         {
             if (index < m_max_object_types)
             {
@@ -314,7 +314,7 @@ namespace ncore
             return nullptr;
         }
 
-        void allocator_t::destroy_object(s16 index, void* object_ptr)
+        void allocator_t::destroy_object(u16 index, void* object_ptr)
         {
             if (index < m_max_object_types && object_ptr != nullptr)
             {
@@ -326,7 +326,7 @@ namespace ncore
             }
         }
 
-        u32 allocator_t::get_number_of_instances(s16 cp_index) const
+        u16 allocator_t::get_number_of_instances(u16 cp_index) const
         {
             object_t* object = m_objects[cp_index];
             if (object == nullptr)
@@ -334,7 +334,7 @@ namespace ncore
             return object->m_num_objects;
         }
 
-        bool allocator_t::register_component(u32 object_index, u32 max_components, u32 cp_index, s32 cp_sizeof, s32 cp_alignof, const char* cp_name)
+        bool allocator_t::register_component(u16 object_index, u16 max_components, u16 cp_index, u32 cp_sizeof, u32 cp_alignof, const char* cp_name)
         {
             object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
             if (object == nullptr)
@@ -343,7 +343,7 @@ namespace ncore
             return true;
         }
 
-        bool allocator_t::is_component_registered(u32 object_index, u32 cp_index) const
+        bool allocator_t::is_component_registered(u16 object_index, u16 cp_index) const
         {
             object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
             if (object == nullptr)
@@ -351,7 +351,7 @@ namespace ncore
             return object->m_a_component[cp_index].m_sizeof_component > 0;
         }
 
-        bool allocator_t::has_cp(u32 object_index, void const* object_ptr, u32 cp_index) const
+        bool allocator_t::has_cp(u16 object_index, void const* object_ptr, u16 cp_index) const
         {
             object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
             if (object == nullptr)
@@ -360,7 +360,7 @@ namespace ncore
             return g_has_cp(object, instance_index, cp_index);
         }
 
-        void* allocator_t::add_cp(u32 object_index, void* object_ptr, u32 cp_index)
+        void* allocator_t::add_cp(u16 object_index, void* object_ptr, u16 cp_index)
         {
             object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
             if (object == nullptr)
@@ -369,7 +369,7 @@ namespace ncore
             return g_add_cp(object, instance_index, cp_index);
         }
 
-        void* allocator_t::add_cp(u32 object_index, void const* object_ptr, u32 cp_index) const
+        void* allocator_t::add_cp(u16 object_index, void const* object_ptr, u16 cp_index) const
         {
             object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
             if (object == nullptr)
@@ -378,7 +378,7 @@ namespace ncore
             return g_add_cp(object, instance_index, cp_index);
         }
 
-        void allocator_t::rem_cp(u32 object_index, void const* object_ptr, u32 cp_index)
+        void allocator_t::rem_cp(u16 object_index, void const* object_ptr, u16 cp_index)
         {
             object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
             if (object == nullptr)
@@ -387,7 +387,7 @@ namespace ncore
             g_rem_cp(object, instance_index, cp_index);
         }
 
-        void* allocator_t::get_cp(u32 object_index, void* object_ptr, u32 cp_index)
+        void* allocator_t::get_cp(u16 object_index, void* object_ptr, u16 cp_index)
         {
             object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
             if (object == nullptr)
@@ -396,7 +396,7 @@ namespace ncore
             return g_get_cp(object, instance_index, cp_index);
         }
 
-        void const* allocator_t::get_cp(u32 object_index, void const* object_ptr, u32 cp_index) const
+        void const* allocator_t::get_cp(u16 object_index, void const* object_ptr, u16 cp_index) const
         {
             object_t const* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
             if (object == nullptr)
@@ -405,7 +405,7 @@ namespace ncore
             return g_get_cp(object, instance_index, cp_index);
         }
 
-        const char* allocator_t::get_component_name(u32 cp_index) const
+        const char* allocator_t::get_component_name(u16 cp_index) const
         {
             object_t* object = (cp_index < m_max_object_types) ? m_objects[cp_index] : nullptr;
             if (object != nullptr && object->m_a_component_name != nullptr)
@@ -413,7 +413,7 @@ namespace ncore
             return "";
         }
 
-        bool allocator_t::has_tag(u32 object_index, void const* object_ptr, s16 tg_index) const
+        bool allocator_t::has_tag(u16 object_index, void const* object_ptr, u16 tg_index) const
         {
             object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
             if (object == nullptr)
@@ -422,7 +422,7 @@ namespace ncore
             return g_has_tag(object, instance_index, tg_index);
         }
 
-        void allocator_t::add_tag(u32 object_index, void const* object_ptr, s16 tg_index)
+        void allocator_t::add_tag(u16 object_index, void const* object_ptr, u16 tg_index)
         {
             object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
             if (object == nullptr)
@@ -431,7 +431,7 @@ namespace ncore
             g_add_tag(object, instance_index, tg_index);
         }
 
-        void allocator_t::rem_tag(u32 object_index, void const* object_ptr, s16 tg_index)
+        void allocator_t::rem_tag(u16 object_index, void const* object_ptr, u16 tg_index)
         {
             object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
             if (object == nullptr)
@@ -440,14 +440,14 @@ namespace ncore
             g_rem_tag(object, instance_index, tg_index);
         }
 
-        void* allocator_t::iterate_objects_begin(u32 object_index) const
+        void* allocator_t::iterate_objects_begin(u16 object_index) const
         {
             object_t const* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
             s32 const       index  = (object != nullptr) ? object->m_object_state.find_used() : -1;
             return (index >= 0) ? &object->m_per_object_instance_data[index * object->m_instance_data_sizeof] : nullptr;
         }
 
-        void* allocator_t::iterate_objects_next(u32 object_index, void const* object_ptr) const
+        void* allocator_t::iterate_objects_next(u16 object_index, void const* object_ptr) const
         {
             object_t const* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
             if (object == nullptr)
