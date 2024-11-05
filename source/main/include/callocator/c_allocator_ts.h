@@ -25,8 +25,8 @@ namespace ncore
         };
 
         // Process the allocations sequence and return the addresses of the allocations
-        void process_sequence(PkDuration sequence_duration, allocation_t* allocations, u32 num_allocations, alloc_t* allocator, u32* out_addresses);
-    } // namespace npk
+        void process_sequence(PkDuration sequence_duration, allocation_t const* const allocations, u32 num_allocations, alloc_t* allocator, u32* out_addresses);
+    } // namespace nts
 
 } // namespace ncore
 
