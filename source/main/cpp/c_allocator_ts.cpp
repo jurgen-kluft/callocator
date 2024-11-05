@@ -50,32 +50,5 @@ namespace ncore
             g_qsort(entries, num_allocations, sizeof(entry_t), s_sort_entries);
         }
 
-        const u32 N = 64;
-        struct binnode_t // N is dynamic: 2(32) / 4(64) / 8(128) / 16(256) / 32(512) / 64(1024) nodes
-        {
-            u64        m_bins[N];
-            binnode_t* m_children[N];
-        };
-
-        struct binleaf_t // 512 bytes, 4096 bits
-        {
-            u64 m_bins[64];
-        };
-
-        struct bintree_t
-        {
-            u32        m_size;
-            u8         m_levels;
-            u8         m_padding;
-            u16        m_padding;
-            u64        m_l0;
-            binnode_t* m_root;
-        };
-
-        //         16    = 8 + 16 + 64 + 64 = 152 bits max
-        //      64 * 64  = 4096 bits max (num binnodes = 0, num leafnodes = 1)
-        //     64 * 4096 = 262144 bits max (num binnodes = 1, num leafnodes = 16)
-        //   64 * 64 * 4096 = 16777216 bits max (num binnodes = 64, num leafnodes = 4096)
-
     } // namespace nts
 } // namespace ncore
