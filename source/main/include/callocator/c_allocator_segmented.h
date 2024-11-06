@@ -32,7 +32,7 @@ namespace ncore
             void setup(alloc_t* allocator, u64 address_range, u8 node_count_2log);
             void teardown(alloc_t* allocator);
 
-            bool allocate(u64 size, u64& out_address); // Returns false if the size is not available
+            bool allocate(u64 size, u64& out_address, node_t& out_node); // Returns false if the size is not available
             bool deallocate(u64 address);              // Deallocates the memory at the given address
 
             bool split(node_t node); // Splits the node into two nodes
@@ -133,7 +133,7 @@ namespace ncore
                 m_size_list_occupancy &= ~(1 << index);
         }
 
-        template <typename T> bool allocator_t<T>::allocate(u64 _size, u64& out_address)
+        template <typename T> bool allocator_t<T>::allocate(u64 _size, u64& out_address, node_t& out_node)
         {
             span_t const span  = (span_t)(_size >> m_base_min_2log);
             u8 const     index = math::ilog2(span);
@@ -160,6 +160,7 @@ namespace ncore
 
             m_node_free[node >> 4] |= (1 << (node & 15));
 
+            out_node = node;
             out_address = (u64)node << m_base_min_2log;
             return true;
         }
