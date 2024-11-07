@@ -68,10 +68,9 @@ namespace ncore
     } // namespace nocs
 } // namespace ncore
 
-UNITTEST_SUITE_BEGIN(nocs)
+UNITTEST_SUITE_BEGIN(ocs)
 {
-    // Test the object components pool
-    UNITTEST_FIXTURE(object_components)
+    UNITTEST_FIXTURE(main)
     {
         UNITTEST_ALLOCATOR;
 

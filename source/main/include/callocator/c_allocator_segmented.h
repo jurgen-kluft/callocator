@@ -16,24 +16,21 @@ namespace ncore
         {
             const u64   c_null = D_CONSTANT_U64(0xffffffffffffffff);
             typedef T   node_t;
-            typedef u16 span_t;
+            typedef u32 span_t;
 
-            // node state is 1 bit per node, 0 = free, 0x80 = allocated
-            // the lower 7 bits is the size range of the node
-            u8*     m_node_size;           // Size is the size_index + 1, so 1 = 32 MB, 2 = 64 MB, 3 = 128 MB, etc.
+            u8*     m_node_size;           // Size is 'm_node_size[size_index] + 1'
             node_t* m_node_next;           // Next node in the size list
             node_t* m_node_prev;           // Previous node in the size list
             u16*    m_node_free;           // Single bit per node, 0 = free, 1 = allocated
             u64     m_size_list_occupancy; // Which size list is non-empty
             node_t* m_size_lists;          // Every size has its own list
-            u8      m_base_min_2log;       // ilog2(address_range >> m_node_count_2log)
             u8      m_node_count_2log;     // 16, 15, 14, 13, 12, 11, 10
 
-            void setup(alloc_t* allocator, u64 address_range, u8 node_count_2log);
+            void setup(alloc_t* allocator, u8 node_count_2log);
             void teardown(alloc_t* allocator);
 
-            bool allocate(u64 size, u64& out_address, node_t& out_node); // Returns false if the size is not available
-            bool deallocate(u64 address);              // Deallocates the memory at the given address
+            bool allocate(span_t span, node_t& out_node); // Returns false if the size is not available
+            bool deallocate(node_t node);                 // Deallocates the node
 
             bool split(node_t node); // Splits the node into two nodes
 
@@ -41,7 +38,7 @@ namespace ncore
             void remove_size(u8 size_index, node_t node);
         };
 
-        template <typename T> void allocator_t<T>::setup(alloc_t* allocator, u64 address_range, u8 node_count_2log)
+        template <typename T> void allocator_t<T>::setup(alloc_t* allocator, u8 node_count_2log)
         {
             m_node_count_2log    = node_count_2log;
             u32 const node_count = 1 << node_count_2log;
@@ -50,19 +47,16 @@ namespace ncore
             m_node_prev          = g_allocate_array_and_clear<node_t>(allocator, node_count);
             m_node_free          = g_allocate_array_and_clear<u16>(allocator, (node_count + 15) >> 4);
 
-            const u8 base_size_max   = math::ilog2(address_range);
-            m_base_min_2log          = base_size_max - node_count_2log;
-            const u8 base_size_range = base_size_max - m_base_min_2log;
-            m_node_size[0]           = node_count - 1; // Full size range - 1
-            m_node_next[0]           = 0;              // Link the node to itself
-            m_node_prev[0]           = 0;              // Link the node to itself
+            m_node_size[0] = node_count - 1; // Full size range - 1
+            m_node_next[0] = 0;              // Link the node to itself
+            m_node_prev[0] = 0;              // Link the node to itself
 
-            u32 const size_list_count = base_size_range + 1;
+            u32 const size_list_count = m_node_count_2log + 1;
             m_size_lists              = g_allocate_array_and_clear<node_t>(allocator, size_list_count);
             for (u32 i = 0; i < size_list_count; ++i)
                 m_size_lists[i] = (node_t)c_null;
-            m_size_list_occupancy         = (u64)1 << base_size_range; // Mark the largest size as occupied
-            m_size_lists[base_size_range] = 0;                         // The largest node in the size list
+            m_size_list_occupancy           = (u64)1 << m_node_count_2log; // Mark the largest size as occupied
+            m_size_lists[m_node_count_2log] = 0;                           // The largest node in the size list
         }
 
         template <typename T> void allocator_t<T>::teardown(alloc_t* allocator)
@@ -133,9 +127,9 @@ namespace ncore
                 m_size_list_occupancy &= ~(1 << index);
         }
 
-        template <typename T> bool allocator_t<T>::allocate(u64 _size, u64& out_address, node_t& out_node)
+        template <typename T> bool allocator_t<T>::allocate(u32 _size, node_t& out_node)
         {
-            span_t const span  = (span_t)(_size >> m_base_min_2log);
+            span_t const span  = (span_t)_size;
             u8 const     index = math::ilog2(span);
 
             node_t node = m_size_lists[index];
@@ -160,17 +154,15 @@ namespace ncore
 
             m_node_free[node >> 4] |= (1 << (node & 15));
 
-            out_node = node;
-            out_address = (u64)node << m_base_min_2log;
+            out_node    = node;
             return true;
         }
 
-        template <typename T> bool allocator_t<T>::deallocate(u64 address)
+        template <typename T> bool allocator_t<T>::deallocate(node_t node)
         {
-            if (address == c_null || address >= (((u64)1 << m_base_min_2log) << 8))
+            if (node == c_null || node >= (1<<m_node_count_2log))
                 return false;
 
-            node_t node = (node_t)(address >> m_base_min_2log);
             m_node_free[node >> 4] &= ~(1 << (node & 15));
 
             span_t span  = (span_t)m_node_size[node] + 1;
