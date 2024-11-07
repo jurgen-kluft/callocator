@@ -25,8 +25,9 @@ namespace ncore
             u64     m_size_list_occupancy; // Which size list is non-empty
             node_t* m_size_lists;          // Every size has its own list
             u8      m_node_count_2log;     // 16, 15, 14, 13, 12, 11, 10
+            u8      m_max_span_2log;
 
-            void setup(alloc_t* allocator, u8 node_count_2log);
+            void setup(alloc_t* allocator, u8 node_count_2log, u8 max_span_2log);
             void teardown(alloc_t* allocator);
 
             bool allocate(span_t span, node_t& out_node); // Returns false if the size is not available
@@ -38,9 +39,10 @@ namespace ncore
             void remove_size(u8 size_index, node_t node);
         };
 
-        template <typename T> void allocator_t<T>::setup(alloc_t* allocator, u8 node_count_2log)
+        template <typename T> void allocator_t<T>::setup(alloc_t* allocator, u8 node_count_2log, u8 max_span_2log)
         {
             m_node_count_2log    = node_count_2log;
+            m_max_span_2log      = max_span_2log;
             u32 const node_count = 1 << node_count_2log;
             m_node_size          = g_allocate_array_and_clear<u8>(allocator, node_count);
             m_node_next          = g_allocate_array_and_clear<node_t>(allocator, node_count);
@@ -57,6 +59,17 @@ namespace ncore
                 m_size_lists[i] = (node_t)c_null;
             m_size_list_occupancy           = (u64)1 << m_node_count_2log; // Mark the largest size as occupied
             m_size_lists[m_node_count_2log] = 0;                           // The largest node in the size list
+
+            // Split the full range until we reach the maximum span
+            if (m_max_span_2log < m_node_count_2log)
+            {
+                span_t const span = (1 << m_max_span_2log);
+                for (u32 n = 0; n < node_count; n += span)
+                {
+                    m_node_size[n] = span - 1;
+                    add_size(m_max_span_2log, n);
+                }
+            }
         }
 
         template <typename T> void allocator_t<T>::teardown(alloc_t* allocator)
@@ -154,13 +167,13 @@ namespace ncore
 
             m_node_free[node >> 4] |= (1 << (node & 15));
 
-            out_node    = node;
+            out_node = node;
             return true;
         }
 
         template <typename T> bool allocator_t<T>::deallocate(node_t node)
         {
-            if (node == c_null || node >= (1<<m_node_count_2log))
+            if (node == c_null || node >= (1 << m_node_count_2log))
                 return false;
 
             m_node_free[node >> 4] &= ~(1 << (node & 15));
@@ -168,7 +181,8 @@ namespace ncore
             span_t span  = (span_t)m_node_size[node] + 1;
             u8     index = math::ilog2(span);
 
-            while (true)
+            // Keep span smaller or equal to the largest span allowed
+            while (span < (1 << m_max_span_2log))
             {
                 // Could be that we are freeing the largest size allocation, this means
                 // that we should not merge the node with its sibling.

@@ -21,7 +21,7 @@ UNITTEST_SUITE_BEGIN(segmented)
         UNITTEST_TEST(allocate)
         {
             nsegmented::allocator_t<u16> range;
-            range.setup(Allocator, 15); // 32768 nodes
+            range.setup(Allocator, 15, 15); // 32768 nodes
 
             u16 node = 0;
             CHECK_TRUE(range.allocate(1, node));
@@ -51,7 +51,7 @@ UNITTEST_SUITE_BEGIN(segmented)
         UNITTEST_TEST(allocate_and_deallocate)
         {
             nsegmented::allocator_t<u16> range;
-            range.setup(Allocator, 8); // 256 nodes
+            range.setup(Allocator, 8, 8); // 256 nodes
 
             for (s32 i = 0; i < 16; ++i)
             {

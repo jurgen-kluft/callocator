@@ -64,7 +64,7 @@ UNITTEST_SUITE_BEGIN(tlfs)
                     {
                         const uint_t maxitems = 2 * spacelen;
 
-                        void** pointers = (void**)Allocator->allocate((u32)(maxitems * sizeof(void*)));
+                        void** pointers = g_allocate_array_and_clear<void*>(Allocator, maxitems);
                         CHECK_NOT_NULL(pointers);
 
                         // Allocate random sizes up to the cap threshold.
@@ -98,7 +98,7 @@ UNITTEST_SUITE_BEGIN(tlfs)
                             if (s_rand() % 10 == 0)
                             {
                                 uint_t newlen = ((uint_t)s_rand() % cap) + 1;
-                                pointers[p]          = g_reallocate(tlsf, pointers[p], (u32)len, (u32)newlen);
+                                pointers[p]   = g_reallocate(tlsf, pointers[p], (u32)len, (u32)newlen);
                                 CHECK_NOT_NULL(pointers[p]);
                                 len = newlen;
                             }
@@ -113,25 +113,22 @@ UNITTEST_SUITE_BEGIN(tlfs)
 
                             ++p;
                             if (p == maxitems)
-                            {
-                                --p;
                                 break;
-                            }
                         }
+                        --p;
 
                         // Randomly deallocate the memory blocks until all of them are freed.
                         // The free space should match the free space after initialisation.
-                        for (s32 n = i; n;)
+                        for (s32 r = p; r > 0;)
                         {
-                            uint_t target = (uint_t)s_rand() % i;
+                            uint_t target = (uint_t)s_rand() % p;
                             if (pointers[target] == nullptr)
                                 continue;
                             u8* data = (u8*)pointers[target];
                             CHECK_TRUE(data[0] == 0xa5);
                             tlsf->deallocate(pointers[target]);
                             pointers[target] = nullptr;
-                            n--;
-
+                            r--;
                             // tlsf_check(t);
                         }
 
