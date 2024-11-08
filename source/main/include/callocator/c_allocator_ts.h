@@ -13,19 +13,18 @@ namespace ncore
 
     namespace nts
     {
-        typedef u16 PkTime;
-        typedef u16 PkDuration;
-        typedef u32 PkAllocSize;
-
+        // time points are in the range [0, 65535]
         struct allocation_t
         {
-            PkTime      alloc_time;
-            PkTime      free_time;
-            PkAllocSize alloc_size;
+            u16           alloc_time;
+            u16           free_time;
+            u32           alloc_size;
+            u32           index;
+            u32           address;
         };
 
-        // Process the allocations sequence and return the addresses of the allocations
-        void process_sequence(PkDuration sequence_duration, allocation_t const* const allocations, u32 num_allocations, alloc_t* allocator, u32* out_addresses);
+        // Process the allocations sequence and compute the address for each allocation
+        u32 process_sequence(allocation_t* const allocations, u32 num_allocations, alloc_t* allocator);
     } // namespace nts
 
 } // namespace ncore
