@@ -1,5 +1,5 @@
-#ifndef __C_ALLOCATOR_TSMA_ALLOCATOR_H__
-#define __C_ALLOCATOR_TSMA_ALLOCATOR_H__
+#ifndef __C_ALLOCATOR_TS_ALLOCATOR_H__
+#define __C_ALLOCATOR_TS_ALLOCATOR_H__
 #include "ccore/c_target.h"
 #ifdef USE_PRAGMA_ONCE
 #    pragma once
@@ -16,11 +16,12 @@ namespace ncore
         // time points are in the range [0, 65535]
         struct allocation_t
         {
-            u16           alloc_time;
-            u16           free_time;
-            u32           alloc_size;
-            u32           index;
-            u32           address;
+            u16 alloc_time;
+            u16 free_time;
+            u32 alloc_size;
+            u16 index;
+            u16 parent;  // this is used by the algorithm
+            u32 address; // this is the result
         };
 
         // Process the allocations sequence and compute the address for each allocation

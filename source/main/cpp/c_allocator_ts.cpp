@@ -24,17 +24,10 @@ namespace ncore
             return 0;
         }
 
-        struct dsnode_t
-        {
-            u16 m_parent;
-        };
-
         struct bucket_t
         {
-            u16 list_tail;
-            u16 list_head;
+            u16 list;
             u16 max_endpoint;
-            u16 num_intervals;
         };
 
         u32 process_sequence(allocation_t* const allocations, u32 num_allocations, alloc_t* allocator)
@@ -49,7 +42,6 @@ namespace ncore
 
             // sort by end-point (free-time)
             g_qsort(allocations, num_allocations, sizeof(allocation_t), s_sort_entries);
-            dsnode_t* nodes = g_allocate_array_and_memset<dsnode_t>(allocator, num_allocations, 0xFFFFFFFF);
 
             // Note: we also need to keep buckets sorted by their end-point (free-time)
             bucket_t* buckets     = g_allocate_array_and_clear<bucket_t>(allocator, num_allocations);
@@ -86,10 +78,9 @@ namespace ncore
                     // Add the interval to the bucket
                     bucket_t found_bucket = buckets[found_index];
 
-                    nodes[i].m_parent         = found_bucket.list_tail;
-                    found_bucket.list_tail    = i;
+                    interval.parent           = found_bucket.list;
+                    found_bucket.list         = i;
                     found_bucket.max_endpoint = interval.free_time;
-                    found_bucket.num_intervals += 1;
 
                     // Find the place we need to move this bucket to, do a binary search on the range [found_index+1, num_buckets)]
                     // Note: Since we increased the end-point of the bucket, we may need to move it more to the end of the array.
@@ -130,10 +121,8 @@ namespace ncore
                 {
                     // Start a new bucket
                     bucket_t bucket;
-                    bucket.list_tail     = i;
-                    bucket.list_head     = i;
-                    bucket.max_endpoint  = interval.free_time;
-                    bucket.num_intervals = 1;
+                    bucket.list         = i;
+                    bucket.max_endpoint = interval.free_time;
 
                     // Find the place we need to move this bucket to, do a binary search on the range [0, num_buckets)]
                     // 'move' the range [0, new_place) to [1, new_place+1)] and insert the bucket at new_place
@@ -172,21 +161,20 @@ namespace ncore
             {
                 bucket_t const& bucket   = buckets[i];
                 u32             max_size = 0;
-                u16             node     = bucket.list_tail;
+                u16             node     = bucket.list;
                 do
                 {
                     allocation_t& interval = allocations[node];
                     interval.address       = address;
                     if (interval.alloc_size > max_size)
                         max_size = interval.alloc_size;
-                    node = nodes[node].m_parent;
+                    node = interval.parent;
                 } while (node != 0xFFFF);
                 address += max_size;
             }
 
             // Deallocate the buckets and nodes array
             g_deallocate(allocator, buckets);
-            g_deallocate(allocator, nodes);
 
             return address;
         }
