@@ -14,9 +14,9 @@ namespace ncore
         // A segmented allocator that allocates memory in segments of 2^N
         template <typename T> struct allocator_t
         {
-            const u64   c_null = D_CONSTANT_U64(0xffffffffffffffff);
-            typedef T   node_t;
-            typedef u32 span_t;
+            static const T c_null = ~0;
+            typedef T      node_t;
+            typedef u32    span_t;
 
             u8*     m_node_size;           // Size is 'm_node_size[size_index] + 1'
             node_t* m_node_next;           // Next node in the size list
@@ -49,16 +49,10 @@ namespace ncore
             m_node_prev          = g_allocate_array_and_clear<node_t>(allocator, node_count);
             m_node_free          = g_allocate_array_and_clear<u16>(allocator, (node_count + 15) >> 4);
 
-            m_node_size[0] = node_count - 1; // Full size range - 1
-            m_node_next[0] = 0;              // Link the node to itself
-            m_node_prev[0] = 0;              // Link the node to itself
-
             u32 const size_list_count = m_node_count_2log + 1;
             m_size_lists              = g_allocate_array_and_clear<node_t>(allocator, size_list_count);
             for (u32 i = 0; i < size_list_count; ++i)
-                m_size_lists[i] = (node_t)c_null;
-            m_size_list_occupancy           = (u64)1 << m_node_count_2log; // Mark the largest size as occupied
-            m_size_lists[m_node_count_2log] = 0;                           // The largest node in the size list
+                m_size_lists[i] = c_null;
 
             // Split the full range until we reach the maximum span
             if (m_max_span_2log < m_node_count_2log)
@@ -69,6 +63,15 @@ namespace ncore
                     m_node_size[n] = span - 1;
                     add_size(m_max_span_2log, n);
                 }
+            }
+            else
+            {
+                m_node_size[0] = node_count - 1; // Full size range - 1
+                m_node_next[0] = 0;              // Link the node to itself
+                m_node_prev[0] = 0;              // Link the node to itself
+
+                m_size_list_occupancy           = (u64)1 << m_node_count_2log; // Mark the largest size as occupied
+                m_size_lists[m_node_count_2log] = 0;                           // The largest node in the size list
             }
         }
 
