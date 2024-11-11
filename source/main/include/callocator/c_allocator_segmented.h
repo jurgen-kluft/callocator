@@ -185,7 +185,7 @@ namespace ncore
             u8     index = math::ilog2(span);
 
             // Keep span smaller or equal to the largest span allowed
-            while (span < (1 << m_max_span_2log))
+            while (span < ((u32)1 << m_max_span_2log))
             {
                 // Could be that we are freeing the largest size allocation, this means
                 // that we should not merge the node with its sibling.

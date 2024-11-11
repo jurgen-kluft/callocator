@@ -105,7 +105,7 @@ namespace ncore
                     if (place > found_index) // If the bucket is not already in the right place
                     {
                         // Move the range [found_index + 1, place) to [found, place - 1]
-                        for (u32 j = found_index + 1; j <= place; ++j)
+                        for (s32 j = found_index + 1; j <= place; ++j)
                             buckets[j - 1] = buckets[j];
 
                         // Insert the bucket at (place - 1) since the array has been shifted
