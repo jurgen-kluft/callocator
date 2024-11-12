@@ -1,7 +1,7 @@
 #include "ccore/c_target.h"
 #include "ccore/c_allocator.h"
 #include "ccore/c_memory.h"
-#include "cbase/c_integer.h"
+#include "ccore/c_math.h"
 
 #include "callocator/c_allocator_stack.h"
 

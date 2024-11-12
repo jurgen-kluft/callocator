@@ -1,7 +1,7 @@
 #include "ccore/c_memory.h"
 #include "ccore/c_allocator.h"
+#include "ccore/c_math.h"
 #include "cbase/c_hash.h"
-#include "cbase/c_integer.h"
 #include "cbase/c_runes.h"
 #include "cbase/c_tree32.h"
 
