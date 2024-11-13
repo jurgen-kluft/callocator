@@ -87,7 +87,7 @@ namespace ncore
         template <typename T> bool allocator_t<T>::split(node_t node)
         {
             const span_t span  = (span_t)m_node_size[node] + 1;
-            const u8     index = math::ilog2(span);
+            const u8     index = math::g_ilog2(span);
 
             remove_size(index, node);
 
@@ -146,7 +146,7 @@ namespace ncore
         template <typename T> bool allocator_t<T>::allocate(u32 _size, node_t& out_node)
         {
             span_t const span  = (span_t)_size;
-            u8 const     index = math::ilog2(span);
+            u8 const     index = math::g_ilog2(span);
 
             node_t node = m_size_lists[index];
             if (node == (node_t)c_null)
@@ -157,7 +157,7 @@ namespace ncore
                 if (occupancy == 0) // There are no free sizes available
                     return false;
 
-                u8 occ = math::findFirstBit(occupancy);
+                u8 occ = math::g_findFirstBit(occupancy);
                 node   = m_size_lists[occ];
                 while (occ > index)
                 {
@@ -182,7 +182,7 @@ namespace ncore
             m_node_free[node >> 4] &= ~(1 << (node & 15));
 
             span_t span  = (span_t)m_node_size[node] + 1;
-            u8     index = math::ilog2(span);
+            u8     index = math::g_ilog2(span);
 
             // Keep span smaller or equal to the largest span allowed
             while (span < ((u32)1 << m_max_span_2log))
@@ -206,7 +206,7 @@ namespace ncore
 
                 node  = merged;
                 span  = (span_t)m_node_size[node] + 1;
-                index = math::ilog2(span);
+                index = math::g_ilog2(span);
             }
 
             add_size(index, node); // Add the merged node to the size list
