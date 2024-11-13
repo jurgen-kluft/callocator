@@ -27,7 +27,7 @@ namespace ncore
     {
         if (m_buffer_begin == nullptr)
             return nullptr;
-        u8* const ptr   = (u8*)math::alignUp((u64)m_buffer_cursor, alignment);
+        u8* const ptr   = (u8*)math::g_alignUp((u64)m_buffer_cursor, alignment);
         m_buffer_cursor = ptr + size;
         m_allocation_count++;
         return ptr;

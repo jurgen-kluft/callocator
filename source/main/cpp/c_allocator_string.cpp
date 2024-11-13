@@ -157,7 +157,7 @@ namespace ncore
         storage_t* g_create_storage_utf8(void* mem, size_t mem_size)
         {
             nutf8::utf8_storage_t* storage   = new (mem) nutf8::utf8_storage_t();
-            u32 const              max_items = math::floorpo2(nutf8::compute_max_items(mem_size));
+            u32 const              max_items = math::g_floorpo2(nutf8::compute_max_items(mem_size));
             storage->setup((u8*)mem + sizeof(nutf8::utf8_storage_t), mem_size - sizeof(nutf8::utf8_storage_t), max_items);
             return storage;
         }
@@ -308,7 +308,7 @@ namespace ncore
         storage_t* g_create_storage_ascii(void* mem, size_t mem_size)
         {
             nascii::ascii_storage_t* storage   = new (mem) nascii::ascii_storage_t();
-            u32 const                max_items = math::floorpo2(nascii::compute_max_items(mem_size));
+            u32 const                max_items = math::g_floorpo2(nascii::compute_max_items(mem_size));
             storage->setup((u8*)mem + sizeof(nascii::ascii_storage_t), mem_size - sizeof(nascii::ascii_storage_t), max_items);
             return storage;
         }
