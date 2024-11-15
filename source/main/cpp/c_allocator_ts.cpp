@@ -50,6 +50,7 @@ namespace ncore
             for (u32 i = 0; i < num_allocations; ++i)
             {
                 allocation_t& interval = allocations[i];
+                interval.parent        = 0xFFFF;
 
                 // Find the bucket with the largest right-most end point, such that bucket.max_endpoint < interval.startpoint
                 // Buckets are sorted by max_endpoint, so we can do a binary search to find the right bucket

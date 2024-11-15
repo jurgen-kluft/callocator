@@ -24,7 +24,7 @@ namespace ncore
 
         struct object_a_t
         {
-            D_DECLARE_OBJECT_TYPE(kObjectA);
+            D_OCS_OBJECT_SET(kObjectA);
             int   a;
             int   b;
             float c;
@@ -32,7 +32,7 @@ namespace ncore
 
         struct object_b_t
         {
-            D_DECLARE_OBJECT_TYPE(kObjectB);
+            D_OCS_OBJECT_SET(kObjectB);
             int   a;
             int   b;
             float c;
@@ -40,7 +40,7 @@ namespace ncore
 
         struct component_a_t
         {
-            D_DECLARE_COMPONENT_TYPE(kComponentA);
+            D_OCS_COMPONENT_SET(kComponentA);
             int   a;
             int   b;
             float c;
@@ -49,7 +49,7 @@ namespace ncore
 
         struct component_b_t
         {
-            D_DECLARE_COMPONENT_TYPE(kComponentB);
+            D_OCS_COMPONENT_SET(kComponentB);
             int   a;
             int   b;
             float c;
@@ -58,7 +58,7 @@ namespace ncore
 
         struct component_c_t
         {
-            D_DECLARE_COMPONENT_TYPE(kComponentC);
+            D_OCS_COMPONENT_SET(kComponentC);
             int   a;
             int   b;
             float c;
