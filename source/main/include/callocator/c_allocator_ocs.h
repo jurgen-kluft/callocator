@@ -40,8 +40,16 @@ namespace ncore
             template <typename T, typename C> bool is_component_registered() const { return is_component_registered(T::ocs_object, C::ocs_component); }
 
             // Create and destroy objects
-            template <typename T> T*   create_object() { return (T*)create_object(T::ocs_object); }
-            template <typename T> void destroy_object(T* e) { destroy_object(T::ocs_object, e); }
+            template <typename T> T* create_object()
+            {
+                void* mem = create_object(T::ocs_object);
+                return new (mem) T();
+            }
+            template <typename T> void destroy_object(T* e)
+            {
+                e->~T();
+                destroy_object(T::ocs_object, e);
+            }
 
             // Get number of object instances
             template <typename T> u16 get_number_of_instances() const { return get_number_of_instances(T::ocs_object); }
@@ -50,18 +58,40 @@ namespace ncore
             template <typename T, typename C> T* get_object(C const* component) const { return get_object(T::ocs_object, C::ocs_component, component); }
 
             // Components
-            template <typename C, typename T> bool     has_component(T const* object) const { return has_cp(T::ocs_object, object, C::ocs_component); }
-            template <typename C, typename T> C*       add_component(T const* object) { return (C*)add_cp(T::ocs_object, object, C::ocs_component); }
+            template <typename C, typename T> bool has_component(T const* object) const { return has_cp(T::ocs_object, object, C::ocs_component); }
+            template <typename C, typename T> C*   add_component(T const* object)
+            {
+                void* mem = add_cp(T::ocs_object, object, C::ocs_component);
+                return new (mem) C();
+            }
             template <typename C, typename T> C*       get_component(T* object) { return (C*)get_cp(T::ocs_object, object, C::ocs_component); }
             template <typename C, typename T> C const* get_component(T const* object) const { return (C*)get_cp(T::ocs_object, object, C::ocs_component); }
-            template <typename C, typename T> void     rem_component(T const* object) { rem_cp(T::ocs_object, object, C::ocs_component); }
+            template <typename C, typename T> void     rem_component(T const* object)
+            {
+                C* cp = rem_cp(T::ocs_object, object, C::ocs_component);
+                if (cp)
+                {
+                    cp->~C();
+                }
+            }
 
             // Component -> Component
-            template <typename T, typename C1, typename C2> bool      has_component(C1 const* cp1) { return (C2*)get_cp(T::ocs_object, C1::ocs_component, cp1, C2::ocs_component); }
-            template <typename T, typename C1, typename C2> C2*       add_component(C1 const* cp1) const { return (C2*)add_cp(T::ocs_object, C1::ocs_component, cp1, C2::ocs_component); }
+            template <typename T, typename C1, typename C2> bool has_component(C1 const* cp1) { return get_cp(T::ocs_object, C1::ocs_component, cp1, C2::ocs_component) != nullptr; }
+            template <typename T, typename C1, typename C2> C2*  add_component(C1 const* cp1) const
+            {
+                void* mem = add_cp(T::ocs_object, C1::ocs_component, cp1, C2::ocs_component);
+                return new (mem) C2();
+            }
             template <typename T, typename C1, typename C2> C2*       get_component(C1 const* cp1) { return (C2*)get_cp(T::ocs_object, C1::ocs_component, cp1, C2::ocs_component); }
             template <typename T, typename C1, typename C2> C2 const* get_component(C1 const* cp1) const { return (C2*)get_cp(T::ocs_object, C1::ocs_component, cp1, C2::ocs_component); }
-            template <typename T, typename C1, typename C2> void      rem_component(C1 const* cp1) { rem_cp(T::ocs_object, C1::ocs_component, cp1, C2::ocs_component); }
+            template <typename T, typename C1, typename C2> void      rem_component(C1 const* cp1)
+            {
+                C2* cp = (C2*)rem_cp(T::ocs_object, C1::ocs_component, cp1, C2::ocs_component);
+                if (cp)
+                {
+                    cp->~C2();
+                }
+            }
 
             // Get component name
             const char* get_component_name(u16 cp_index) const;
@@ -101,8 +131,8 @@ namespace ncore
             bool        has_cp(u16 object_index, u16 cp1_index, void const* cp1, u16 cp2_index) const;
             void*       add_cp(u16 object_index, void const* object, u16 cp_index);
             void*       add_cp(u16 object_index, u16 cp1_index, void const* cp1, u16 cp2_index);
-            void        rem_cp(u16 object_index, void const* object, u16 cp_index);
-            void        rem_cp(u16 object_index, u16 cp1_index, void const* cp1, u16 cp2_index);
+            void*       rem_cp(u16 object_index, void const* object, u16 cp_index);
+            void*       rem_cp(u16 object_index, u16 cp1_index, void const* cp1, u16 cp2_index);
             void*       get_cp(u16 object_index, void* object, u16 cp_index);
             void const* get_cp(u16 object_index, void const* object, u16 cp_index) const;
             void*       get_cp(u16 object_index, u16 cp1_index, void* cp1, u16 cp2_index);
