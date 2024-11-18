@@ -302,7 +302,7 @@ namespace ncore
 
         u16 allocator_t::get_number_of_instances(u16 cp_index) const { return m_object->m_num_instances; }
 
-        bool allocator_t::register_component(u16 max_components, u16 cp_index, u32 cp_sizeof, u32 cp_alignof)
+        bool allocator_t::register_component(u16 cp_index, u16 max_components, u32 cp_sizeof, u32 cp_alignof)
         {
             object_t* object = (cp_index < m_object->m_max_component_types) ? m_object : nullptr;
             if (object == nullptr)

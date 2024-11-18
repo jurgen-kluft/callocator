@@ -44,6 +44,7 @@ namespace ncore
             }
 
             // Components
+            template <typename C> bool              register_component(u16 max_components) { return register_component(C::__ncs_index__, max_components, sizeof(C), alignof(C)); }
             template <typename C> bool              is_component_registered() const { return is_component_registered(C::__ncs_index__); }
             template <typename C1, typename C2> C2* create_component(C1 const* cp1)
             {
@@ -75,7 +76,7 @@ namespace ncore
             alloc_t*  m_allocator;
             object_t* m_object;
 
-            bool register_component(u16 max_components, u16 cp_index, u32 cp_sizeof, u32 cp_alignof);
+            bool register_component(u16 cp_index, u16 max_components, u32 cp_sizeof, u32 cp_alignof);
             bool is_component_registered(u16 cp_index) const;
 
             void* create_instance(u16 cp_index);
