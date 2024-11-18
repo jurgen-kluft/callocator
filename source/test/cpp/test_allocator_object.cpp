@@ -28,6 +28,7 @@ namespace ncore
             int   a;
             int   b;
             float c;
+            DCORE_CLASS_PLACEMENT_NEW_DELETE
         };
 
         struct object_b_t
@@ -36,6 +37,7 @@ namespace ncore
             int   a;
             int   b;
             float c;
+            DCORE_CLASS_PLACEMENT_NEW_DELETE
         };
 
         struct component_a_t
@@ -98,17 +100,19 @@ UNITTEST_SUITE_BEGIN(ocs)
             CHECK_TRUE(pool.is_object_registered<nocs::object_a_t>());
             CHECK_TRUE(pool.is_object_registered<nocs::object_b_t>());
 
-            bool obj_a_res_a = pool.register_component<nocs::object_a_t, nocs::component_a_t>(10, "a");
+            bool obj_a_res_a = pool.register_component<nocs::object_a_t, nocs::component_a_t>(10);
             CHECK_TRUE(obj_a_res_a);
 
-            bool obj_a_res_b = pool.register_component<nocs::object_a_t, nocs::component_b_t>(10, "b");
+            bool obj_a_res_b = pool.register_component<nocs::object_a_t, nocs::component_b_t>(10);
             CHECK_TRUE(obj_a_res_b);
 
-            bool obj_a_res_c = pool.register_component<nocs::object_a_t, nocs::component_c_t>(10, "c");
+            bool obj_a_res_c = pool.register_component<nocs::object_a_t, nocs::component_c_t>(10);
             CHECK_TRUE(obj_a_res_c);
 
-            bool obj_b_res_a = pool.register_component<nocs::object_b_t, nocs::component_a_t>(10, "a");
+            bool obj_b_res_a = pool.register_component<nocs::object_b_t, nocs::component_a_t>(10);
             CHECK_TRUE(obj_b_res_a);
+            bool obj_b_res_b = pool.register_component<nocs::object_b_t, nocs::component_b_t>(10);
+            CHECK_TRUE(obj_b_res_b);
 
             bool obj_a_cp_a_registered = pool.is_component_registered<nocs::object_a_t, nocs::component_a_t>();
             CHECK_TRUE(obj_a_cp_a_registered);

@@ -34,9 +34,9 @@ namespace ncore
             template <typename T> T* next(T const* iter) const { return (T*)iterate_objects_next(T::__ocs_object__, iter); }
 
             // Register object / component
-            template <typename T> bool             register_object(u16 max_object_instances, u16 max_components, u16 max_tags) { return register_object(T::__ocs_object__, sizeof(T), max_object_instances, max_components, max_tags); }
+            template <typename T> bool             register_object(u16 max_instances, u16 max_components, u16 max_tags) { return register_object(T::__ocs_object__, sizeof(T), max_instances, max_components, max_tags); }
             template <typename T> bool             is_object_registered() const { return T::__ocs_object__ < m_max_object_types && m_objects[T::__ocs_object__] != nullptr; }
-            template <typename T, typename C> bool register_component(u16 max_component_instances, const char* name) { return register_component(T::__ocs_object__, max_component_instances, C::__ocs_component__, sizeof(C), alignof(C), name); }
+            template <typename T, typename C> bool register_component(u16 max_instances) { return register_component(T::__ocs_object__, C::__ocs_component__, max_instances, sizeof(C), alignof(C)); }
             template <typename T, typename C> bool is_component_registered() const { return is_component_registered(T::__ocs_object__, C::__ocs_component__); }
 
             // Create and destroy objects
@@ -68,7 +68,7 @@ namespace ncore
             template <typename C, typename T> C const* get_component(T const* object) const { return (C*)get_cp(T::__ocs_object__, object, C::__ocs_component__); }
             template <typename C, typename T> void     rem_component(T const* object)
             {
-                C* cp = rem_cp(T::__ocs_object__, object, C::__ocs_component__);
+                C* cp = (C*)rem_cp(T::__ocs_object__, object, C::__ocs_component__);
                 if (cp)
                 {
                     cp->~C();
@@ -112,7 +112,7 @@ namespace ncore
             u32        m_max_object_types;
 
             bool register_object(u16 object_index, u32 sizeof_object, u16 max_object_instances, u16 max_components, u16 max_tags);
-            bool register_component(u16 object_index, u16 max_components, u16 cp_index, u32 cp_sizeof, u32 cp_alignof);
+            bool register_component(u16 object_index, u16 cp_index, u16 max_components, u32 cp_sizeof, u32 cp_alignof);
             bool is_component_registered(u16 object_index, u16 cp_index) const;
 
             void* create_object(u16 cp_index);
