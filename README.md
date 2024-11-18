@@ -16,6 +16,9 @@ This package contains:
 * Object-Component allocator, allocator for managing objects that have components
 * Segmented (2^N) allocator, allocate memory with sizes 2^N - 2^M, out of a memory range of 2^O
 
+If you like my work and want to support me. Please consider to buy me a [coffee!](https://www.buymeacoffee.com/Jur93n)
+<img src="bmacoffee.png" width="100">
+
 ## TLSF Allocator
 
 This is an implementation of the TLSF allocator, Two-Level Segregate Fit, which is a memory allocator that is designed to be fast and efficient for real-time systems. It is a general-purpose memory allocator that can be used in embedded systems, game development, and other applications where performance is critical.
