@@ -14,10 +14,10 @@ namespace ncore
 
     namespace nocs
     {
-#define D_OCS_OBJECT static u16 const ocs_object
-#define D_OCS_OBJECT_SET(i) static u16 const ocs_object = i
-#define D_OCS_COMPONENT static u16 const ocs_component
-#define D_OCS_COMPONENT_SET(i) static u16 const ocs_component = i
+#define D_OCS_OBJECT static u16 const __ocs_object__
+#define D_OCS_OBJECT_SET(i) static u16 const __ocs_object__ = i
+#define D_OCS_COMPONENT static u16 const __ocs_component__
+#define D_OCS_COMPONENT_SET(i) static u16 const __ocs_component__ = i
 
         struct allocator_t
         {
@@ -30,45 +30,45 @@ namespace ncore
             // objects
 
             // Iterate over objects, first call 'begin' and then 'next' until 'next' returns nullptr
-            template <typename T> T* begin() const { return (T*)iterate_objects_begin(T::ocs_object); }
-            template <typename T> T* next(T const* iter) const { return (T*)iterate_objects_next(T::ocs_object, iter); }
+            template <typename T> T* begin() const { return (T*)iterate_objects_begin(T::__ocs_object__); }
+            template <typename T> T* next(T const* iter) const { return (T*)iterate_objects_next(T::__ocs_object__, iter); }
 
             // Register object / component
-            template <typename T> bool             register_object(u16 max_object_instances, u16 max_components, u16 max_tags) { return register_object(T::ocs_object, sizeof(T), max_object_instances, max_components, max_tags); }
-            template <typename T> bool             is_object_registered() const { return T::ocs_object < m_max_object_types && m_objects[T::ocs_object] != nullptr; }
-            template <typename T, typename C> bool register_component(u16 max_component_instances, const char* name) { return register_component(T::ocs_object, max_component_instances, C::ocs_component, sizeof(C), alignof(C), name); }
-            template <typename T, typename C> bool is_component_registered() const { return is_component_registered(T::ocs_object, C::ocs_component); }
+            template <typename T> bool             register_object(u16 max_object_instances, u16 max_components, u16 max_tags) { return register_object(T::__ocs_object__, sizeof(T), max_object_instances, max_components, max_tags); }
+            template <typename T> bool             is_object_registered() const { return T::__ocs_object__ < m_max_object_types && m_objects[T::__ocs_object__] != nullptr; }
+            template <typename T, typename C> bool register_component(u16 max_component_instances, const char* name) { return register_component(T::__ocs_object__, max_component_instances, C::__ocs_component__, sizeof(C), alignof(C), name); }
+            template <typename T, typename C> bool is_component_registered() const { return is_component_registered(T::__ocs_object__, C::__ocs_component__); }
 
             // Create and destroy objects
             template <typename T> T* create_object()
             {
-                void* mem = create_object(T::ocs_object);
+                void* mem = create_object(T::__ocs_object__);
                 return new (mem) T();
             }
             template <typename T> void destroy_object(T* e)
             {
                 e->~T();
-                destroy_object(T::ocs_object, e);
+                destroy_object(T::__ocs_object__, e);
             }
 
             // Get number of object instances
-            template <typename T> u16 get_number_of_instances() const { return get_number_of_instances(T::ocs_object); }
+            template <typename T> u16 get_number_of_instances() const { return get_number_of_instances(T::__ocs_object__); }
 
             // Objects
-            template <typename T, typename C> T* get_object(C const* component) const { return get_object(T::ocs_object, C::ocs_component, component); }
+            template <typename T, typename C> T* get_object(C const* component) const { return get_object(T::__ocs_object__, C::__ocs_component__, component); }
 
             // Components
-            template <typename C, typename T> bool has_component(T const* object) const { return has_cp(T::ocs_object, object, C::ocs_component); }
+            template <typename C, typename T> bool has_component(T const* object) const { return has_cp(T::__ocs_object__, object, C::__ocs_component__); }
             template <typename C, typename T> C*   add_component(T const* object)
             {
-                void* mem = add_cp(T::ocs_object, object, C::ocs_component);
+                void* mem = add_cp(T::__ocs_object__, object, C::__ocs_component__);
                 return new (mem) C();
             }
-            template <typename C, typename T> C*       get_component(T* object) { return (C*)get_cp(T::ocs_object, object, C::ocs_component); }
-            template <typename C, typename T> C const* get_component(T const* object) const { return (C*)get_cp(T::ocs_object, object, C::ocs_component); }
+            template <typename C, typename T> C*       get_component(T* object) { return (C*)get_cp(T::__ocs_object__, object, C::__ocs_component__); }
+            template <typename C, typename T> C const* get_component(T const* object) const { return (C*)get_cp(T::__ocs_object__, object, C::__ocs_component__); }
             template <typename C, typename T> void     rem_component(T const* object)
             {
-                C* cp = rem_cp(T::ocs_object, object, C::ocs_component);
+                C* cp = rem_cp(T::__ocs_object__, object, C::__ocs_component__);
                 if (cp)
                 {
                     cp->~C();
@@ -76,34 +76,31 @@ namespace ncore
             }
 
             // Component -> Component
-            template <typename T, typename C1, typename C2> bool has_component(C1 const* cp1) { return get_cp(T::ocs_object, C1::ocs_component, cp1, C2::ocs_component) != nullptr; }
+            template <typename T, typename C1, typename C2> bool has_component(C1 const* cp1) { return get_cp(T::__ocs_object__, C1::__ocs_component__, cp1, C2::__ocs_component__) != nullptr; }
             template <typename T, typename C1, typename C2> C2*  add_component(C1 const* cp1) const
             {
-                void* mem = add_cp(T::ocs_object, C1::ocs_component, cp1, C2::ocs_component);
+                void* mem = add_cp(T::__ocs_object__, C1::__ocs_component__, cp1, C2::__ocs_component__);
                 return new (mem) C2();
             }
-            template <typename T, typename C1, typename C2> C2*       get_component(C1 const* cp1) { return (C2*)get_cp(T::ocs_object, C1::ocs_component, cp1, C2::ocs_component); }
-            template <typename T, typename C1, typename C2> C2 const* get_component(C1 const* cp1) const { return (C2*)get_cp(T::ocs_object, C1::ocs_component, cp1, C2::ocs_component); }
+            template <typename T, typename C1, typename C2> C2*       get_component(C1 const* cp1) { return (C2*)get_cp(T::__ocs_object__, C1::__ocs_component__, cp1, C2::__ocs_component__); }
+            template <typename T, typename C1, typename C2> C2 const* get_component(C1 const* cp1) const { return (C2*)get_cp(T::__ocs_object__, C1::__ocs_component__, cp1, C2::__ocs_component__); }
             template <typename T, typename C1, typename C2> void      rem_component(C1 const* cp1)
             {
-                C2* cp = (C2*)rem_cp(T::ocs_object, C1::ocs_component, cp1, C2::ocs_component);
+                C2* cp = (C2*)rem_cp(T::__ocs_object__, C1::__ocs_component__, cp1, C2::__ocs_component__);
                 if (cp)
                 {
                     cp->~C2();
                 }
             }
 
-            // Get component name
-            const char* get_component_name(u16 cp_index) const;
-
             // Tags
-            template <typename T> bool has_tag(T const* object, u16 tg_index) const { return has_tag(T::ocs_object, object, 0xFFFF, nullptr, tg_index); }
-            template <typename T> void add_tag(T const* object, u16 tg_index) { add_tag(T::ocs_object, object, 0xFFFF, nullptr, tg_index); }
-            template <typename T> void rem_tag(T const* object, u16 tg_index) { rem_tag(T::ocs_object, object, 0xFFFF, nullptr, tg_index); }
+            template <typename T> bool has_tag(T const* object, u16 tg_index) const { return has_tag(T::__ocs_object__, object, 0xFFFF, nullptr, tg_index); }
+            template <typename T> void add_tag(T const* object, u16 tg_index) { add_tag(T::__ocs_object__, object, 0xFFFF, nullptr, tg_index); }
+            template <typename T> void rem_tag(T const* object, u16 tg_index) { rem_tag(T::__ocs_object__, object, 0xFFFF, nullptr, tg_index); }
 
-            template <typename T, typename C> bool has_tag(T const* object, C const* component, u16 tg_index) const { return has_tag(T::ocs_object, object, C::ocs_component, component, tg_index); }
-            template <typename T, typename C> void add_tag(T const* object, C const* component, u16 tg_index) { add_tag(T::ocs_object, object, C::ocs_component, component, tg_index); }
-            template <typename T, typename C> void rem_tag(T const* object, C const* component, u16 tg_index) { rem_tag(T::ocs_object, object, C::ocs_component, component, tg_index); }
+            template <typename T, typename C> bool has_tag(T const* object, C const* component, u16 tg_index) const { return has_tag(T::__ocs_object__, object, C::__ocs_component__, component, tg_index); }
+            template <typename T, typename C> void add_tag(T const* object, C const* component, u16 tg_index) { add_tag(T::__ocs_object__, object, C::__ocs_component__, component, tg_index); }
+            template <typename T, typename C> void rem_tag(T const* object, C const* component, u16 tg_index) { rem_tag(T::__ocs_object__, object, C::__ocs_component__, component, tg_index); }
 
             struct object_t;
 
@@ -115,7 +112,7 @@ namespace ncore
             u32        m_max_object_types;
 
             bool register_object(u16 object_index, u32 sizeof_object, u16 max_object_instances, u16 max_components, u16 max_tags);
-            bool register_component(u16 object_index, u16 max_components, u16 cp_index, u32 cp_sizeof, u32 cp_alignof, const char* cp_name);
+            bool register_component(u16 object_index, u16 max_components, u16 cp_index, u32 cp_sizeof, u32 cp_alignof);
             bool is_component_registered(u16 object_index, u16 cp_index) const;
 
             void* create_object(u16 cp_index);
