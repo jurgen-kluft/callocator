@@ -125,18 +125,18 @@ UNITTEST_SUITE_BEGIN(ocs)
             nocs::object_a_t* oa2 = pool.create_object<nocs::object_a_t>();
             nocs::object_b_t* ob1 = pool.create_object<nocs::object_b_t>();
 
-            nocs::component_a_t* oaca = pool.add_component<nocs::component_a_t>(oa1);
-            nocs::component_b_t* oacb = pool.add_component<nocs::component_b_t>(oa1);
-            nocs::component_c_t* oacc = pool.add_component<nocs::component_c_t>(oa1);
+            nocs::component_a_t* oaca = pool.create_component<nocs::component_a_t>(oa1);
+            nocs::component_b_t* oacb = pool.create_component<nocs::component_b_t>(oa1);
+            nocs::component_c_t* oacc = pool.create_component<nocs::component_c_t>(oa1);
 
-            nocs::component_a_t* obca = pool.add_component<nocs::component_a_t>(ob1);
-            nocs::component_b_t* obcb = pool.add_component<nocs::component_b_t>(ob1);
+            nocs::component_a_t* obca = pool.create_component<nocs::component_a_t>(ob1);
+            nocs::component_b_t* obcb = pool.create_component<nocs::component_b_t>(ob1);
 
             nocs::object_b_t*    objb   = pool.create_object<nocs::object_b_t>();
-            nocs::component_a_t* objbca = pool.add_component<nocs::component_a_t>(objb);
-            nocs::component_b_t* objbcb = pool.add_component<nocs::component_b_t>(objb);
-            pool.rem_component<nocs::component_a_t>(objb);
-            pool.rem_component<nocs::component_b_t>(objb);
+            nocs::component_a_t* objbca = pool.create_component<nocs::component_a_t>(objb);
+            nocs::component_b_t* objbcb = pool.create_component<nocs::component_b_t>(objb);
+            pool.destroy_component<nocs::component_a_t>(objb);
+            pool.destroy_component<nocs::component_b_t>(objb);
             pool.destroy_object<nocs::object_b_t>(objb);
 
             bool obj_a_has_cp_a = pool.has_component<nocs::component_a_t>(oa1);
@@ -148,12 +148,12 @@ UNITTEST_SUITE_BEGIN(ocs)
             nocs::component_a_t* cpa1 = pool.get_component<nocs::component_a_t>(oa1);
             CHECK_NOT_NULL(cpa1);
 
-            pool.rem_component<nocs::component_a_t>(oa1);
-            pool.rem_component<nocs::component_b_t>(oa1);
-            pool.rem_component<nocs::component_c_t>(oa1);
+            pool.destroy_component<nocs::component_a_t>(oa1);
+            pool.destroy_component<nocs::component_b_t>(oa1);
+            pool.destroy_component<nocs::component_c_t>(oa1);
 
-            pool.rem_component<nocs::component_a_t>(ob1);
-            pool.rem_component<nocs::component_b_t>(ob1);
+            pool.destroy_component<nocs::component_a_t>(ob1);
+            pool.destroy_component<nocs::component_b_t>(ob1);
 
             pool.destroy_object<nocs::object_a_t>(oa1);
             pool.destroy_object<nocs::object_a_t>(oa2);

@@ -389,7 +389,7 @@ namespace ncore
             return g_has_cp(object, instance_index, cp2_index);
         }
 
-        void* allocator_t::add_cp(u16 object_index, void const* object_ptr, u16 cp_index)
+        void* allocator_t::create_cp(u16 object_index, void const* object_ptr, u16 cp_index)
         {
             object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
             if (object == nullptr)
@@ -398,7 +398,7 @@ namespace ncore
             return g_add_cp(object, instance_index, cp_index);
         }
 
-        void* allocator_t::add_cp(u16 object_index, u16 cp1_index, void const* cp1, u16 cp2_index)
+        void* allocator_t::create_cp(u16 object_index, u16 cp1_index, void const* cp1, u16 cp2_index)
         {
             object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
             if (object == nullptr)
@@ -407,7 +407,7 @@ namespace ncore
             return g_add_cp(object, instance_index, cp2_index);
         }
 
-        void* allocator_t::rem_cp(u16 object_index, void const* object_ptr, u16 cp_index)
+        void* allocator_t::destroy_cp(u16 object_index, void const* object_ptr, u16 cp_index)
         {
             object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
             if (object == nullptr)
@@ -416,7 +416,7 @@ namespace ncore
             return g_rem_cp(object, instance_index, cp_index);
         }
 
-        void* allocator_t::rem_cp(u16 object_index, u16 cp1_index, void const* cp1, u16 cp2_index)
+        void* allocator_t::destroy_cp(u16 object_index, u16 cp1_index, void const* cp1, u16 cp2_index)
         {
             object_t* object = (object_index < m_max_object_types) ? m_objects[object_index] : nullptr;
             if (object == nullptr)

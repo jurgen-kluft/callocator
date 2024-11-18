@@ -58,22 +58,31 @@ namespace ncore
             template <typename T, typename C> T* get_object(C const* component) const { return get_object(T::__ocs_object__, C::__ocs_component__, component); }
 
             // Components
-            template <typename C, typename T> bool has_component(T const* object) const { return has_cp(T::__ocs_object__, object, C::__ocs_component__); }
-            template <typename C, typename T> C*   add_component(T const* object)
+            template <typename C, typename T> C* create_component(T const* object)
             {
-                void* mem = add_cp(T::__ocs_object__, object, C::__ocs_component__);
+                void* mem = create_cp(T::__ocs_object__, object, C::__ocs_component__);
                 return new (mem) C();
             }
-            template <typename C, typename T> C*       get_component(T* object) { return (C*)get_cp(T::__ocs_object__, object, C::__ocs_component__); }
-            template <typename C, typename T> C const* get_component(T const* object) const { return (C*)get_cp(T::__ocs_object__, object, C::__ocs_component__); }
-            template <typename C, typename T> void     rem_component(T const* object)
+            template <typename C, typename T> void destroy_component(T const* object)
             {
-                C* cp = (C*)rem_cp(T::__ocs_object__, object, C::__ocs_component__);
+                C* cp = (C*)destroy_cp(T::__ocs_object__, object, C::__ocs_component__);
                 if (cp)
                 {
                     cp->~C();
                 }
             }
+            template <typename T, typename C1, typename C2> void destroy_component(C1 const* cp1)
+            {
+                C2* cp = (C2*)destroy_cp(T::__ocs_object__, C1::__ocs_component__, cp1, C2::__ocs_component__);
+                if (cp)
+                {
+                    cp->~C2();
+                }
+            }
+
+            template <typename C, typename T> bool     has_component(T const* object) const { return has_cp(T::__ocs_object__, object, C::__ocs_component__); }
+            template <typename C, typename T> C*       get_component(T* object) { return (C*)get_cp(T::__ocs_object__, object, C::__ocs_component__); }
+            template <typename C, typename T> C const* get_component(T const* object) const { return (C*)get_cp(T::__ocs_object__, object, C::__ocs_component__); }
 
             // Component -> Component
             template <typename T, typename C1, typename C2> bool has_component(C1 const* cp1) { return get_cp(T::__ocs_object__, C1::__ocs_component__, cp1, C2::__ocs_component__) != nullptr; }
@@ -84,14 +93,6 @@ namespace ncore
             }
             template <typename T, typename C1, typename C2> C2*       get_component(C1 const* cp1) { return (C2*)get_cp(T::__ocs_object__, C1::__ocs_component__, cp1, C2::__ocs_component__); }
             template <typename T, typename C1, typename C2> C2 const* get_component(C1 const* cp1) const { return (C2*)get_cp(T::__ocs_object__, C1::__ocs_component__, cp1, C2::__ocs_component__); }
-            template <typename T, typename C1, typename C2> void      rem_component(C1 const* cp1)
-            {
-                C2* cp = (C2*)rem_cp(T::__ocs_object__, C1::__ocs_component__, cp1, C2::__ocs_component__);
-                if (cp)
-                {
-                    cp->~C2();
-                }
-            }
 
             // Tags
             template <typename T> bool has_tag(T const* object, u16 tg_index) const { return has_tag(T::__ocs_object__, object, 0xFFFF, nullptr, tg_index); }
@@ -124,12 +125,12 @@ namespace ncore
 
             void* get_object(u16 object_index, u16 component_index, void const* component);
 
+            void*       create_cp(u16 object_index, void const* object, u16 cp_index);
+            void*       create_cp(u16 object_index, u16 cp1_index, void const* cp1, u16 cp2_index);
+            void*       destroy_cp(u16 object_index, void const* object, u16 cp_index);
+            void*       destroy_cp(u16 object_index, u16 cp1_index, void const* cp1, u16 cp2_index);
             bool        has_cp(u16 object_index, void const* object, u16 cp_index) const;
             bool        has_cp(u16 object_index, u16 cp1_index, void const* cp1, u16 cp2_index) const;
-            void*       add_cp(u16 object_index, void const* object, u16 cp_index);
-            void*       add_cp(u16 object_index, u16 cp1_index, void const* cp1, u16 cp2_index);
-            void*       rem_cp(u16 object_index, void const* object, u16 cp_index);
-            void*       rem_cp(u16 object_index, u16 cp1_index, void const* cp1, u16 cp2_index);
             void*       get_cp(u16 object_index, void* object, u16 cp_index);
             void const* get_cp(u16 object_index, void const* object, u16 cp_index) const;
             void*       get_cp(u16 object_index, u16 cp1_index, void* cp1, u16 cp2_index);
