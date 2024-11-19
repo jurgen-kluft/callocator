@@ -4,6 +4,10 @@
 
 #include "callocator/c_allocator_tlsf.h"
 
+#ifdef CC_COMPILER_MSVC
+#include <intrin.h>
+#endif
+
 ///< TLSF allocator, Two-Level Segregate Fit
 
 namespace ncore
@@ -20,7 +24,7 @@ namespace ncore
 #ifdef CC_COMPILER_MSVC
             unsigned long r = 0;
             _BitScanForward(&r, x);
-            return (uint32_t)r;
+            return (uint32_t)(r + 1);
 #else
             return __builtin_ffs(x);
 #endif
@@ -68,12 +72,12 @@ namespace ncore
 #endif
 
 /* All allocation sizes and addresses are aligned. */
-#define ALIGN_SIZE ((size_t)1 << ALIGN_SHIFT)
-#if __SIZE_WIDTH__ == 64
+#if CC_PLATFORM_PTR_SIZE == 8
 #    define ALIGN_SHIFT 3
 #else
 #    define ALIGN_SHIFT 2
 #endif
+#define ALIGN_SIZE ((size_t)1 << ALIGN_SHIFT)
 
 /* First level (FL) and second level (SL) counts */
 #define SL_SHIFT 4
