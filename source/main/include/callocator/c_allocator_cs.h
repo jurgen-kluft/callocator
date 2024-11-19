@@ -84,17 +84,17 @@ namespace ncore
             u16   get_number_of_instances(u16 cp_index) const;
 
             void* iterate_begin(u16 cp_index) const;
-            void* iterate_next(u16 cp_index, void const* cp_ptr) const;
+            void* iterate_next(u16 cp1_index, void const* cp1_ptr) const;
 
-            bool        has_cp(u16 cp1_index, void const* cp_ptr, u16 cp_index) const;
-            void*       add_cp(u16 cp1_index, void const* cp_ptr, u16 cp_index);
-            void*       rem_cp(u16 cp1_index, void const* cp_ptr, u16 cp_index);
-            void*       get_cp(u16 cp1_index, void* cp_ptr, u16 cp_index);
-            void const* get_cp(u16 cp1_index, void const* cp_ptr, u16 cp_index) const;
+            bool        has_cp(u16 cp1_index, void const* cp1_ptr, u16 cp_index) const;
+            void*       add_cp(u16 cp1_index, void const* cp1_ptr, u16 cp_index);
+            void*       rem_cp(u16 cp1_index, void const* cp1_ptr, u16 cp_index);
+            void*       get_cp(u16 cp1_index, void* cp1_ptr, u16 cp_index);
+            void const* get_cp(u16 cp1_index, void const* cp1_ptr, u16 cp_index) const;
 
-            bool has_tag(u16 cp_index, void const* cp_ptr, u16 tg_index) const;
-            void add_tag(u16 cp_index, void const* cp_ptr, u16 tg_index);
-            void rem_tag(u16 cp_index, void const* cp_ptr, u16 tg_index);
+            bool has_tag(u16 cp1_index, void const* cp1_ptr, u16 tg_index) const;
+            void add_tag(u16 cp1_index, void const* cp1_ptr, u16 tg_index);
+            void rem_tag(u16 cp1_index, void const* cp1_ptr, u16 tg_index);
         };
     } // namespace ncs
 } // namespace ncore

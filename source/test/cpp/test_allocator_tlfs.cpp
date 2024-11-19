@@ -62,7 +62,7 @@ UNITTEST_SUITE_BEGIN(tlfs)
                     uint_t cap      = (uint_t)s_rand() % sizes[i] + 1;
                     uint_t spacelen = sizes[i];
                     {
-                        const uint_t maxitems = 2 * spacelen;
+                        const u32 maxitems = (u32)(2 * spacelen);
 
                         void** pointers = g_allocate_array_and_clear<void*>(Allocator, maxitems);
                         CHECK_NOT_NULL(pointers);

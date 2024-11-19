@@ -9,7 +9,7 @@ namespace ncore
     namespace nocs
     {
         // ------------------------------------------------------------------------------------------------
-        struct component_container_t
+        struct component_type_t
         {
             u32      m_free_index;
             u32      m_sizeof_component;
@@ -33,12 +33,12 @@ namespace ncore
             u32*                   m_per_object_component_occupancy;
             u32*                   m_per_object_tag_data;
             u32*                   m_per_object_instance_data;
-            component_container_t* m_a_component;
+            component_type_t* m_a_component;
             duomap_t               m_object_state;
         };
         typedef allocator_t::object_t object_t;
 
-        static void s_teardown(alloc_t* allocator, component_container_t* container)
+        static void s_teardown(alloc_t* allocator, component_type_t* container)
         {
             allocator->deallocate(container->m_component_data);
             allocator->deallocate(container->m_map);
@@ -63,7 +63,7 @@ namespace ncore
             object->m_per_object_component_occupancy = g_allocate_array_and_memset<u32>(allocator, max_objects * object->m_component_occupancy_sizeof, 0);
             object->m_per_object_tag_data            = g_allocate_array_and_memset<u32>(allocator, max_objects * object->m_tag_data_sizeof, 0);
 
-            object->m_a_component = g_allocate_array_and_memset<component_container_t>(allocator, max_components, 0);
+            object->m_a_component = g_allocate_array_and_memset<component_type_t>(allocator, max_components, 0);
 
             object->m_instance_data_sizeof     = (sizeof_object + 3) >> 2;
             object->m_per_object_instance_data = g_allocate_array<u32>(allocator, max_objects * object->m_instance_data_sizeof);
@@ -80,7 +80,7 @@ namespace ncore
 
             for (u32 i = 0; i < object->m_max_component_types; ++i)
             {
-                component_container_t* container = &object->m_a_component[i];
+                component_type_t* container = &object->m_a_component[i];
                 if (container->m_sizeof_component > 0)
                     s_teardown(allocator, container);
             }
@@ -148,7 +148,7 @@ namespace ncore
 
         static u32 g_instance_index(object_t const* object, u16 const component_index, void const* component_ptr)
         {
-            component_container_t const& cptype       = object->m_a_component[component_index];
+            component_type_t const& cptype       = object->m_a_component[component_index];
             u32 const                    local_index  = (u32)(((u32 const*)component_ptr - (u32 const*)cptype.m_component_data) / cptype.m_sizeof_component);
             u32 const                    global_index = cptype.m_unmap[local_index];
             return global_index;
@@ -165,7 +165,7 @@ namespace ncore
             // See if the component container is present, if not we need to initialize it
             if (object->m_a_component[cp_index].m_sizeof_component == 0)
             {
-                component_container_t* container = &object->m_a_component[cp_index];
+                component_type_t* container = &object->m_a_component[cp_index];
                 container->m_free_index          = 0;
                 container->m_sizeof_component    = cp_sizeof;
                 container->m_component_data      = g_allocate_array<byte>(object->m_allocator, cp_sizeof * max_components);
@@ -179,7 +179,7 @@ namespace ncore
 
         static void g_unregister_component(object_t* object, u16 cp_index)
         {
-            component_container_t* container = &object->m_a_component[cp_index];
+            component_type_t* container = &object->m_a_component[cp_index];
             if (container->m_sizeof_component > 0)
                 s_teardown(object->m_allocator, container);
         }
@@ -195,7 +195,7 @@ namespace ncore
             if (cp_index >= object->m_max_component_types)
                 return nullptr;
 
-            component_container_t* container = &object->m_a_component[cp_index];
+            component_type_t* container = &object->m_a_component[cp_index];
             if (container->m_sizeof_component == 0)
                 return nullptr;
 
@@ -229,7 +229,7 @@ namespace ncore
             if (cp_index >= object->m_max_component_types)
                 return nullptr;
 
-            component_container_t* container = &object->m_a_component[cp_index];
+            component_type_t* container = &object->m_a_component[cp_index];
             if (container->m_sizeof_component == 0)
                 return nullptr;
 
@@ -252,7 +252,7 @@ namespace ncore
             if (cp_index >= object->m_max_component_types)
                 return nullptr;
 
-            component_container_t* container = &object->m_a_component[cp_index];
+            component_type_t* container = &object->m_a_component[cp_index];
             if (container->m_sizeof_component == 0)
                 return nullptr;
 
@@ -267,7 +267,7 @@ namespace ncore
             if (cp_index >= object->m_max_component_types)
                 return nullptr;
 
-            component_container_t* container = &object->m_a_component[cp_index];
+            component_type_t* container = &object->m_a_component[cp_index];
             if (container->m_sizeof_component == 0)
                 return nullptr;
 

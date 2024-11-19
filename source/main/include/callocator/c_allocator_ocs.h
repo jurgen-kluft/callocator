@@ -63,6 +63,11 @@ namespace ncore
                 void* mem = create_cp(T::__ocs_object__, object, C::__ocs_component__);
                 return new (mem) C();
             }
+            template <typename T, typename C1, typename C2> C2*  create_component(C1 const* cp1) const
+            {
+                void* mem = add_cp(T::__ocs_object__, C1::__ocs_component__, cp1, C2::__ocs_component__);
+                return new (mem) C2();
+            }
             template <typename C, typename T> void destroy_component(T const* object)
             {
                 C* cp = (C*)destroy_cp(T::__ocs_object__, object, C::__ocs_component__);
@@ -86,11 +91,6 @@ namespace ncore
 
             // Component -> Component
             template <typename T, typename C1, typename C2> bool has_component(C1 const* cp1) { return get_cp(T::__ocs_object__, C1::__ocs_component__, cp1, C2::__ocs_component__) != nullptr; }
-            template <typename T, typename C1, typename C2> C2*  add_component(C1 const* cp1) const
-            {
-                void* mem = add_cp(T::__ocs_object__, C1::__ocs_component__, cp1, C2::__ocs_component__);
-                return new (mem) C2();
-            }
             template <typename T, typename C1, typename C2> C2*       get_component(C1 const* cp1) { return (C2*)get_cp(T::__ocs_object__, C1::__ocs_component__, cp1, C2::__ocs_component__); }
             template <typename T, typename C1, typename C2> C2 const* get_component(C1 const* cp1) const { return (C2*)get_cp(T::__ocs_object__, C1::__ocs_component__, cp1, C2::__ocs_component__); }
 
