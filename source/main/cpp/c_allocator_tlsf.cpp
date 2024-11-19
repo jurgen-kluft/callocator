@@ -690,7 +690,7 @@ namespace ncore
     {
         tlsf_alloc_simple_t* alloc = new (mem) tlsf_alloc_simple_t();
         alloc->mMemory             = nmem::ptr_align((u8*)mem + sizeof(tlsf_alloc_simple_t), 16);
-        alloc->mMemorySize         = nmem::ptr_diff(alloc->mMemory, mem);
+        alloc->mMemorySize         = mem_size - nmem::ptr_diff(mem, alloc->mMemory);
         ntlsf::tlsf_setup(alloc);
         return alloc;
     }

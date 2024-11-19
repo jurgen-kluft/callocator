@@ -75,7 +75,7 @@ namespace ncore
 
                     m_data.m_str_memory = (utf8::prune)(m_data.m_tree.m_nodes + max_items);
                     m_data.m_str_cursor = m_data.m_str_memory;
-                    m_data.m_str_end    = m_data.m_str_cursor + mem_size - 1;
+                    m_data.m_str_end    = (utf8::prune)mem + mem_size - 1;
                     m_data.m_str_end->r = utf8::TERMINATOR;
                 }
 
@@ -226,7 +226,7 @@ namespace ncore
 
                     m_data.m_str_memory = (char*)(m_data.m_tree.m_nodes + max_items);
                     m_data.m_str_cursor = m_data.m_str_memory;
-                    m_data.m_str_end    = m_data.m_str_cursor + mem_size - 1;
+                    m_data.m_str_end    = (char*)mem + mem_size - 1;
                     *m_data.m_str_end   = ascii::TERMINATOR;
                 }
 
