@@ -40,27 +40,28 @@ namespace ncore
         {
             allocator->deallocate(container->m_cp_data);
             allocator->deallocate(container->m_map);
+            allocator->deallocate(container->m_unmap);
             container->m_occupancy.release(allocator);
             container->m_free_index       = 0;
             container->m_sizeof_component = 0;
         }
 
-        static object_t* g_create_object(alloc_t* allocator, u32 sizeof_object, u32 max_instances, u32 max_components, u32 max_tags)
+        static object_t* g_create_object(alloc_t* allocator, u32 max_instances, u32 max_component_types, u32 max_tags)
         {
             object_t* object = allocator->construct<object_t>();
 
             object->m_allocator                  = allocator;
             object->m_num_instances              = 0;
             object->m_max_instances              = max_instances;
-            object->m_max_component_types        = max_components;
+            object->m_max_component_types        = max_component_types;
             object->m_max_tag_types              = max_tags;
-            object->m_component_occupancy_sizeof = (max_components + 31) >> 5;
+            object->m_component_occupancy_sizeof = (max_component_types + 31) >> 5;
             object->m_tag_data_sizeof            = (max_tags + 31) >> 5;
 
             object->m_per_instance_component_occupancy = g_allocate_array_and_memset<u32>(allocator, max_instances * object->m_component_occupancy_sizeof, 0);
             object->m_per_instance_tag_data            = g_allocate_array_and_memset<u32>(allocator, max_instances * object->m_tag_data_sizeof, 0);
 
-            object->m_a_component = g_allocate_array_and_memset<component_type_t>(allocator, max_components, 0);
+            object->m_a_component = g_allocate_array_and_memset<component_type_t>(allocator, max_component_types, 0);
 
             duomap_t::config_t cfg = duomap_t::config_t::compute(max_instances);
             object->m_object_state.init_all_free(cfg, allocator);
@@ -92,8 +93,7 @@ namespace ncore
         {
             if (m_object != nullptr)
                 return false;
-            m_allocator = allocator;
-            m_object    = g_allocate<object_t>(allocator);
+            m_object = g_create_object(allocator, max_object_instances, max_components, max_tags);
             return true;
         }
 
@@ -138,10 +138,10 @@ namespace ncore
                 object->m_num_instances--;
         }
 
-        static void g_register_component(object_t* object, u32 max_components, u16 cp_index, s32 cp_sizeof, s32 cp_alignof)
+        static bool g_register_component(object_t* object, u32 max_components, u16 cp_index, s32 cp_sizeof, s32 cp_alignof)
         {
             // See if the component container is present, if not we need to initialize it
-            if (object->m_a_component[cp_index].m_sizeof_component == 0)
+            if (cp_index < object->m_max_component_types && object->m_a_component[cp_index].m_sizeof_component == 0)
             {
                 component_type_t* container   = &object->m_a_component[cp_index];
                 container->m_free_index       = 0;
@@ -152,7 +152,9 @@ namespace ncore
 
                 binmap_t::config_t const cfg = binmap_t::config_t::compute(max_components);
                 container->m_occupancy.init_all_free_lazy(cfg, object->m_allocator);
+                return true;
             }
+            return false;
         }
 
         static void g_unregister_component(object_t* object, u16 cp_index)
@@ -177,7 +179,7 @@ namespace ncore
             if (container->m_sizeof_component == 0)
                 return nullptr;
 
-            if (container->m_map[instance_index] != 0xFFFF)
+            if (container->m_map[instance_index] == 0xFFFF)
             {
                 s32 local_component_index = container->m_occupancy.find();
                 if (local_component_index == -1)
@@ -215,7 +217,7 @@ namespace ncore
 
             if (container->m_map[instance_index] != 0xFFFF)
             {
-                s32 const local_component_index           = container->m_map[instance_index];
+                u16 const local_component_index           = container->m_map[instance_index];
                 container->m_map[instance_index]          = 0xFFFF;
                 container->m_unmap[local_component_index] = 0xFFFF;
                 container->m_occupancy.set_free(local_component_index);
@@ -231,12 +233,10 @@ namespace ncore
         {
             if (cp_index >= object->m_max_component_types)
                 return nullptr;
-
             component_type_t* container = &object->m_a_component[cp_index];
             if (container->m_sizeof_component == 0)
                 return nullptr;
-
-            s32 const local_component_index = container->m_map[instance_index];
+            u16 const local_component_index = container->m_map[instance_index];
             if (local_component_index != 0xFFFF)
                 return &container->m_cp_data[local_component_index * container->m_sizeof_component];
             return nullptr;
@@ -246,14 +246,37 @@ namespace ncore
         {
             if (cp_index >= object->m_max_component_types)
                 return nullptr;
-
             component_type_t* container = &object->m_a_component[cp_index];
             if (container->m_sizeof_component == 0)
                 return nullptr;
+            if (container->m_map[instance_index] != 0xFFFF)
+                return &container->m_cp_data[container->m_map[instance_index] * container->m_sizeof_component];
+            return nullptr;
+        }
 
-            u32 const entity_index = instance_index;
-            if (container->m_map[entity_index] != 0xFFFF)
-                return &container->m_cp_data[container->m_map[entity_index] * container->m_sizeof_component];
+        static void* g_get_cp2(object_t* object, u16 cp1_index, void* cp1_ptr, u16 cp2_index)
+        {
+            component_type_t const& cp1type        = object->m_a_component[cp1_index];
+            u32 const               local_index    = (u32)(((u32 const*)cp1_ptr - (u32 const*)cp1type.m_cp_data) / cp1type.m_sizeof_component);
+            u32 const               instance_index = cp1type.m_unmap[local_index];
+            component_type_t*       cp2type        = &object->m_a_component[cp2_index];
+            ASSERT (cp2type->m_sizeof_component != 0);
+            u16 const local_component_index = cp2type->m_map[instance_index];
+            if (local_component_index != 0xFFFF)
+                return &cp2type->m_cp_data[local_component_index * cp2type->m_sizeof_component];
+            return nullptr;
+        }
+
+        static void const* g_get_cp2(object_t const* object, u16 cp1_index, void const* cp1_ptr, u16 cp2_index)
+        {
+            component_type_t const& cp1type        = object->m_a_component[cp1_index];
+            u32 const               local_index    = (u32)(((u32 const*)cp1_ptr - (u32 const*)cp1type.m_cp_data) / cp1type.m_sizeof_component);
+            u32 const               instance_index = cp1type.m_unmap[local_index];
+            component_type_t const* cp2type        = &object->m_a_component[cp2_index];
+            ASSERT (cp2type->m_sizeof_component != 0);
+            u16 const local_component_index = cp2type->m_map[instance_index];
+            if (local_component_index != 0xFFFF)
+                return &cp2type->m_cp_data[local_component_index * cp2type->m_sizeof_component];
             return nullptr;
         }
 
@@ -283,99 +306,57 @@ namespace ncore
 
         void* allocator_t::create_instance(u16 cp_index)
         {
-            if (cp_index < m_object->m_max_component_types)
-            {
-                s32 const instance_index = g_create_instance(m_object);
-                return g_add_cp(m_object, instance_index, cp_index);
-            }
-            return nullptr;
+            s32 const instance_index = g_create_instance(m_object);
+            return g_add_cp(m_object, instance_index, cp_index);
         }
 
-        void allocator_t::destroy_instance(u16 cp_index, void* cp_ptr)
+        void allocator_t::destroy_instance(u16 cp1_index, void* cp1)
         {
-            if (cp_index < m_object->m_max_component_types && cp_ptr != nullptr)
+            if (cp1_index < m_object->m_max_component_types && cp1 != nullptr)
             {
-                u32 const instance_index = g_instance_index(m_object, cp_index, cp_ptr);
+                u32 const instance_index = g_instance_index(m_object, cp1_index, cp1);
                 g_destroy_instance(m_object, instance_index);
             }
         }
 
-        u16 allocator_t::get_number_of_instances(u16 cp_index) const { return m_object->m_num_instances; }
+        u16  allocator_t::get_number_of_instances(u16 cp_index) const { return m_object->m_num_instances; }
+        bool allocator_t::register_component(u16 cp_index, u16 max_components, u32 cp_sizeof, u32 cp_alignof) { return g_register_component(m_object, max_components, cp_index, cp_sizeof, cp_alignof); }
+        bool allocator_t::is_component_registered(u16 cp_index) const { return (cp_index < m_object->m_max_component_types) && m_object->m_a_component[cp_index].m_sizeof_component > 0; }
 
-        bool allocator_t::register_component(u16 cp_index, u16 max_components, u32 cp_sizeof, u32 cp_alignof)
+        bool allocator_t::has_cp(u16 cp1_index, void const* cp1, u16 cp2_index) const
         {
-            object_t* object = (cp_index < m_object->m_max_component_types) ? m_object : nullptr;
-            if (object == nullptr)
-                return false;
-            g_register_component(object, max_components, cp_index, cp_sizeof, cp_alignof);
-            return true;
-        }
-
-        bool allocator_t::is_component_registered(u16 cp_index) const
-        {
-            object_t* object = (cp_index < m_object->m_max_component_types) ? m_object : nullptr;
-            if (object == nullptr)
-                return false;
-            return object->m_a_component[cp_index].m_sizeof_component > 0;
-        }
-
-        bool allocator_t::has_cp(u16 cp_index, void const* cp_ptr, u16 cp1_index) const
-        {
-            object_t* object = (cp_index < m_object->m_max_component_types) ? m_object : nullptr;
-            if (object == nullptr)
-                return false;
-            u32 const instance_index = g_instance_index(object, cp_index, cp_ptr);
-            return g_has_cp(object, instance_index, cp_index);
+            u32 const instance_index = g_instance_index(m_object, cp1_index, cp1);
+            return g_has_cp(m_object, instance_index, cp2_index);
         }
 
         void* allocator_t::add_cp(u16 cp1_index, void const* cp1, u16 cp2_index)
         {
-            object_t* object = (cp1_index < m_object->m_max_component_types) ? m_object : nullptr;
-            if (object == nullptr)
-                return nullptr;
-            u32 const instance_index = g_instance_index(object, cp1_index, cp1);
-            return g_add_cp(object, instance_index, cp2_index);
+            u32 const instance_index = g_instance_index(m_object, cp1_index, cp1);
+            return g_add_cp(m_object, instance_index, cp2_index);
         }
 
         void* allocator_t::rem_cp(u16 cp1_index, void const* cp1, u16 cp2_index)
         {
-            object_t* object = (cp1_index < m_object->m_max_component_types) ? m_object : nullptr;
-            if (object == nullptr)
-                return nullptr;
-            u32 const instance_index = g_instance_index(object, cp1_index, cp1);
-            return g_rem_cp(object, instance_index, cp2_index);
+            u32 const instance_index = g_instance_index(m_object, cp1_index, cp1);
+            return g_rem_cp(m_object, instance_index, cp2_index);
         }
 
         void* allocator_t::get_cp(u16 cp1_index, void* cp1_ptr, u16 cp2_index)
         {
-            object_t* object = (cp1_index < m_object->m_max_component_types) ? m_object : nullptr;
-            if (object == nullptr)
-                return nullptr;
-
-            u16 const instance_index = g_instance_index(object, cp1_index, cp1_ptr);
-            return g_get_cp(object, instance_index, cp2_index);
+            return g_get_cp2(m_object, cp1_index, cp1_ptr, cp2_index);
         }
 
         void const* allocator_t::get_cp(u16 cp1_index, void const* cp1_ptr, u16 cp2_index) const
         {
-            object_t const* object = (cp1_index < m_object->m_max_component_types) ? m_object : nullptr;
-            if (object == nullptr)
-                return nullptr;
-
-            u16 const instance_index = g_instance_index(object, cp1_index, cp1_ptr);
-            return g_get_cp(object, instance_index, cp2_index);
+            return g_get_cp2(m_object, cp1_index, cp1_ptr, cp2_index);
         }
 
         bool allocator_t::has_tag(u16 cp_index, void const* cp_ptr, u16 tg_index) const
         {
-            object_t* object = (cp_index < m_object->m_max_component_types) ? m_object : nullptr;
-            if (object == nullptr)
-                return false;
-
             if (cp_ptr != nullptr)
             {
-                u32 const instance_index = g_instance_index(object, cp_index, cp_ptr);
-                return !g_has_tag(object, instance_index, tg_index);
+                u32 const instance_index = g_instance_index(m_object, cp_index, cp_ptr);
+                return !g_has_tag(m_object, instance_index, tg_index);
             }
 
             return false;
@@ -383,51 +364,39 @@ namespace ncore
 
         void allocator_t::add_tag(u16 cp_index, void const* cp_ptr, u16 tg_index)
         {
-            object_t* object = (cp_index < m_object->m_max_component_types) ? m_object : nullptr;
-            if (object == nullptr)
-                return;
-
             if (cp_ptr != nullptr)
             {
-                u32 const instance_index = g_instance_index(object, cp_index, cp_ptr);
-                g_add_tag(object, instance_index, tg_index);
+                u32 const instance_index = g_instance_index(m_object, cp_index, cp_ptr);
+                g_add_tag(m_object, instance_index, tg_index);
             }
         }
 
         void allocator_t::rem_tag(u16 cp_index, void const* cp_ptr, u16 tg_index)
         {
-            object_t* object = (cp_index < m_object->m_max_component_types) ? m_object : nullptr;
-            if (object == nullptr)
-                return;
-
             if (cp_ptr != nullptr)
             {
-                u32 const instance_index = g_instance_index(object, cp_index, cp_ptr);
-                g_rem_tag(object, instance_index, tg_index);
+                u32 const instance_index = g_instance_index(m_object, cp_index, cp_ptr);
+                g_rem_tag(m_object, instance_index, tg_index);
             }
         }
 
         void* allocator_t::iterate_begin(u16 cp_index) const
         {
-            object_t* object         = (cp_index < m_object->m_max_component_types) ? m_object : nullptr;
-            s32 const instance_index = (object != nullptr) ? object->m_object_state.find_used() : -1;
+            s32 const instance_index = m_object->m_object_state.find_used();
             if (instance_index >= 0)
             {
-                return g_get_cp(object, instance_index, cp_index);
+                return g_get_cp(m_object, instance_index, cp_index);
             }
             return nullptr;
         }
 
         void* allocator_t::iterate_next(u16 cp_index, void const* cp_ptr) const
         {
-            object_t* object = (cp_index < m_object->m_max_component_types) ? m_object : nullptr;
-            if (object == nullptr)
-                return nullptr;
-            u32 const instance_index = g_instance_index(object, cp_index, cp_ptr);
-            s32 const next_index     = object->m_object_state.next_used_up(instance_index + 1);
+            u32 const instance_index = g_instance_index(m_object, cp_index, cp_ptr);
+            s32 const next_index     = m_object->m_object_state.next_used_up(instance_index + 1);
             if (next_index >= 0)
             {
-                return g_get_cp(object, next_index, cp_index);
+                return g_get_cp(m_object, next_index, cp_index);
             }
             return nullptr;
         }

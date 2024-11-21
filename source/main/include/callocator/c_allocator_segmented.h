@@ -47,15 +47,14 @@ namespace ncore
             m_node_prev          = g_allocate_array_and_clear<node_t>(allocator, node_count);
 
             u32 const size_list_count = m_node_count_2log + 1;
-            m_size_lists              = g_allocate_array_and_clear<node_t>(allocator, size_list_count);
-            for (u32 i = 0; i < size_list_count; ++i)
-                m_size_lists[i] = c_null;
+            m_size_lists              = g_allocate_array_and_memset<node_t>(allocator, size_list_count, 0xFFFFFFFF);
+            m_size_list_occupancy     = 0;
 
-            // Split the full range until we reach the maximum span
             if (m_max_span_2log < m_node_count_2log)
             {
-                m_size_list_occupancy = 0;
+
                 u8 const span         = m_max_span_2log;
+                // Split the full range until we reach the maximum span
                 for (u32 n = 0; n < node_count; n += (1 << span))
                 {
                     m_node_size[n] = span;
@@ -64,12 +63,8 @@ namespace ncore
             }
             else
             {
-                m_node_size[0] = m_node_count_2log; // Full size range - 1
-                m_node_next[0] = 0;                 // Link the node to itself
-                m_node_prev[0] = 0;                 // Link the node to itself
-
-                m_size_list_occupancy           = (u64)1 << m_node_count_2log; // Mark the largest size as occupied
-                m_size_lists[m_node_count_2log] = 0;                           // The largest node in the size list
+                m_node_size[0] = m_node_count_2log;
+                add_size(m_node_count_2log, 0);
             }
         }
 

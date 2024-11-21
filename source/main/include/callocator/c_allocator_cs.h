@@ -17,9 +17,12 @@ namespace ncore
 #define D_CS_COMPONENT static u16 const __ncs_index__
 #define D_CS_COMPONENT_SET(i) static u16 const __ncs_index__ = i
 
+        // TODO: When registering a component, also pass a callback_t that is a destructor for the component
+        //       When destroy_instance is called, call the destructor for every component.
+
         struct allocator_t
         {
-            inline allocator_t() : m_allocator(nullptr), m_object(nullptr) {}
+            inline allocator_t() : m_object(nullptr) {}
 
             bool setup(alloc_t* allocator, u16 max_object_instances, u16 max_components, u16 max_tags);
             void teardown();
@@ -73,7 +76,6 @@ namespace ncore
             DCORE_CLASS_PLACEMENT_NEW_DELETE
 
         private:
-            alloc_t*  m_allocator;
             object_t* m_object;
 
             bool register_component(u16 cp_index, u16 max_components, u32 cp_sizeof, u32 cp_alignof);
