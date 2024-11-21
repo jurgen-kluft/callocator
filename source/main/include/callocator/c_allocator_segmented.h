@@ -28,7 +28,7 @@ namespace ncore
             void setup(alloc_t* allocator, u8 node_count_2log, u8 max_span_2log);
             void teardown(alloc_t* allocator);
 
-            bool allocate(span_t span, node_t& out_node); // Returns false if the size is not available
+            bool allocate(u32 size, node_t& out_node); // Returns false if the size is not available
             bool deallocate(node_t node);                 // Deallocates the node
 
             bool split(node_t node); // Splits the node into two nodes
@@ -87,17 +87,17 @@ namespace ncore
             remove_size(span, node);
 
             // Split the node into two nodes
-            node_t const insert = node + ((1 << (span >> 1));
-            m_node_size[node]   = (span >> 1);
-            m_node_size[insert] = (span >> 1);
+            node_t const insert = node + (1 << (span - 1));
+            m_node_size[node]   = span - 1;
+            m_node_size[insert] = span - 1;
 
             // Invalidate the next and previous pointers of the new node (debugging)
             m_node_next[insert] = (node_t)c_null;
             m_node_prev[insert] = (node_t)c_null;
 
             // Add node and insert into the size list that is (index - 1)
-            add_size(index - 1, node);
-            add_size(index - 1, insert);
+            add_size(span - 1, node);
+            add_size(span - 1, insert);
 
             return true;
         }
@@ -138,9 +138,9 @@ namespace ncore
                 m_size_list_occupancy &= ~((u64)1 << index);
         }
 
-        template <typename T> bool allocator_t<T>::allocate(span_t _size, node_t& out_node)
+        template <typename T> bool allocator_t<T>::allocate(u32 size, node_t& out_node)
         {
-            u8 const span  = math::g_ilog2(span);
+            u8 const span  = math::g_ilog2(size);
             u8 const index = span;
 
             node_t node = m_size_lists[index];
@@ -196,7 +196,7 @@ namespace ncore
                 remove_size(index, sibling);                           // Sibling is being merged, remove it
                 node_t const merged = node < sibling ? node : sibling; // Always take the left node as the merged node
                 node_t const other  = node < sibling ? sibling : node; // Always take the right node as the other node
-                m_node_size[merged] = span << 1;                       // Double the span (size) of the node
+                m_node_size[merged] = span + 1;                        // Double the span (size) of the node
                 m_node_size[other]  = 0;                               // Invalidate the node that is merged into 'merged'
 
                 node  = merged;
