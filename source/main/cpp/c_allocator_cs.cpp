@@ -260,7 +260,7 @@ namespace ncore
             u32 const               local_index    = (u32)(((u32 const*)cp1_ptr - (u32 const*)cp1type.m_cp_data) / cp1type.m_sizeof_component);
             u32 const               instance_index = cp1type.m_unmap[local_index];
             component_type_t*       cp2type        = &object->m_a_component[cp2_index];
-            ASSERT (cp2type->m_sizeof_component != 0);
+            ASSERT(cp2type->m_sizeof_component != 0);
             u16 const local_component_index = cp2type->m_map[instance_index];
             if (local_component_index != 0xFFFF)
                 return &cp2type->m_cp_data[local_component_index * cp2type->m_sizeof_component];
@@ -273,7 +273,7 @@ namespace ncore
             u32 const               local_index    = (u32)(((u32 const*)cp1_ptr - (u32 const*)cp1type.m_cp_data) / cp1type.m_sizeof_component);
             u32 const               instance_index = cp1type.m_unmap[local_index];
             component_type_t const* cp2type        = &object->m_a_component[cp2_index];
-            ASSERT (cp2type->m_sizeof_component != 0);
+            ASSERT(cp2type->m_sizeof_component != 0);
             u16 const local_component_index = cp2type->m_map[instance_index];
             if (local_component_index != 0xFFFF)
                 return &cp2type->m_cp_data[local_component_index * cp2type->m_sizeof_component];
@@ -314,6 +314,7 @@ namespace ncore
         {
             if (cp1_index < m_object->m_max_component_types && cp1 != nullptr)
             {
+                ASSERT(is_component_registered(cp1_index));
                 u32 const instance_index = g_instance_index(m_object, cp1_index, cp1);
                 g_destroy_instance(m_object, instance_index);
             }
@@ -325,29 +326,34 @@ namespace ncore
 
         bool allocator_t::has_cp(u16 cp1_index, void const* cp1, u16 cp2_index) const
         {
+            ASSERT(is_component_registered(cp1_index) && is_component_registered(cp2_index));
             u32 const instance_index = g_instance_index(m_object, cp1_index, cp1);
             return g_has_cp(m_object, instance_index, cp2_index);
         }
 
         void* allocator_t::add_cp(u16 cp1_index, void const* cp1, u16 cp2_index)
         {
+            ASSERT(is_component_registered(cp1_index) && is_component_registered(cp2_index));
             u32 const instance_index = g_instance_index(m_object, cp1_index, cp1);
             return g_add_cp(m_object, instance_index, cp2_index);
         }
 
         void* allocator_t::rem_cp(u16 cp1_index, void const* cp1, u16 cp2_index)
         {
+            ASSERT(is_component_registered(cp1_index) && is_component_registered(cp2_index));
             u32 const instance_index = g_instance_index(m_object, cp1_index, cp1);
             return g_rem_cp(m_object, instance_index, cp2_index);
         }
 
         void* allocator_t::get_cp(u16 cp1_index, void* cp1_ptr, u16 cp2_index)
         {
+            ASSERT(is_component_registered(cp1_index) && is_component_registered(cp2_index));
             return g_get_cp2(m_object, cp1_index, cp1_ptr, cp2_index);
         }
 
         void const* allocator_t::get_cp(u16 cp1_index, void const* cp1_ptr, u16 cp2_index) const
         {
+            ASSERT(is_component_registered(cp1_index) && is_component_registered(cp2_index));
             return g_get_cp2(m_object, cp1_index, cp1_ptr, cp2_index);
         }
 
@@ -355,6 +361,7 @@ namespace ncore
         {
             if (cp_ptr != nullptr)
             {
+                ASSERT(is_component_registered(cp_index));
                 u32 const instance_index = g_instance_index(m_object, cp_index, cp_ptr);
                 return !g_has_tag(m_object, instance_index, tg_index);
             }
@@ -366,6 +373,7 @@ namespace ncore
         {
             if (cp_ptr != nullptr)
             {
+                ASSERT(is_component_registered(cp_index));
                 u32 const instance_index = g_instance_index(m_object, cp_index, cp_ptr);
                 g_add_tag(m_object, instance_index, tg_index);
             }
@@ -375,6 +383,7 @@ namespace ncore
         {
             if (cp_ptr != nullptr)
             {
+                ASSERT(is_component_registered(cp_index));
                 u32 const instance_index = g_instance_index(m_object, cp_index, cp_ptr);
                 g_rem_tag(m_object, instance_index, tg_index);
             }
@@ -385,6 +394,7 @@ namespace ncore
             s32 const instance_index = m_object->m_object_state.find_used();
             if (instance_index >= 0)
             {
+                ASSERT(is_component_registered(cp_index));
                 return g_get_cp(m_object, instance_index, cp_index);
             }
             return nullptr;
@@ -392,6 +402,7 @@ namespace ncore
 
         void* allocator_t::iterate_next(u16 cp_index, void const* cp_ptr) const
         {
+            ASSERT(is_component_registered(cp_index));
             u32 const instance_index = g_instance_index(m_object, cp_index, cp_ptr);
             s32 const next_index     = m_object->m_object_state.next_used_up(instance_index + 1);
             if (next_index >= 0)
