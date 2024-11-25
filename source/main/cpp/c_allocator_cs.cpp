@@ -263,7 +263,7 @@ namespace ncore
             component_type_t const& cp1type        = object->m_a_component[cp1_index];
             u32 const               local_cp1_index= (u32)(((u32 const*)cp1_ptr - (u32 const*)cp1type.m_cp_data) / cp1type.m_sizeof_component);
             u32 const               global_index   = cp1type.m_unmap[local_cp1_index];
-            component_type_t const& cp2type        = &object->m_a_component[cp2_index];
+            component_type_t const& cp2type        = object->m_a_component[cp2_index];
             ASSERT(cp2type.m_sizeof_component > 0);
             index_t const local_cp2_index = cp2type.m_map[global_index];
             if (local_cp2_index != c_null_index)
