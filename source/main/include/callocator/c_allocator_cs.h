@@ -78,7 +78,7 @@ namespace ncore
         private:
             object_t* m_object;
 
-            bool register_component(u16 cp_index, u16 max_components, u32 cp_sizeof, u32 cp_alignof);
+            bool register_component(u16 cp_index, u32 max_instances, u32 cp_sizeof, u32 cp_alignof);
             bool is_component_registered(u16 cp_index) const;
 
             void* create_instance(u16 cp_index);
