@@ -238,7 +238,7 @@ namespace ncore
         static void const* s_get_cp(object_t const* object, u16 instance_index, u16 cp_index)
         {
             ASSERT(cp_index < object->m_max_component_types);
-            component_type_t* container = &object->m_a_component[cp_index];
+            component_type_t const* container = &object->m_a_component[cp_index];
             ASSERT(container->m_sizeof_component > 0);
             if (container->m_map[instance_index] != c_null_index)
                 return &container->m_cp_data[container->m_map[instance_index] * container->m_sizeof_component];
@@ -248,26 +248,26 @@ namespace ncore
         static void* s_get_cp2(object_t* object, u16 cp1_index, void* cp1_ptr, u16 cp2_index)
         {
             component_type_t const& cp1type        = object->m_a_component[cp1_index];
-            u32 const               local_index    = (u32)(((u32 const*)cp1_ptr - (u32 const*)cp1type.m_cp_data) / cp1type.m_sizeof_component);
-            u32 const               instance_index = cp1type.m_unmap[local_index];
-            component_type_t*       cp2type        = &object->m_a_component[cp2_index];
-            ASSERT(cp2type->m_sizeof_component > 0);
-            index_t const local_component_index = cp2type->m_map[instance_index];
-            if (local_component_index != c_null_index)
-                return &cp2type->m_cp_data[local_component_index * cp2type->m_sizeof_component];
+            u32 const               local_cp1_index= (u32)(((u32 const*)cp1_ptr - (u32 const*)cp1type.m_cp_data) / cp1type.m_sizeof_component);
+            u32 const               global_index   = cp1type.m_unmap[local_cp1_index];
+            component_type_t&       cp2type        = object->m_a_component[cp2_index];
+            ASSERT(cp2type.m_sizeof_component > 0);
+            index_t const local_cp2_index = cp2type.m_map[global_index];
+            if (local_cp2_index != c_null_index)
+                return &cp2type.m_cp_data[local_cp2_index * cp2type.m_sizeof_component];
             return nullptr;
         }
 
         static void const* s_get_cp2(object_t const* object, u16 cp1_index, void const* cp1_ptr, u16 cp2_index)
         {
             component_type_t const& cp1type        = object->m_a_component[cp1_index];
-            u32 const               local_index    = (u32)(((u32 const*)cp1_ptr - (u32 const*)cp1type.m_cp_data) / cp1type.m_sizeof_component);
-            u32 const               instance_index = cp1type.m_unmap[local_index];
-            component_type_t const* cp2type        = &object->m_a_component[cp2_index];
-            ASSERT(cp2type->m_sizeof_component > 0);
-            index_t const local_component_index = cp2type->m_map[instance_index];
-            if (local_component_index != c_null_index)
-                return &cp2type->m_cp_data[local_component_index * cp2type->m_sizeof_component];
+            u32 const               local_cp1_index= (u32)(((u32 const*)cp1_ptr - (u32 const*)cp1type.m_cp_data) / cp1type.m_sizeof_component);
+            u32 const               global_index   = cp1type.m_unmap[local_cp1_index];
+            component_type_t const& cp2type        = &object->m_a_component[cp2_index];
+            ASSERT(cp2type.m_sizeof_component > 0);
+            index_t const local_cp2_index = cp2type.m_map[global_index];
+            if (local_cp2_index != c_null_index)
+                return &cp2type.m_cp_data[local_cp2_index * cp2type.m_sizeof_component];
             return nullptr;
         }
 
