@@ -77,16 +77,16 @@ UNITTEST_SUITE_BEGIN(cs)
 
         UNITTEST_TEST(test_init_shutdown)
         {
-            ncs::allocator_t pool;
+            cs_alloc_t pool;
             pool.setup(Allocator, 32, 10, 10);
             pool.teardown();
         }
 
         UNITTEST_TEST(register_object_and_component_types)
         {
-            ncs::allocator_t poola;
+            cs_alloc_t poola;
             poola.setup(Allocator, 30, 10, 10);
-            ncs::allocator_t poolb;
+            cs_alloc_t poolb;
             poolb.setup(Allocator, 30, 10, 10);
 
             bool obj_a = poola.register_component<ncs::object_a_t>(40);
