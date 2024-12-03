@@ -45,7 +45,7 @@ namespace ncore
     {
         m_index = math::g_findFirstBit(~m_used);
         ASSERT(m_index < m_capacity);
-        m_used |= (1 << m_index);
+        m_used |= ((u64)1 << m_index);
     }
 
     bool frame_alloc_t::end_frame()
