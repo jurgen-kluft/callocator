@@ -10,6 +10,9 @@ virtual void void deallocate(void* p) = 0;         ///< Deallocate/Free memory
 This package contains:
 
 * TLSF allocator, Two-Level Segregate Fit
+* Offset allocator, fast hard realtime O(1) allocator with minimal fragmentation
+  * Note: fixed 32 bit index, instead of allowing a 16 bit index
+  * Note: reduced memory footprint (24 vs 32 bytes per node) compared to original [implementation](https://github.com/sebbbi/OffsetAllocator/tree/main)
 * Frame allocator, per-frame allocator
 * Linear allocator, linear allocator designed for temporary memory
 * Stack allocator, stack based allocator for fast allocation and deallocation
@@ -22,6 +25,12 @@ If you like my work and want to support me. Please consider to buy me a [coffee!
 ## TLSF Allocator
 
 This is an implementation of the TLSF allocator, Two-Level Segregate Fit, which is a memory allocator that is designed to be fast and efficient for real-time systems. It is a general-purpose memory allocator that can be used in embedded systems, game development, and other applications where performance is critical.
+
+## Offset Allocator
+
+Offset Allocator, which is a fast and efficient memory allocator that is designed for hard real-time systems. It is a general-purpose memory allocator that can be used in embedded systems, game development, and other applications where performance is critical. Uses 256 bins with 8 bit floating point distribution (3 bit mantissa + 5 bit exponent) and a two level bitfield to find the next available bin using 2x LZCNT instructions to make all operations O(1). Bin sizes following the floating point distribution ensures hard bounds for memory overhead percentage regarless of size class. Pow2 bins would waste up to +100% memory (+50% on average). Our float bins waste up to +12.5% (+6.25% on average).
+
+The allocation metadata is stored in a separate data structure, making this allocator suitable for external memory like GPU heaps, buffers and arrays. Returns an offset to the first element of the allocated contiguous range.
 
 ## Frame Allocator
 
