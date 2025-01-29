@@ -35,13 +35,13 @@ namespace ncore
 
         struct full_storage_report_t
         {
-            struct Region
+            struct region_t
             {
                 u32 size;
                 u32 count;
             };
 
-            Region freeRegions[NUM_LEAF_BINS];
+            region_t freeRegions[NUM_LEAF_BINS];
         };
 
         class allocator_t
@@ -84,7 +84,7 @@ namespace ncore
             struct neighbor_t
             {
                 u32 prev;
-                u32 next;  // 31 bits for index, 1 bit for used flag
+                u32 next;
             };
 
             alloc_t*    m_allocator;

@@ -22,19 +22,19 @@ namespace ncore
         struct allocator_t::object_t
         {
             DCORE_CLASS_PLACEMENT_NEW_DELETE
-            alloc_t*               m_allocator;
-            u32                    m_num_objects;
-            u32                    m_max_objects;
-            u32                    m_max_component_types;
-            u32                    m_max_tag_types;
-            u32                    m_component_occupancy_sizeof; // per object, u32[]
-            u32                    m_tag_data_sizeof;            // per object, u32[]
-            u32                    m_instance_data_sizeof;       // per object, u32[]
-            u32*                   m_per_object_component_occupancy;
-            u32*                   m_per_object_tag_data;
-            u32*                   m_per_object_instance_data;
+            alloc_t*          m_allocator;
+            u32               m_num_objects;
+            u32               m_max_objects;
+            u32               m_max_component_types;
+            u32               m_max_tag_types;
+            u32               m_component_occupancy_sizeof; // per object, u32[]
+            u32               m_tag_data_sizeof;            // per object, u32[]
+            u32               m_instance_data_sizeof;       // per object, u32[]
+            u32*              m_per_object_component_occupancy;
+            u32*              m_per_object_tag_data;
+            u32*              m_per_object_instance_data;
             component_type_t* m_a_component;
-            duomap_t               m_object_state;
+            duomap_t          m_object_state;
         };
         typedef allocator_t::object_t object_t;
 
@@ -149,8 +149,8 @@ namespace ncore
         static u32 g_instance_index(object_t const* object, u16 const component_index, void const* component_ptr)
         {
             component_type_t const& cptype       = object->m_a_component[component_index];
-            u32 const                    local_index  = (u32)(((u32 const*)component_ptr - (u32 const*)cptype.m_component_data) / cptype.m_sizeof_component);
-            u32 const                    global_index = cptype.m_unmap[local_index];
+            u32 const               local_index  = (u32)(((u32 const*)component_ptr - (u32 const*)cptype.m_component_data) / cptype.m_sizeof_component);
+            u32 const               global_index = cptype.m_unmap[local_index];
             return global_index;
         }
 
@@ -165,12 +165,12 @@ namespace ncore
             // See if the component container is present, if not we need to initialize it
             if (object->m_a_component[cp_index].m_sizeof_component == 0)
             {
-                component_type_t* container = &object->m_a_component[cp_index];
-                container->m_free_index          = 0;
-                container->m_sizeof_component    = cp_sizeof;
-                container->m_component_data      = g_allocate_array<byte>(object->m_allocator, cp_sizeof * max_components);
-                container->m_map                 = g_allocate_array_and_memset<u16>(object->m_allocator, object->m_max_objects, 0xFFFFFFFF);
-                container->m_unmap               = g_allocate_array_and_memset<u16>(object->m_allocator, object->m_max_objects, 0xFFFFFFFF);
+                component_type_t* container   = &object->m_a_component[cp_index];
+                container->m_free_index       = 0;
+                container->m_sizeof_component = cp_sizeof;
+                container->m_component_data   = g_allocate_array<byte>(object->m_allocator, cp_sizeof * max_components);
+                container->m_map              = g_allocate_array_and_memset<u16>(object->m_allocator, object->m_max_objects, 0xFFFFFFFF);
+                container->m_unmap            = g_allocate_array_and_memset<u16>(object->m_allocator, object->m_max_objects, 0xFFFFFFFF);
 
                 binmap_t::config_t const cfg = binmap_t::config_t::compute(max_components);
                 container->m_occupancy.init_all_free_lazy(cfg, object->m_allocator);

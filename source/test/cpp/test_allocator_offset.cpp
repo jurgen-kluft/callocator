@@ -13,6 +13,10 @@ namespace ncore
             extern u32 uintToFloatRoundUp(u32 size);
             extern u32 uintToFloatRoundDown(u32 size);
             extern u32 floatToUint(u32 floatValue);
+
+            extern u32 U32ToF32RoundUp(u32 size);
+            extern u32 U32ToF32RoundDown(u32 size);
+            extern u32 F32ToU32(u32 floatValue);
         }  // namespace nfloat
     }  // namespace noffset
 }  // namespace ncore

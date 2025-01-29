@@ -312,7 +312,6 @@ namespace ncore
                 neighbor.next                  = newNodeIndex;
             }
 
-            //return {.offset = node.dataOffset, .metadata = nodeIndex};
             allocation_t a;
             a.offset = node.dataOffset;
             a.metadata = nodeIndex;
@@ -442,12 +441,11 @@ namespace ncore
 #ifdef DEBUG_VERBOSE
             printf("Getting node %u from freelist[%u]\n", nodeIndex, m_freeOffset + 1);
 #endif
-            // m_nodes[nodeIndex]     = {.dataOffset = dataOffset, .dataSize = size, .binListNext = topNodeIndex};
             m_nodes[nodeIndex].dataOffset  = dataOffset;
             m_nodes[nodeIndex].dataSize    = size;
             m_nodes[nodeIndex].binListNext = topNodeIndex;
             m_nodes[nodeIndex].binListPrev = node_t::NIL;
-            // m_neighbors[nodeIndex] = {.prev = node_t::NIL, .next = node_t::NIL};
+
             m_neighbors[nodeIndex].prev = node_t::NIL;
             m_neighbors[nodeIndex].next = node_t::NIL;
             setUnused(nodeIndex);
