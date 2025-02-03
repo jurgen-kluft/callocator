@@ -154,7 +154,6 @@ namespace ncore
         }
 
         D_INLINE uint_t block_size(const block_t* block) { return block->header & ~BLOCK_BITS; }
-
         D_INLINE void block_set_size(block_t* block, uint_t size)
         {
             ASSERTS(!(size % ALIGN_SIZE), "invalid size");
@@ -162,9 +161,7 @@ namespace ncore
         }
 
         D_INLINE bool block_is_free(const block_t* block) { return !!(block->header & BLOCK_BIT_FREE); }
-
         D_INLINE bool block_is_prev_free(const block_t* block) { return !!(block->header & BLOCK_BIT_PREV_FREE); }
-
         D_INLINE void block_set_prev_free(block_t* block, bool free) { block->header = free ? block->header | BLOCK_BIT_PREV_FREE : block->header & ~BLOCK_BIT_PREV_FREE; }
 
         D_INLINE uint_t align_up(uint_t x, uint_t align)
@@ -174,9 +171,7 @@ namespace ncore
         }
 
         D_INLINE char* align_ptr(char* p, uint_t align) { return (char*)align_up((uint_t)p, align); }
-
         D_INLINE char* block_payload(block_t* block) { return (char*)block + CC_OFFSETOF(block_t, header) + BLOCK_OVERHEAD; }
-
         D_INLINE block_t* to_block(void* ptr)
         {
             block_t* block = (block_t*)ptr;
@@ -210,7 +205,6 @@ namespace ncore
         }
 
         D_INLINE bool block_can_split(block_t* block, uint_t size) { return block_size(block) >= sizeof(block_t) + size; }
-
         D_INLINE void block_set_free(block_t* block, bool free)
         {
             ASSERTS(block_is_free(block) != free, "block free bit unchanged");

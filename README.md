@@ -34,7 +34,7 @@ The allocation metadata is stored in a separate data structure, making this allo
 
 ## Frame Allocator
 
-This allocator is designed to be used as a per-frame allocator. It is useful for allocating temporary memory that is only needed for the duration of a single frame. This can be useful for things like rendering, physics, or other systems that need to allocate temporary memory for a single frame and then free it at the end of the frame.
+This allocator is designed to be used as a per-frame allocator. It is useful for allocating temporary memory that is only needed for the duration of a single frame. This can be useful for things like rendering, physics, or other systems that need to allocate temporary memory for a single frame and then free it at at a specific moment in the future.
 
 ## Linear Allocator
 
