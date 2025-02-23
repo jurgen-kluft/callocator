@@ -26,7 +26,7 @@ If you like my work and want to support me. Please consider to buy me a [coffee!
 
 ## Component Allocator
 
-The idea behind this allocator is that we can have 'entities' that have components. This enables associating components (data) in a dynamic way which means that you can add and remove components at runtime. This is useful for example in game development where you have entities that have components like position, velocity, etc. But also for other things like a graph with node and edges where you want the graph to use to optimize different data sets, you can now create a GraphEdge as an object and decorate it with components that are part of your data-set.
+The idea behind this allocator is that we can have an 'entity' with components (note: entity doesn't really exist). This enables associating components (data) in a dynamic way which means that you can add and remove components at runtime. This is useful for example in game development where you have entities that have components like position, velocity, etc. But also for other things like a graph with node and edges where you want the graph to use different data sets, you can now create a GraphEdge as an object and decorate it with components that are part of such a data-set.
 
 ## Frame Allocator
 
