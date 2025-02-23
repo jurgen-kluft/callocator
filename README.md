@@ -52,7 +52,7 @@ This allocator is a stack-based allocator that can only be used through the use 
 
 ## String Allocator
 
-This allocator is designed to be used for managing string memory. It is useful for allocating memory for strings that are needed for a short or long period of time and can be deallocated all at once. This can be useful for things like parsing strings, formatting strings, or other tasks where you need to allocate memory for strings and then free it all at once.
+This allocator is designed to be used for storing unique, ASCII or UTF-8, strings. It is useful for allocating memory for strings that are needed for a short or long period of time and can be deallocated all at once. This can be useful for things like parsing strings, formatting strings, or other tasks where you need to allocate memory for strings and then free it all at once.
 
 ## TLSF Allocator
 
