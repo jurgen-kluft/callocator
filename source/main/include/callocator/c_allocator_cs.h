@@ -54,11 +54,7 @@ namespace ncore
         }
         template <typename C1, typename C2> void destroy_component(C1 const* cp1)
         {
-            C2* cp = (C2*)rem_cp(C1::__ncs_index__, cp1, C2::__ncs_index__);
-            if (cp)
-            {
-                cp->~C2();
-            }
+            rem_cp(C1::__ncs_index__, cp1, C2::__ncs_index__);
         }
         template <typename C1, typename C2> bool      has_component(C1 const* cp1) { return get_cp(C1::__ncs_index__, cp1, C2::__ncs_index__) != nullptr; }
         template <typename C1, typename C2> C2*       get_component(C1 const* cp1) { return (C2*)get_cp(C1::__ncs_index__, cp1, C2::__ncs_index__); }
@@ -88,7 +84,7 @@ namespace ncore
 
         bool        has_cp(u16 cp1_index, void const* cp1_ptr, u16 cp_index) const;
         void*       add_cp(u16 cp1_index, void const* cp1_ptr, u16 cp_index);
-        void*       rem_cp(u16 cp1_index, void const* cp1_ptr, u16 cp_index);
+        void        rem_cp(u16 cp1_index, void const* cp1_ptr, u16 cp_index);
         void*       get_cp(u16 cp1_index, void* cp1_ptr, u16 cp_index);
         void const* get_cp(u16 cp1_index, void const* cp1_ptr, u16 cp_index) const;
 

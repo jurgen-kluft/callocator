@@ -30,7 +30,7 @@ namespace ncore
             u16 max_endpoint;
         };
 
-        u32 process_sequence(allocation_t* const allocations, u32 num_allocations, alloc_t* allocator)
+        u32 g_process_sequence(allocation_t* const allocations, u32 num_allocations, alloc_t* allocator)
         {
             // Note: It is best if the incoming allocator is a 'stack' allocator since the memory allocated here is temporary.
 

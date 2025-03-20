@@ -28,17 +28,17 @@ namespace ncore
 
         DCORE_CLASS_PLACEMENT_NEW_DELETE
 
+        u8*   m_buffer_begin;
+        u8*   m_buffer_cursor;
+        u8*   m_buffer_end;
+        int_t m_allocation_count;
+
     protected:
         virtual void* v_allocate(u32 size, u32 alignment);
         virtual void  v_deallocate(void* ptr);
         virtual void  v_restore_cursor(u8* cursor, int_t allocation_count);
 
         friend class stack_alloc_scope_t;
-
-        u8*   m_buffer_begin;
-        u8*   m_buffer_cursor;
-        u8*   m_buffer_end;
-        int_t m_allocation_count;
     };
 
     class stack_alloc_scope_t

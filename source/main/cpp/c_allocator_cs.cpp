@@ -12,12 +12,11 @@ namespace ncore
 
     struct component_type_t
     {
-        u32      m_free_index;
-        u32      m_sizeof_component;
-        byte*    m_cp_data;
-        index_t* m_map;       // instance index -> component index
-        index_t* m_unmap;     // component index -> instance index
-        binmap_t m_occupancy; // 32 bytes
+        u32      m_cp_sizeof; // unit = bytes
+        u32      m_cp_count; // number of used components
+        byte*    m_cp_data; // component data, size = m_cp_sizeof * m_max_instances
+        index_t* m_map;   // instance index -> component index
+        index_t* m_unmap; // component index -> instance index
     };
 
     struct cs_alloc_t::object_t
@@ -42,9 +41,8 @@ namespace ncore
         allocator->deallocate(container->m_cp_data);
         allocator->deallocate(container->m_map);
         allocator->deallocate(container->m_unmap);
-        container->m_occupancy.release(allocator);
-        container->m_free_index       = 0;
-        container->m_sizeof_component = 0;
+        container->m_cp_count       = 0;
+        container->m_cp_sizeof = 0;
     }
 
     static object_t* s_create_object(alloc_t* allocator, u32 max_instances, u32 max_component_types, u32 max_tags)
@@ -77,7 +75,7 @@ namespace ncore
         for (u32 i = 0; i < object->m_max_component_types; ++i)
         {
             component_type_t* container = &object->m_a_component[i];
-            if (container->m_sizeof_component > 0)
+            if (container->m_cp_sizeof > 0)
                 s_teardown(allocator, container);
         }
 
@@ -129,7 +127,7 @@ namespace ncore
     static u32 s_instance_index(object_t const* object, u16 const cp_type_index, void const* cp_ptr)
     {
         component_type_t const& cptype         = object->m_a_component[cp_type_index];
-        u32 const               local_cp_index = (u32)(((u32 const*)cp_ptr - (u32 const*)cptype.m_cp_data) / cptype.m_sizeof_component);
+        u32 const               local_cp_index = (u32)(((u32 const*)cp_ptr - (u32 const*)cptype.m_cp_data) / cptype.m_cp_sizeof);
         return cptype.m_unmap[local_cp_index];
     }
 
@@ -142,17 +140,14 @@ namespace ncore
     static bool s_register_component(object_t* object, u32 max_instances, u16 cp_index, s32 cp_sizeof, s32 cp_alignof)
     {
         // See if the component container is present, if not we need to initialize it
-        if (cp_index < object->m_max_component_types && object->m_a_component[cp_index].m_sizeof_component == 0)
+        if (cp_index < object->m_max_component_types && object->m_a_component[cp_index].m_cp_sizeof == 0)
         {
             component_type_t* container   = &object->m_a_component[cp_index];
-            container->m_free_index       = 0;
-            container->m_sizeof_component = cp_sizeof;
+            container->m_cp_count       = 0;
+            container->m_cp_sizeof = cp_sizeof;
             container->m_cp_data          = g_allocate_array<byte>(object->m_allocator, cp_sizeof * max_instances);
             container->m_map              = g_allocate_array_and_memset<index_t>(object->m_allocator, object->m_max_instances, 0xFFFFFFFF);
             container->m_unmap            = g_allocate_array_and_memset<index_t>(object->m_allocator, object->m_max_instances, 0xFFFFFFFF);
-
-            binmap_t::config_t const cfg = binmap_t::config_t::compute(max_instances);
-            container->m_occupancy.init_all_free_lazy(cfg, object->m_allocator);
             return true;
         }
         return false;
@@ -161,7 +156,7 @@ namespace ncore
     static void s_unregister_component(object_t* object, u16 cp_index)
     {
         component_type_t* container = &object->m_a_component[cp_index];
-        if (container->m_sizeof_component > 0)
+        if (container->m_cp_sizeof > 0)
             s_teardown(object->m_allocator, container);
     }
 
@@ -175,18 +170,10 @@ namespace ncore
     {
         ASSERT(cp_index < object->m_max_component_types);
         component_type_t* container = &object->m_a_component[cp_index];
-        ASSERT(container->m_sizeof_component > 0); // component must be registered
+        ASSERT(container->m_cp_sizeof > 0); // component must be registered
         if (container->m_map[global_index] == c_null_index)
         {
-            s32 local_cp_index = container->m_occupancy.find();
-            if (local_cp_index == -1)
-            {
-                if (container->m_free_index >= container->m_occupancy.size())
-                    return nullptr;
-                container->m_occupancy.tick_all_free_lazy(container->m_free_index);
-                local_cp_index = container->m_free_index++;
-            }
-            container->m_occupancy.set_used(local_cp_index);
+            s32 const local_cp_index = container->m_cp_count++;
 
             // map and unmap
             container->m_map[global_index]     = (index_t)local_cp_index;
@@ -194,42 +181,51 @@ namespace ncore
 
             u32* component_occupancy = &object->m_per_instance_component_occupancy[global_index * object->m_component_occupancy_sizeof];
             component_occupancy[cp_index >> 5] |= (1 << (cp_index & 31));
-            return &container->m_cp_data[local_cp_index * container->m_sizeof_component];
+            return &container->m_cp_data[local_cp_index * container->m_cp_sizeof];
         }
         else
         {
             u32 const local_cp_index = container->m_map[global_index];
-            return &container->m_cp_data[local_cp_index * container->m_sizeof_component];
+            return &container->m_cp_data[local_cp_index * container->m_cp_sizeof];
         }
     }
 
-    static void* s_rem_cp(object_t* object, u32 global_index, u16 cp_index)
+    static void s_rem_cp(object_t* object, u32 global_index, u16 cp_index)
     {
         ASSERT(cp_index < object->m_max_component_types);
         component_type_t* container = &object->m_a_component[cp_index];
-        ASSERT(container->m_sizeof_component > 0);
+        ASSERT(container->m_cp_sizeof > 0);
         if (container->m_map[global_index] != c_null_index)
         {
             index_t const local_cp_index       = container->m_map[global_index];
             container->m_map[global_index]     = c_null_index;
             container->m_unmap[local_cp_index] = c_null_index;
-            container->m_occupancy.set_free(local_cp_index);
+
+            // Did we remove the last component or do we now have a gap in the component list?
+            index_t const local_cp_index_last = container->m_cp_count - 1;
+            if (local_cp_index < local_cp_index_last)
+            {
+                // Move the last component to the location of the one we are removing
+                container->m_cp_count--;
+                container->m_map[container->m_unmap[local_cp_index_last]] = local_cp_index;
+                byte* local_cp_data = &container->m_cp_data[local_cp_index * container->m_cp_sizeof];
+                byte* local_cp_data_last = &container->m_cp_data[local_cp_index_last * container->m_cp_sizeof];
+                nmem::memcpy(local_cp_data, local_cp_data_last, container->m_cp_sizeof);
+            }
 
             u32* component_occupancy = &object->m_per_instance_component_occupancy[global_index * object->m_component_occupancy_sizeof];
             component_occupancy[cp_index >> 5] &= ~(1 << (cp_index & 31));
-            return &container->m_cp_data[local_cp_index * container->m_sizeof_component];
         }
-        return nullptr;
     }
 
     static void* s_get_cp(object_t* object, u16 global_index, u16 cp_index)
     {
         ASSERT(cp_index < object->m_max_component_types);
         component_type_t* container = &object->m_a_component[cp_index];
-        ASSERT(container->m_sizeof_component > 0);
+        ASSERT(container->m_cp_sizeof > 0);
         index_t const local_cp_index = container->m_map[global_index];
         if (local_cp_index != c_null_index)
-            return &container->m_cp_data[local_cp_index * container->m_sizeof_component];
+            return &container->m_cp_data[local_cp_index * container->m_cp_sizeof];
         return nullptr;
     }
 
@@ -237,35 +233,35 @@ namespace ncore
     {
         ASSERT(cp_index < object->m_max_component_types);
         component_type_t const* container = &object->m_a_component[cp_index];
-        ASSERT(container->m_sizeof_component > 0);
+        ASSERT(container->m_cp_sizeof > 0);
         if (container->m_map[global_index] != c_null_index)
-            return &container->m_cp_data[container->m_map[global_index] * container->m_sizeof_component];
+            return &container->m_cp_data[container->m_map[global_index] * container->m_cp_sizeof];
         return nullptr;
     }
 
     static void* s_get_cp2(object_t* object, u16 cp1_index, void* cp1_ptr, u16 cp2_index)
     {
         component_type_t const& cp1type         = object->m_a_component[cp1_index];
-        u32 const               local_cp1_index = (u32)(((u32 const*)cp1_ptr - (u32 const*)cp1type.m_cp_data) / cp1type.m_sizeof_component);
+        u32 const               local_cp1_index = (u32)(((u32 const*)cp1_ptr - (u32 const*)cp1type.m_cp_data) / cp1type.m_cp_sizeof);
         u32 const               global_index    = cp1type.m_unmap[local_cp1_index];
         component_type_t&       cp2type         = object->m_a_component[cp2_index];
-        ASSERT(cp2type.m_sizeof_component > 0);
+        ASSERT(cp2type.m_cp_sizeof > 0);
         index_t const local_cp2_index = cp2type.m_map[global_index];
         if (local_cp2_index != c_null_index)
-            return &cp2type.m_cp_data[local_cp2_index * cp2type.m_sizeof_component];
+            return &cp2type.m_cp_data[local_cp2_index * cp2type.m_cp_sizeof];
         return nullptr;
     }
 
     static void const* s_get_cp2(object_t const* object, u16 cp1_index, void const* cp1_ptr, u16 cp2_index)
     {
         component_type_t const& cp1type         = object->m_a_component[cp1_index];
-        u32 const               local_cp1_index = (u32)(((u32 const*)cp1_ptr - (u32 const*)cp1type.m_cp_data) / cp1type.m_sizeof_component);
+        u32 const               local_cp1_index = (u32)(((u32 const*)cp1_ptr - (u32 const*)cp1type.m_cp_data) / cp1type.m_cp_sizeof);
         u32 const               global_index    = cp1type.m_unmap[local_cp1_index];
         component_type_t const& cp2type         = object->m_a_component[cp2_index];
-        ASSERT(cp2type.m_sizeof_component > 0);
+        ASSERT(cp2type.m_cp_sizeof > 0);
         index_t const local_cp2_index = cp2type.m_map[global_index];
         if (local_cp2_index != c_null_index)
-            return &cp2type.m_cp_data[local_cp2_index * cp2type.m_sizeof_component];
+            return &cp2type.m_cp_data[local_cp2_index * cp2type.m_cp_sizeof];
         return nullptr;
     }
 
@@ -309,7 +305,7 @@ namespace ncore
 
     u32  cs_alloc_t::get_number_of_instances(u16 cp_index) const { return m_object->m_num_instances; }
     bool cs_alloc_t::register_component(u16 cp_index, u32 max_instances, u32 cp_sizeof, u32 cp_alignof) { return s_register_component(m_object, max_instances, cp_index, cp_sizeof, cp_alignof); }
-    bool cs_alloc_t::is_component_registered(u16 cp_index) const { return (cp_index < m_object->m_max_component_types) && m_object->m_a_component[cp_index].m_sizeof_component > 0; }
+    bool cs_alloc_t::is_component_registered(u16 cp_index) const { return (cp_index < m_object->m_max_component_types) && m_object->m_a_component[cp_index].m_cp_sizeof > 0; }
 
     bool cs_alloc_t::has_cp(u16 cp1_index, void const* cp1, u16 cp2_index) const
     {
@@ -325,11 +321,11 @@ namespace ncore
         return s_add_cp(m_object, global_index, cp2_index);
     }
 
-    void* cs_alloc_t::rem_cp(u16 cp1_index, void const* cp1, u16 cp2_index)
+    void cs_alloc_t::rem_cp(u16 cp1_index, void const* cp1, u16 cp2_index)
     {
         ASSERT(is_component_registered(cp1_index) && is_component_registered(cp2_index));
         u32 const global_index = s_instance_index(m_object, cp1_index, cp1);
-        return s_rem_cp(m_object, global_index, cp2_index);
+        s_rem_cp(m_object, global_index, cp2_index);
     }
 
     void* cs_alloc_t::get_cp(u16 cp1_index, void* cp1_ptr, u16 cp2_index)

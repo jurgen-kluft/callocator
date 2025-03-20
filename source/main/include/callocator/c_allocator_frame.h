@@ -44,14 +44,14 @@ namespace ncore
 
         DCORE_CLASS_PLACEMENT_NEW_DELETE
 
-    private:
-        virtual void* v_allocate(u32 size, u32 alignment);
-        virtual void  v_deallocate(void* ptr);
-
         s8       m_index;
         u8       m_capacity;
         u64      m_used; // each bit indicates if the frame is used or not
         frame_t* m_frame_array;
+
+    private:
+        virtual void* v_allocate(u32 size, u32 alignment);
+        virtual void  v_deallocate(void* ptr);
 
         frame_alloc_t(const frame_alloc_t&);
         frame_alloc_t& operator=(const frame_alloc_t&);

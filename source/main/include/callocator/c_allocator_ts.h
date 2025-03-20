@@ -25,7 +25,7 @@ namespace ncore
         };
 
         // Process the allocations sequence and compute the address for each allocation
-        u32 process_sequence(allocation_t* const allocations, u32 num_allocations, alloc_t* allocator);
+        u32 g_process_sequence(allocation_t* const allocations, u32 num_allocations, alloc_t* allocator);
     } // namespace nts
 
 } // namespace ncore
