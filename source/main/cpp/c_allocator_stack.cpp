@@ -25,12 +25,16 @@ namespace ncore
 
     void* stack_alloc_t::v_allocate(u32 size, u32 alignment)
     {
-        if (m_buffer_begin == nullptr)
-            return nullptr;
         u8* const ptr   = (u8*)math::g_alignUp((u64)m_buffer_cursor, alignment);
         m_buffer_cursor = ptr + size;
-        m_allocation_count++;
-        return ptr;
+        if (m_buffer_cursor >= m_buffer_begin && m_buffer_cursor < m_buffer_end)
+        {
+            m_allocation_count++;
+            return ptr;
+        }
+
+        // We are out of memory
+        return nullptr;
     }
 
     void stack_alloc_t::v_deallocate(void* ptr)
@@ -43,7 +47,7 @@ namespace ncore
 
     void stack_alloc_t::v_restore_cursor(u8* cursor, int_t allocation_count)
     {
-        // Has the user forgot to deallocate one or more allocations?
+        // Has the user forgotten to deallocate one or more allocations?
         ASSERT(m_allocation_count == allocation_count);
         m_buffer_cursor    = cursor;
         m_allocation_count = allocation_count;

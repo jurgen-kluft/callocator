@@ -64,7 +64,7 @@ namespace ncore
                         mantissa++;
                 }
 
-                return (exp << MANTISSA_BITS) + mantissa;  // + allows mantissa->exp overflow for round up
+                return (exp << MANTISSA_BITS) + mantissa; // + allows mantissa->exp overflow for round up
             }
 
             u32 uintToFloatRoundDown(u32 size)
@@ -105,7 +105,7 @@ namespace ncore
                     return (mantissa | MANTISSA_VALUE) << (exponent - 1);
                 }
             }
-        }  // namespace nfloat
+        } // namespace nfloat
 
         // Utility functions
         u32 findLowestSetBitAfter(u32 bitMask, u32 startBitIndex)
@@ -119,33 +119,14 @@ namespace ncore
         }
 
         allocator_t::allocator_t(alloc_t* allocator, u32 size, u32 maxAllocs)
-            : m_allocator(allocator)
-            , m_size(size)
-            , m_maxAllocs(maxAllocs)
-            , m_freeStorage(0)
-            , m_usedBinsTop(0)
-            , m_nodes(nullptr)
-            , m_neighbors(nullptr)
-            , m_used(nullptr)
-            , m_freeIndex(0)
-            , m_freeListHead(node_t::NIL)
-            , m_freeOffset(maxAllocs - 1)
+            : m_allocator(allocator), m_size(size), m_maxAllocs(maxAllocs), m_freeStorage(0), m_usedBinsTop(0), m_nodes(nullptr), m_neighbors(nullptr), m_used(nullptr), m_freeIndex(0), m_freeListHead(node_t::NIL), m_freeOffset(maxAllocs - 1)
         {
-            ASSERT(m_size < 0x80000000);  // Size must be less than 2^31
+            ASSERT(m_size < 0x80000000); // Size must be less than 2^31
         }
 
         allocator_t::allocator_t(allocator_t&& other)
-            : m_allocator(other.m_allocator)
-            , m_size(other.m_size)
-            , m_maxAllocs(other.m_maxAllocs)
-            , m_freeStorage(other.m_freeStorage)
-            , m_usedBinsTop(other.m_usedBinsTop)
-            , m_nodes(other.m_nodes)
-            , m_neighbors(other.m_neighbors)
-            , m_used(other.m_used)
-            , m_freeIndex(other.m_freeIndex)
-            , m_freeListHead(other.m_freeListHead)
-            , m_freeOffset(other.m_freeOffset)
+            : m_allocator(other.m_allocator), m_size(other.m_size), m_maxAllocs(other.m_maxAllocs), m_freeStorage(other.m_freeStorage), m_usedBinsTop(other.m_usedBinsTop), m_nodes(other.m_nodes), m_neighbors(other.m_neighbors), m_used(other.m_used),
+              m_freeIndex(other.m_freeIndex), m_freeListHead(other.m_freeListHead), m_freeOffset(other.m_freeOffset)
         {
             nmem::memcpy(m_usedBins, other.m_usedBins, sizeof(u8) * NUM_TOP_BINS);
             nmem::memcpy(m_binIndices, other.m_binIndices, sizeof(u32) * NUM_LEAF_BINS);
@@ -163,21 +144,18 @@ namespace ncore
 
         void allocator_t::setup()
         {
-            m_nodes     = (node_t*)m_allocator->allocate(sizeof(node_t) * m_maxAllocs);
-            m_neighbors = (neighbor_t*)m_allocator->allocate(sizeof(neighbor_t) * m_maxAllocs);
-            m_used      = (u32*)m_allocator->allocate((m_maxAllocs >> 5) * sizeof(u32));
+            m_nodes     = g_allocate_array<node_t>(m_allocator, m_maxAllocs);
+            m_neighbors = g_allocate_array<neighbor_t>(m_allocator, m_maxAllocs);
+            m_used      = g_allocate_array<u32>(m_allocator, (m_maxAllocs >> 5));
 
             reset();
         }
 
         void allocator_t::teardown()
         {
-            if (m_nodes)
-                m_allocator->deallocate(m_nodes);
-            if (m_neighbors)
-                m_allocator->deallocate(m_neighbors);
-            if (m_used)
-                m_allocator->deallocate(m_used);
+            g_deallocate_array<node_t>(m_allocator, m_nodes);
+            g_deallocate_array<neighbor_t>(m_allocator, m_neighbors);
+            g_deallocate_array<u32>(m_allocator, m_used);
 
             m_freeStorage  = 0;
             m_usedBinsTop  = 0;
@@ -211,12 +189,9 @@ namespace ncore
 
         allocator_t::~allocator_t()
         {
-            if (m_nodes)
-                m_allocator->deallocate(m_nodes);
-            if (m_neighbors)
-                m_allocator->deallocate(m_neighbors);
-            if (m_used)
-                m_allocator->deallocate(m_used);
+            g_deallocate_array<node_t>(m_allocator, m_nodes);
+            g_deallocate_array<neighbor_t>(m_allocator, m_neighbors);
+            g_deallocate_array<u32>(m_allocator, m_used);
         }
 
         allocation_t allocator_t::allocate(u32 size)
@@ -224,9 +199,9 @@ namespace ncore
             // Out of allocations?
             if (m_freeOffset == 0)
             {
-                //return {.offset = allocation_t::NO_SPACE, .metadata = allocation_t::NO_SPACE};
+                // return {.offset = allocation_t::NO_SPACE, .metadata = allocation_t::NO_SPACE};
                 allocation_t a;
-                a.offset = allocation_t::NO_SPACE;
+                a.offset   = allocation_t::NO_SPACE;
                 a.metadata = allocation_t::NO_SPACE;
                 return a;
             }
@@ -255,9 +230,9 @@ namespace ncore
                 // Out of space?
                 if (topBinIndex == allocation_t::NO_SPACE)
                 {
-                    //return {.offset = allocation_t::NO_SPACE, .metadata = allocation_t::NO_SPACE};
+                    // return {.offset = allocation_t::NO_SPACE, .metadata = allocation_t::NO_SPACE};
                     allocation_t a;
-                    a.offset = allocation_t::NO_SPACE;
+                    a.offset   = allocation_t::NO_SPACE;
                     a.metadata = allocation_t::NO_SPACE;
                     return a;
                 }
@@ -288,12 +263,12 @@ namespace ncore
             // Bin empty?
             if (m_binIndices[binIndex] == node_t::NIL)
             {
-                m_usedBins[topBinIndex] &= ~(1 << leafBinIndex);  // Remove a leaf bin mask bit
+                m_usedBins[topBinIndex] &= ~(1 << leafBinIndex); // Remove a leaf bin mask bit
 
                 // All leaf bins empty?
                 if (m_usedBins[topBinIndex] == 0)
                 {
-                    m_usedBinsTop &= ~(1 << topBinIndex);  // Remove a top bin mask bit
+                    m_usedBinsTop &= ~(1 << topBinIndex); // Remove a top bin mask bit
                 }
             }
 
@@ -313,7 +288,7 @@ namespace ncore
             }
 
             allocation_t a;
-            a.offset = node.dataOffset;
+            a.offset   = node.dataOffset;
             a.metadata = nodeIndex;
             return a;
         }
@@ -553,7 +528,7 @@ namespace ncore
             }
 
             storage_report_t report;
-            report.totalFreeSpace = freeStorage;
+            report.totalFreeSpace    = freeStorage;
             report.largestFreeRegion = largestFreeRegion;
             return report;
         }
@@ -570,11 +545,11 @@ namespace ncore
                     nodeIndex = m_nodes[nodeIndex].binListNext;
                     count++;
                 }
-                report.freeRegions[i].size = nfloat::floatToUint(i);
+                report.freeRegions[i].size  = nfloat::floatToUint(i);
                 report.freeRegions[i].count = count;
             }
             return report;
         }
-    }  // namespace ngfx
+    } // namespace noffset
 
-}  // namespace ncore
+} // namespace ncore

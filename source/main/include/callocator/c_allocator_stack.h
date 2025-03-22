@@ -10,10 +10,11 @@
 namespace ncore
 {
     // Stack allocator
-    // The frame allocator is a specialized allocator. You can use it when you are allocating different size blocks that
-    // all have a life-time that doesn't differ much, like one single frame of a game, or when passing an allocator to
-    // a JSON parser that will allocate a lot of small blocks and then deallocate them all at once.
-    // This allocator is very very fast in allocations O(1) and deallocations O(1).
+    //
+    // The stack allocator is a specialized allocator. You can use it when you are allocating temporary
+    // objects that are only used in a limited scope, for example, in a function. Furthermore, it is
+    // not thread safe, so there should be one instance of the stack allocator per thread.
+    //
     class stack_alloc_scope_t;
     class stack_alloc_t : protected alloc_t
     {
