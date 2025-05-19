@@ -18,12 +18,12 @@ func GetPackage() *denv.Package {
 	mainpkg.AddPackage(cbasepkg)
 
 	// 'callocator' library
-	mainlib := denv.SetupDefaultCppLibProject("callocator", "github.com\\jurgen-kluft\\callocator")
-	mainlib.Dependencies = append(mainlib.Dependencies, cbasepkg.GetMainLib())
+	mainlib := denv.SetupCppLibProject("callocator", "github.com\\jurgen-kluft\\callocator")
+	mainlib.AddDependencies(cbasepkg.GetMainLib()...)
 
 	// 'callocator' unittest project
 	maintest := denv.SetupDefaultCppTestProject("callocator"+"_test", "github.com\\jurgen-kluft\\callocator")
-	maintest.Dependencies = append(maintest.Dependencies, cunittestpkg.GetMainLib())
+	maintest.AddDependencies(cunittestpkg.GetMainLib()...)
 	maintest.Dependencies = append(maintest.Dependencies, mainlib)
 
 	mainpkg.AddMainLib(mainlib)
