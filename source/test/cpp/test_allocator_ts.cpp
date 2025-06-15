@@ -25,7 +25,7 @@ UNITTEST_SUITE_BEGIN(nts)
             };
 
             u32 num_allocations = g_array_size(allocations);
-            u32 max_memory_used = nts::process_sequence(allocations, num_allocations, Allocator);
+            u32 max_memory_used = nts::g_process_sequence(allocations, num_allocations, Allocator);
 
             CHECK_EQUAL(1792, max_memory_used);
 
@@ -47,7 +47,7 @@ UNITTEST_SUITE_BEGIN(nts)
             };
 
             u32 num_allocations = g_array_size(allocations);
-            u32 max_memory_used = nts::process_sequence(allocations, num_allocations, Allocator);
+            u32 max_memory_used = nts::g_process_sequence(allocations, num_allocations, Allocator);
 
             CHECK_EQUAL(1536, max_memory_used);
 
@@ -69,7 +69,7 @@ UNITTEST_SUITE_BEGIN(nts)
             };
 
             u32 num_allocations = g_array_size(allocations);
-            u32 max_memory_used = nts::process_sequence(allocations, num_allocations, Allocator);
+            u32 max_memory_used = nts::g_process_sequence(allocations, num_allocations, Allocator);
 
             CHECK_EQUAL(1536, max_memory_used);
 
@@ -110,7 +110,7 @@ UNITTEST_SUITE_BEGIN(nts)
             // -
 
             u32 num_allocations = g_array_size(allocations);
-            u32 max_memory_used = nts::process_sequence(allocations, num_allocations, Allocator);
+            u32 max_memory_used = nts::g_process_sequence(allocations, num_allocations, Allocator);
 
             CHECK_EQUAL(6, max_memory_used);
 
