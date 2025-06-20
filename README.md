@@ -14,9 +14,11 @@ This package contains:
 * Linear allocator, linear allocator designed for temporary memory
 * Object-Component allocator, allocator for managing objects that have components
 * Offset allocator, fast hard realtime O(1) allocator with minimal fragmentation
+  * Note: Implementation from [here](https://github.com/sebbbi/OffsetAllocator)
 * Stack allocator, stack based allocator for fast allocation and deallocation
 * String allocator, allocator for managing string memory
 * TLSF allocator, Two-Level Segregate Fit
+  * Note: Implementation from [here](https://github.com/jserv/tlsf-bsd)
   * Note: fixed 32 bit index, instead of allowing a 16 bit index
   * Note: reduced memory footprint (24 vs 32 bytes per node) compared to original [implementation](https://github.com/sebbbi/OffsetAllocator/tree/main)
 * Segmented (2^N) allocator, allocate memory with sizes 2^N - 2^M, out of a memory range of 2^O

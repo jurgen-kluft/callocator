@@ -5,6 +5,9 @@
 
 namespace ncore
 {
+    // Implementation by Sebastian Aaltonen
+    // https://github.com/sebbbi/OffsetAllocator
+    // Adjustments made by me to reduce memory consumption.
     namespace noffset
     {
         inline u32 lzcnt_nonzero(u32 v)
