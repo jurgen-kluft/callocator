@@ -9,13 +9,14 @@
 
 namespace ncore
 {
+    class stack_alloc_scope_t;
+
     // Stack allocator
     //
     // The stack allocator is a specialized allocator. You can use it when you are allocating temporary
     // objects that are only used in a limited scope, for example, in a function. Furthermore, it is
     // not thread safe, so there should be one instance of the stack allocator per thread.
     //
-    class stack_alloc_scope_t;
     class stack_alloc_t : protected alloc_t
     {
     public:
