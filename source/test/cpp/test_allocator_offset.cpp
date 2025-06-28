@@ -105,14 +105,14 @@ UNITTEST_SUITE_BEGIN(offset)
 
         UNITTEST_FIXTURE_SETUP()
         {
-            allocator = Allocator->construct<ncore::noffset::allocator_t>(Allocator, 1024 * 1024 * 256);
+            allocator = new (Allocator) ncore::noffset::allocator_t(Allocator, 1024 * 1024 * 256);
             allocator->setup();
         }
 
         UNITTEST_FIXTURE_TEARDOWN()
         {
             allocator->teardown();
-            Allocator->destruct(allocator);
+            g_destruct(Allocator, allocator);
         }
 
         UNITTEST_TEST(basic)

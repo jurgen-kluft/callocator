@@ -1,18 +1,19 @@
 #include "ccore/c_target.h"
 #include "ccore/c_debug.h"
 #include "ccore/c_memory.h"
+#include "ccore/c_vmem.h"
 
-#include "callocator/c_allocator_tlsf.h"
+#include "callocator/c_allocator_heap.h"
 
 #ifdef CC_COMPILER_MSVC
 #    include <intrin.h>
 #endif
 
-// TLSF allocator, Two-Level Segregate Fit
+// A heap allocator implemented according to the TLSF allocator, Two-Level Segregate Fit
 // See license description at the end of this file
 namespace ncore
 {
-    namespace ntlsf
+    namespace nheap
     {
         static inline u32 s_ffs(u32 x)
         {
@@ -38,16 +39,6 @@ namespace ncore
 #endif
         };
 
-        struct context_t
-        {
-            u32      fl;
-            u32      sl[TLSF_FL_COUNT];
-            block_t* block[TLSF_FL_COUNT][TLSF_SL_COUNT];
-            u64      size;
-
-            DCORE_CLASS_PLACEMENT_NEW_DELETE
-        };
-
         struct block_t
         {
             // Valid only if the previous block is free and is actually
@@ -57,6 +48,16 @@ namespace ncore
 
             block_t* next_free; // Next and previous free blocks.
             block_t* prev_free; // Only valid if the corresponding block is free.
+        };
+
+        struct context_t
+        {
+            u32      fl;
+            u32      sl[TLSF_FL_COUNT];
+            block_t* block[TLSF_FL_COUNT][TLSF_SL_COUNT];
+            u64      size;
+
+            DCORE_CLASS_PLACEMENT_NEW_DELETE
         };
 
 #define TLSF_MAX_SIZE (((uint_t)1 << (TLSF_FL_MAX - 1)) - sizeof(uint_t))
@@ -155,7 +156,7 @@ namespace ncore
         }
 
         D_INLINE uint_t block_size(const block_t* block) { return block->header & ~BLOCK_BITS; }
-        D_INLINE void block_set_size(block_t* block, uint_t size)
+        D_INLINE void   block_set_size(block_t* block, uint_t size)
         {
             ASSERTS(!(size % ALIGN_SIZE), "invalid size");
             block->header = size | (block->header & BLOCK_BITS);
@@ -171,8 +172,8 @@ namespace ncore
             return (((x - 1) | (align - 1)) + 1);
         }
 
-        D_INLINE char* align_ptr(char* p, uint_t align) { return (char*)align_up((uint_t)p, align); }
-        D_INLINE char* block_payload(block_t* block) { return (char*)block + CC_OFFSETOF(block_t, header) + BLOCK_OVERHEAD; }
+        D_INLINE char*    align_ptr(char* p, uint_t align) { return (char*)align_up((uint_t)p, align); }
+        D_INLINE char*    block_payload(block_t* block) { return (char*)block + CC_OFFSETOF(block_t, header) + BLOCK_OVERHEAD; }
         D_INLINE block_t* to_block(void* ptr)
         {
             block_t* block = (block_t*)ptr;
@@ -587,9 +588,8 @@ namespace ncore
         }
 
 #ifdef TLSF_ENABLE_CHECK
-        const char* allocator_t::check()
+        const char* g_check(context_t* t)
         {
-            allocator_t const* t = this;
             for (u32 i = 0; i < FL_COUNT; ++i)
             {
                 for (u32 j = 0; j < SL_COUNT; ++j)
@@ -643,66 +643,88 @@ namespace ncore
         // allocator_t
         // ----------------------------------------------------------------------------
 
-        allocator_t::allocator_t(context_t* ctx) : m_context(ctx) { ntlsf::g_setup(ctx); }
+        allocator_t::allocator_t(context_t* ctx) : m_context(ctx) { g_setup(ctx); }
         allocator_t::~allocator_t() {}
 
         void* allocator_t::v_allocate(u32 size, u32 alignment)
         {
             if (alignment < 16)
-                return ntlsf::g_malloc(this, m_context, size);
-            return ntlsf::g_aalloc(this, m_context, alignment, size);
+                return g_malloc(this, m_context, size);
+            return g_aalloc(this, m_context, alignment, size);
         }
 
-        void allocator_t::v_deallocate(void* ptr) { ntlsf::g_free(this, m_context, ptr); }
+        void allocator_t::v_deallocate(void* ptr) { g_free(this, m_context, ptr); }
 
         bool allocator_t::v_check(const char*& error_description) const
         {
 #ifdef TLSF_ENABLE_CHECK
-            error_description = ntlsf::allocator_t::check();
+            error_description = g_check(m_context);
             return !error_description;
 #else
             error_description = nullptr;
             return true;
 #endif
         }
-    } // namespace ntlsf
+    } // namespace nheap
 
     // ----------------------------------------------------------------------------
-    // alloc_tlsf_simple_t
+    // alloc_tlsf_vmem_t
     // ----------------------------------------------------------------------------
 
-    class alloc_tlsf_simple_t : public ntlsf::allocator_t
+    class alloc_tlsf_vmem_t : public nheap::allocator_t
     {
     public:
-        void* mMemory;
-        u64   mMemorySize;
+        vmem_arena_t* m_arena;
 
-        alloc_tlsf_simple_t(ntlsf::context_t* context);
-        virtual ~alloc_tlsf_simple_t();
+        alloc_tlsf_vmem_t(nheap::context_t* context, vmem_arena_t* arena);
+        virtual ~alloc_tlsf_vmem_t();
 
         virtual void* v_resize(u64 size);
 
         DCORE_CLASS_PLACEMENT_NEW_DELETE
     };
 
-    alloc_tlsf_simple_t::alloc_tlsf_simple_t(ntlsf::context_t* context) : ntlsf::allocator_t(context), mMemory(nullptr), mMemorySize(0) {}
-    alloc_tlsf_simple_t::~alloc_tlsf_simple_t() {}
+    alloc_tlsf_vmem_t::alloc_tlsf_vmem_t(nheap::context_t* context, vmem_arena_t* arena) : nheap::allocator_t(context), m_arena(arena) {}
+    alloc_tlsf_vmem_t::~alloc_tlsf_vmem_t() {}
 
-    void* alloc_tlsf_simple_t::v_resize(u64 size)
+    void* alloc_tlsf_vmem_t::v_resize(u64 size)
     {
-        if (size > mMemorySize)
+        if (size > (m_arena->m_reserved_pages << m_arena->m_page_size_shift))
             return nullptr;
-        return mMemory;
+
+        if (size > (m_arena->m_committed_pages << m_arena->m_page_size_shift))
+        {
+            // Grow the committed region to the requested size.
+            m_arena->committed(size);
+        }
+
+        return m_arena->m_base;
     }
 
-    alloc_t* g_create_tlsf(void* mem, int_t mem_size)
+    alloc_t* g_create_heap(int_t initial_size, int_t reserved_size)
     {
-        ntlsf::context_t* context  = new (mem) ntlsf::context_t();
-        mem                        = nmem::ptr_align((u8*)mem + sizeof(ntlsf::context_t), 16);
-        alloc_tlsf_simple_t* alloc = new (mem) alloc_tlsf_simple_t(context);
-        alloc->mMemory             = nmem::ptr_align((u8*)mem + sizeof(alloc_tlsf_simple_t), 16);
-        alloc->mMemorySize         = mem_size - nmem::ptr_diff(mem, alloc->mMemory);
+        vmem_arena_t a;
+        a.reserved(reserved_size);
+        a.committed(initial_size);
+        vmem_arena_t* arena = (vmem_arena_t*)a.commit_and_zero(sizeof(vmem_arena_t));
+        *arena = a;
+
+        void*             mem1    = arena->commit(sizeof(nheap::context_t));
+        nheap::context_t* context = new (mem1) nheap::context_t();
+        void*              mem2  = arena->commit(sizeof(alloc_tlsf_vmem_t));
+        alloc_tlsf_vmem_t* alloc = new (mem2) alloc_tlsf_vmem_t(context, arena);
+
         return alloc;
+    }
+
+    void g_release_heap(alloc_t* allocator)
+    {
+        alloc_tlsf_vmem_t* alloc = (alloc_tlsf_vmem_t*)allocator;
+        if (alloc->m_arena)
+        {
+            alloc->m_arena->release();
+            alloc->m_arena = nullptr;
+        }
     }
 
 } // namespace ncore

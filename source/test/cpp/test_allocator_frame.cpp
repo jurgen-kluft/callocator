@@ -31,23 +31,22 @@ UNITTEST_SUITE_BEGIN(frame)
 
         UNITTEST_TEST(alloc3_free3)
         {
-            frame_alloc_t alloc;
+            frame_allocator_t alloc;
 
-            frame_alloc_t::frame_t frames[3];
-            frames[0].setup(frame_alloc_mem1, 1 * cMB);
-            frames[1].setup(frame_alloc_mem2, 1 * cMB);
-            frames[2].setup(frame_alloc_mem3, 1 * cMB);
+            alloc.setup(3, 1024 * 1024, 16 * cMB);
 
-            alloc.setup(frames, 3);
+            s32 frame_ids[3];
 
             for (s32 i = 0; i < 12; ++i)
             {
                 if (i >= 3)
                 {
-                    CHECK_TRUE(alloc.reset_frame((i - 3) % 3));
+                    const s32 frame_id = frame_ids[(i - 3) % 3];
+                    CHECK_TRUE(alloc.reset_frame(frame_id));
                 }
 
-                alloc.begin_frame(i % 3);
+                const s32 frame_id = alloc.new_frame();
+                frame_ids[i % 3] = frame_id;
 
                 void* mem1 = alloc.allocate(512, 8);
                 void* mem2 = alloc.allocate(1024, 16);

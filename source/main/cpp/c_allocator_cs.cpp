@@ -47,7 +47,7 @@ namespace ncore
 
     static object_t* s_create_object(alloc_t* allocator, u32 max_instances, u32 max_component_types, u32 max_tags)
     {
-        object_t* object = allocator->construct<object_t>();
+        object_t* object = g_construct<object_t>(allocator);
 
         object->m_allocator                  = allocator;
         object->m_num_instances              = 0;

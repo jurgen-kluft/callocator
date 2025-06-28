@@ -1,5 +1,5 @@
-#ifndef __C_TLSF_ALLOCATOR_H__
-#define __C_TLSF_ALLOCATOR_H__
+#ifndef __C_HEAP_ALLOCATOR_H__
+#define __C_HEAP_ALLOCATOR_H__
 #include "ccore/c_target.h"
 #ifdef USE_PRAGMA_ONCE
 #    pragma once
@@ -9,9 +9,10 @@
 
 namespace ncore
 {
-    namespace ntlsf
+    struct vmem_arena_t;
+
+    namespace nheap
     {
-        struct block_t;
         struct context_t;
 
         class allocator_t : public alloc_t
@@ -27,17 +28,15 @@ namespace ncore
             virtual void* v_resize(u64 size) = 0;
 
             DCORE_CLASS_PLACEMENT_NEW_DELETE
+
             context_t* m_context;
         };
 
-    } // namespace ntlsf
+    } // namespace nheap
 
-    // Create a TLSF allocator that is backed by a single fixed memory block.
-    alloc_t* g_create_tlsf(void* mem, int_t mem_size);
-
-    // Note: It is very straightforward to implement a TLSF allocator that is backed by a
-    // virtual memory system. This would allow the allocator to grow and shrink as needed.
+    alloc_t* g_create_heap(int_t initial_size, int_t reserved_size);
+    void     g_release_heap(alloc_t* allocator);
 
 }; // namespace ncore
 
-#endif /// __C_TLSF_ALLOCATOR_H__
+#endif /// __C_HEAP_ALLOCATOR_H__

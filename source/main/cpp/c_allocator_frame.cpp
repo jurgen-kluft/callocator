@@ -2,119 +2,158 @@
 #include "ccore/c_allocator.h"
 #include "ccore/c_memory.h"
 #include "ccore/c_math.h"
+#include "ccore/c_vmem.h"
 
 #include "callocator/c_allocator_frame.h"
 
 namespace ncore
 {
-    void frame_alloc_t::frame_t::setup(u8* buffer, u32 size)
+    // Frame allocator (frame scope allocator)
+    //
+    // We have two memory arenas, the first one is used until we reach the maximum number of active frames.
+    // Now we are switching to the second arena, which is used for creating new frames, when we here reach
+    // the maximum number of active frames, the first arena 'should' be unoccupied, so we can reuse it.
+    // An ASSERT will be triggered if we try to allocate a new frame when the first arena is still occupied.
+
+    frame_allocator_t::frame_allocator_t() : m_active_lane(0), m_max_active_frames(0), m_current_frame(nullptr)
     {
-        m_buffer_begin      = buffer;
-        m_buffer_cursor     = buffer;
-        m_buffer_end        = buffer + size;
-        m_num_allocations   = 0;
-        m_num_deallocations = 0;
-    }
-
-    frame_alloc_t::frame_alloc_t() : m_current_frame(0), m_capacity(0), m_frame_array(nullptr) {}
-    frame_alloc_t::~frame_alloc_t() {}
-
-    void frame_alloc_t::reset()
-    {
-        m_current_frame = 0;
-        m_active_size   = 0;
-
-        m_active_mark[0] = 0;
-        m_active_mark[1] = 0;
-        m_active_mark[2] = 0;
-        m_active_mark[3] = 0;
-
-        for (u8 i = 0; i < m_capacity; ++i)
+        for (s32 i = 0; i < 2; i++)
         {
-            frame_t& cf            = m_frame_array[i];
-            cf.m_buffer_cursor     = cf.m_buffer_begin;
-            cf.m_num_allocations   = 0;
-            cf.m_num_deallocations = 0;
+            m_active_frames[i] = 0;
+            m_ended_frames[i]  = 0;
+            m_arena[i]         = nullptr;
         }
     }
 
-    void frame_alloc_t::setup(frame_t* frame_array, s16 num_frames)
+    frame_allocator_t::~frame_allocator_t()
     {
-        ASSERT(frame_array != nullptr && num_frames > 0 && num_frames <= 256);
-        m_frame_array = frame_array;
-        m_capacity    = num_frames;
+        m_arena[0]->release();
+        m_arena[1]->release();
+    }
+
+    void frame_allocator_t::reset()
+    {
+        for (s32 i = 0; i < 2; i++)
+        {
+            m_active_frames[i] = 0;
+            m_ended_frames[i]  = 0;
+            m_arena[i]->reset();
+            m_arena[i]->commit(sizeof(frame_t) * m_max_active_frames, alignof(frame_t));
+        }
+        m_active_lane = 0;
+        // m_max_active_frames = ?;
+        m_current_frame = nullptr;
+    }
+
+    void frame_allocator_t::setup(s32 max_active_frames, int_t average_frame_size, int_t max_reserved_size)
+    {
+        m_max_active_frames = max_active_frames;
+        for (s32 i = 0; i < 2; i++)
+        {
+            vmem_arena_t a;
+            a.reserved(max_reserved_size);
+            a.committed((sizeof(frame_t) * max_active_frames) + average_frame_size * max_active_frames);
+
+            vmem_arena_t* arena = (vmem_arena_t*)a.commit(sizeof(vmem_arena_t));
+            *arena = a;
+
+            m_arena[i] = arena;
+        }
         reset();
     }
 
-    void frame_alloc_t::begin_frame(s16 frame)
+    s32 frame_allocator_t::v_new_frame()
     {
-        if (m_active_size >= m_capacity)
-        {
-            ASSERT(false); // No more frames available, so we cannot allocate a new frame
-            m_current_frame = -1;
-            return;
-        }
+        if (m_current_frame != nullptr)
+            end_frame();
 
-        for (u8 i = 0; i < 8; ++i)
+        if (m_active_frames[m_active_lane] >= m_max_active_frames)
         {
-            s8 const slot = math::g_findFirstBit(~m_active_mark[i]);
-            if (slot >= 0 && slot < 8)
+            // We have reached the maximum number of active frames, switch lanes.
+            // Before we switch we need to ensure that the first arena is not occupied anymore.
+            ASSERT(m_active_lane == 0 || m_arena[0]->m_pos == 0);
+            m_active_lane = 1 - m_active_lane;
+
+            if (m_active_frames[m_active_lane] == m_ended_frames[m_active_lane])
             {
-                m_current_frame = (i << 3) + slot;
-                m_active_mark[i] |= ((u64)1 << slot);
-                m_active_size++;
-                break;
+                m_active_frames[m_active_lane] = 0;
+                m_ended_frames[m_active_lane]  = 0;
+                m_arena[m_active_lane]->reset(); // Reset the arena for the new lane
+            }
+            else
+            {
+                // We are trying to switch lanes, but the other lane is still occupied.
+                // This should not happen, as we are supposed to end all frames before switching lanes.
+                ASSERT(false);
             }
         }
+
+        frame_t* frame_array           = (frame_t*)m_arena[m_active_lane]->m_base;
+        frame_t* new_frame             = &frame_array[m_active_frames[m_active_lane]];
+        new_frame->m_frame_number      = m_active_frames[m_active_lane];
+        new_frame->m_num_allocations   = 0;
+        new_frame->m_num_deallocations = 0;
+        new_frame->m_ended             = 0;
+
+        m_current_frame = new_frame;
+        m_active_frames[m_active_lane]++;
+
+        return new_frame->m_frame_number | (m_active_lane << 24); // Return frame number with lane information
     }
 
-    bool frame_alloc_t::end_frame()
+    bool frame_allocator_t::v_end_frame()
     {
-        ASSERT(m_current_frame >= 0 && m_current_frame < m_capacity);
-        bool const valid = m_frame_array[m_current_frame].m_num_allocations == m_frame_array[m_current_frame].m_num_deallocations;
-        m_current_frame  = -1;
-        return valid;
+        ASSERT(m_current_frame != nullptr && m_current_frame->m_ended == 0);
+        m_current_frame->m_ended = 1;
+        m_ended_frames[m_active_lane]++;
+        m_current_frame = nullptr;
+        return true;
     }
 
-    bool frame_alloc_t::reset_frame(s16 frame)
+    bool frame_allocator_t::v_reset_frame(s32 frame_number)
     {
-        ASSERT(frame < m_capacity);
+        const s32 lane = frame_number >> 24;      // Extract lane from frame number
+        frame_number   = frame_number & 0xffffff; // Extract frame number
+        ASSERT(lane >= 0 && lane < 2);
+        ASSERT(frame_number >= 0 && frame_number < m_max_active_frames);
 
-        m_active_mark[frame >> 3] &= ~(1 << (frame & 7));
-        m_active_size--;
+        frame_t* frame_array = (frame_t*)m_arena[lane]->m_base;
+        frame_t* frame       = &frame_array[frame_number];
 
-        bool const valid = m_frame_array[frame].m_num_allocations == m_frame_array[frame].m_num_deallocations;
+        if (frame->m_frame_number != frame_number)
+        {
+            ASSERT(false);
+            return false;
+        }
 
-        m_frame_array[frame].m_buffer_cursor     = m_frame_array[frame].m_buffer_begin;
-        m_frame_array[frame].m_num_allocations   = 0;
-        m_frame_array[frame].m_num_deallocations = 0;
+        frame->m_frame_number      = -1;
+        frame->m_num_allocations   = 0;
+        frame->m_num_deallocations = 0;
+        frame->m_ended             = 0;
 
-        return valid;
+        return true;
     }
 
-    void* frame_alloc_t::v_allocate(u32 size, u32 alignment)
+    void* frame_allocator_t::v_allocate(u32 size, u32 alignment)
     {
-        ASSERT(m_current_frame >= 0 && m_current_frame < m_capacity);
-        frame_t& cf = m_frame_array[m_current_frame];
+        ASSERT(m_current_frame != nullptr);
 
-        u8* p = ncore::g_ptr_align(cf.m_buffer_cursor, alignment);
-        if ((p + size) > cf.m_buffer_end)
-            return nullptr;
+        byte* p = (byte*)m_arena[m_active_lane]->commit(size, alignment);
+
 #ifdef TARGET_DEBUG
         nmem::memset(p, 0xcd, size);
 #endif
-        cf.m_buffer_cursor = p + size;
-        cf.m_num_allocations++;
+
+        m_current_frame->m_num_allocations++;
+
         return p;
     }
 
-    void frame_alloc_t::v_deallocate(void* ptr)
+    void frame_allocator_t::v_deallocate(void* ptr)
     {
-        ASSERT(m_current_frame >= 0 && m_current_frame < m_capacity);
-        frame_t& cf = m_frame_array[m_current_frame];
-
-        ASSERT(cf.m_num_allocations > cf.m_num_deallocations);
-        cf.m_num_deallocations++;
+        ASSERT(m_current_frame != nullptr);
+        ASSERT(m_current_frame->m_num_allocations > m_current_frame->m_num_deallocations);
+        m_current_frame->m_num_deallocations++;
     }
 
 }; // namespace ncore

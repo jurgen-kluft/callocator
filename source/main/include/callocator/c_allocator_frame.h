@@ -9,6 +9,19 @@
 
 namespace ncore
 {
+    class frame_alloc_t : public alloc_t
+    {
+    public:
+        inline s32  new_frame() { return v_new_frame(); }
+        inline bool end_frame() { return v_end_frame(); }
+        inline bool reset_frame(s32 frame_id) { return v_reset_frame(frame_id); }
+
+    protected:
+        virtual s32  v_new_frame()               = 0; // ends the previous frame and starts a new one, returns new frame id
+        virtual bool v_end_frame()               = 0; // true if 'number of allocations' == 'number of deallocations'
+        virtual bool v_reset_frame(s32 frame_id) = 0; // if a frame is obsolete, reset it so that it can be reused
+    };
+
     // Frame allocator (frame scope allocator)
     // The frame allocator is a specialized allocator. You can use it when you are requesting specific
     // allocations that only have to live for N frames, like a single frame of a game, or when passing
@@ -17,45 +30,42 @@ namespace ncore
     // This allocator is very very fast in allocating O(1) and deallocating O(1).
     // NOTE: We could make virtual memory version of this allocator, so that each frame does not have
     //       to know beforehand how much memory would need to be reserved.
-    class frame_alloc_t : public alloc_t
+    class frame_allocator_t : public frame_alloc_t
     {
     public:
-        frame_alloc_t();
-        virtual ~frame_alloc_t();
+        frame_allocator_t();
+        virtual ~frame_allocator_t();
 
         struct frame_t
         {
-            u8* m_buffer_begin;
-            u8* m_buffer_cursor;
-            u8* m_buffer_end;
+            s32 m_frame_number;
             s32 m_num_allocations;
             s32 m_num_deallocations;
-
-            void setup(u8* buffer, u32 size);
+            s32 m_ended;
         };
 
-        // Note: maximum 256 frames
-        void setup(frame_t* frame_array, s16 num_frames);
+        void setup(s32 max_active_frames, int_t average_frame_size, int_t max_reserved_size);
         void reset();
-
-        void begin_frame(s16 frame);
-        bool end_frame(); // true if 'number of allocations' == 'number of deallocations'
-        bool reset_frame(s16 frame);
 
         DCORE_CLASS_PLACEMENT_NEW_DELETE
 
-        s16      m_capacity;
-        s16      m_current_frame; // Current frame index
-        s16      m_active_size;
-        u32      m_active_mark[8];
-        frame_t* m_frame_array;
+        s32           m_active_frames[2];  // keeping track of the number of active frames in each lane
+        s32           m_ended_frames[2];   // keeping track of the number of ended frames in each lane
+        s32           m_active_lane;       // Current lane, either 0 or 1, used for switching between two arenas
+        s32           m_max_active_frames; // Maximum number of active frames, used for switching between two arenas
+        frame_t*      m_current_frame;     // Current frame, used for allocating memory
+        vmem_arena_t* m_arena[2];          // Virtual memory arenas
 
     private:
-        virtual void* v_allocate(u32 size, u32 alignment);
-        virtual void  v_deallocate(void* ptr);
+        virtual void* v_allocate(u32 size, u32 alignment) final;
+        virtual void  v_deallocate(void* ptr) final;
 
-        frame_alloc_t(const frame_alloc_t&);
-        frame_alloc_t& operator=(const frame_alloc_t&);
+        virtual s32  v_new_frame() final;
+        virtual bool v_end_frame() final;
+        virtual bool v_reset_frame(s32 frame_id) final;
+
+        frame_allocator_t(const frame_allocator_t&)            = delete; // Disable copy constructor
+        frame_allocator_t& operator=(const frame_allocator_t&) = delete; // Disable assignment operator
     };
 
 }; // namespace ncore

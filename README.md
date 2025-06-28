@@ -17,7 +17,7 @@ This package contains:
   * Note: Implementation from [here](https://github.com/sebbbi/OffsetAllocator)
 * Stack allocator, stack based allocator for fast allocation and deallocation
 * String allocator, allocator for managing string memory
-* TLSF allocator, Two-Level Segregate Fit
+* Heap allocator, A heap allocator implemented using `Two-Level Segregate Fit`
   * Note: Implementation from [here](https://github.com/jserv/tlsf-bsd)
   * Note: fixed 32 bit index, instead of allowing a 16 bit index
   * Note: reduced memory footprint (24 vs 32 bytes per node) compared to original [implementation](https://github.com/sebbbi/OffsetAllocator/tree/main)
@@ -56,7 +56,7 @@ This allocator is a stack-based allocator that can only be used through the use 
 
 This allocator is designed to be used for storing unique, ASCII or UTF-8, strings. It is useful for allocating memory for strings that are needed for a short or long period of time and can be deallocated all at once. This can be useful for things like parsing strings, formatting strings, or other tasks where you need to allocate memory for strings and then free it all at once.
 
-## TLSF Allocator
+## Heap Allocator
 
 This is an implementation of the TLSF allocator, Two-Level Segregate Fit, which is a memory allocator that is designed to be fast and efficient for real-time systems. It is a general-purpose memory allocator that can be used in embedded systems, game development, and other applications where performance is critical.
 

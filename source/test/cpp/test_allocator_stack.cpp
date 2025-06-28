@@ -1,4 +1,6 @@
 #include "ccore/c_allocator.h"
+#include "ccore/c_vmem.h"
+
 #include "callocator/c_allocator_stack.h"
 
 #include "cunittest/cunittest.h"
@@ -11,25 +13,31 @@ UNITTEST_SUITE_BEGIN(stack)
     {
         UNITTEST_ALLOCATOR;
 
-        void*          stack_alloc_mem = nullptr;
-        stack_alloc_t* stack_alloc;
+        vmem_arena_t*      arena       = nullptr;
+        stack_allocator_t* stack_alloc = nullptr;
 
         UNITTEST_FIXTURE_SETUP()
         {
-            stack_alloc_mem = Allocator->allocate(1 * cMB);
-            stack_alloc     = Allocator->construct<stack_alloc_t>();
-            stack_alloc->setup(stack_alloc_mem, 1 * cMB);
+            vmem_arena_t a;
+            a.reserved(1 * cMB);
+            a.committed(64 * cKB);
+            arena = (vmem_arena_t*)a.commit(sizeof(vmem_arena_t));
+
+            stack_alloc     = g_construct<stack_allocator_t>(Allocator);
+            stack_alloc->setup(arena);
         }
 
         UNITTEST_FIXTURE_TEARDOWN()
         {
-            Allocator->deallocate(stack_alloc_mem);
             Allocator->deallocate(stack_alloc);
+            stack_alloc = nullptr;
+            arena->release();
+            arena = nullptr;
         }
 
         UNITTEST_TEST(allocN_freeN)
         {
-            CHECK_TRUE(stack_alloc->is_empty());
+            CHECK_TRUE(stack_alloc->m_allocation_count == 0);
 
             for (s32 i = 0; i < 12; ++i)
             {
@@ -89,12 +97,13 @@ UNITTEST_SUITE_BEGIN(stack)
                 mema = nullptr;
             }
 
-            CHECK_TRUE(stack_alloc->is_empty());
+            CHECK_TRUE(stack_alloc->m_allocation_count == 0);
         }
 
         UNITTEST_TEST(construct_destruct)
         {
-            CHECK_TRUE(stack_alloc->is_empty());
+            CHECK_TRUE(stack_alloc->m_allocation_count == 0);
+
             for (s32 i = 0; i < 12; ++i)
             {
                 stack_alloc_scope_t scope(stack_alloc);
@@ -108,15 +117,16 @@ UNITTEST_SUITE_BEGIN(stack)
                     s32 d;
                 };
 
-                test_t* test = scope.construct<test_t>();
+                test_t* test = g_construct<test_t>(&scope);
                 CHECK_NOT_NULL(test);
                 test->a = 1;
                 test->b = 2;
                 test->c = 3;
                 test->d = 4;
-                scope.destruct(test);
+                g_destruct(&scope, test);
             }
-            CHECK_TRUE(stack_alloc->is_empty());
+
+            CHECK_TRUE(stack_alloc->m_allocation_count == 0);
         }
     }
 }

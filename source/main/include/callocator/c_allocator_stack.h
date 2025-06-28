@@ -9,7 +9,19 @@
 
 namespace ncore
 {
+    struct vmem_arena_t;
     class stack_alloc_scope_t;
+
+    class stack_alloc_t : public alloc_t
+    {
+    public:
+        inline void  restore_point(void* point) { v_restore_point(point); }
+        inline void* save_point() { return v_save_point(); }
+
+    protected:
+        virtual void  v_restore_point(void* point) = 0;
+        virtual void* v_save_point()               = 0;
+    };
 
     // Stack allocator
     //
@@ -17,58 +29,44 @@ namespace ncore
     // objects that are only used in a limited scope, for example, in a function. Furthermore, it is
     // not thread safe, so there should be one instance of the stack allocator per thread.
     //
-    class stack_alloc_t : protected alloc_t
+    class stack_allocator_t : protected stack_alloc_t
     {
     public:
-        stack_alloc_t();
-        virtual ~stack_alloc_t() {}
+        stack_allocator_t();
+        virtual ~stack_allocator_t() {}
 
-        void          setup(void* beginAddress, u32 size);
-        D_INLINE bool is_valid() const { return m_buffer_begin != nullptr; }
+        void          setup(vmem_arena_t* arena);
+        D_INLINE bool is_valid() const { return m_arena != nullptr; }
         D_INLINE bool is_empty() const { return m_allocation_count == 0; }
         void          reset();
 
         DCORE_CLASS_PLACEMENT_NEW_DELETE
 
-        u8*   m_buffer_begin;
-        u8*   m_buffer_cursor;
-        u8*   m_buffer_end;
-        int_t m_allocation_count;
+        vmem_arena_t* m_arena;
+        int_t         m_allocation_count;
 
     protected:
-        virtual void* v_allocate(u32 size, u32 alignment);
-        virtual void  v_deallocate(void* ptr);
-        virtual void  v_restore_cursor(u8* cursor, int_t allocation_count);
+        virtual void* v_allocate(u32 size, u32 alignment) final;
+        virtual void  v_deallocate(void* ptr) final;
+        virtual void  v_restore_point(void* point) final;
+        virtual void* v_save_point() final;
 
         friend class stack_alloc_scope_t;
     };
 
-    class stack_alloc_scope_t
+    class stack_alloc_scope_t : public alloc_t
     {
         stack_alloc_t* m_allocator;
-        u8*            m_buffer_cursor;
-        int_t          m_allocation_count;
+        void*          m_point;
 
     public:
-        stack_alloc_scope_t(stack_alloc_t* allocator) : m_allocator(allocator), m_buffer_cursor(allocator->m_buffer_cursor), m_allocation_count(allocator->m_allocation_count) {}
-        ~stack_alloc_scope_t() { m_allocator->v_restore_cursor(m_buffer_cursor, m_allocation_count); }
+        stack_alloc_scope_t();
+        stack_alloc_scope_t(stack_allocator_t* allocator) : m_allocator(allocator) { m_point = m_allocator->save_point(); }
+        ~stack_alloc_scope_t() { m_allocator->restore_point(m_point); }
 
-        D_INLINE void* allocate(u32 size, u32 alignment) { return m_allocator->v_allocate(size, alignment); }
-        D_INLINE void  deallocate(void* ptr) { m_allocator->v_deallocate(ptr); }
-        D_INLINE bool  is_empty() const { return m_allocator->m_allocation_count == 0; }
-
-        template <typename T, typename... Args> T* construct(Args... args)
-        {
-            void* mem    = allocate(sizeof(T), sizeof(void*));
-            T*    object = new (mem) T(args...);
-            return object;
-        }
-
-        template <typename T> void destruct(T* p)
-        {
-            p->~T();
-            deallocate(p);
-        }
+    protected:
+        virtual void* v_allocate(u32 size, u32 alignment) final { return m_allocator->allocate(size, alignment); }
+        virtual void  v_deallocate(void* ptr) final { m_allocator->deallocate(ptr); }
     };
 
 }; // namespace ncore
