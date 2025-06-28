@@ -9,30 +9,34 @@
 
 namespace ncore
 {
-    struct vmem_arena_t;
-
-    // Linear allocator
+    // Linear allocator (life cycle limited allocator)
     // The linear allocator is a specialized allocator. You can use it when you are allocating different size blocks that
-    // all have a life-time that are all part of one group which later can be deallocated all at once.
-    // This allocator is very fast in allocating O(1), deallocating does not do anything.
+    // all have a life-time that doesn't differ much, like one or more frames of a game, or when passing an allocator to
+    // a JSON parser that will allocate a lot of small blocks and then deallocate them all at once.
+    // This allocator is fast in allocations O(1) and deallocations O(1).
     class linear_alloc_t : public alloc_t
     {
     public:
-        inline linear_alloc_t(vmem_arena_t* arena) : m_arena(arena) {}
+        linear_alloc_t();
         virtual ~linear_alloc_t();
 
+        void setup(void* beginAddress, u32 size);
+
+        bool is_valid() const;
+        bool is_empty() const;
         void reset();
 
         DCORE_CLASS_PLACEMENT_NEW_DELETE
 
-        vmem_arena_t* m_arena;
+        struct node_t;
+        node_t* m_buffer_begin;
+        node_t* m_buffer_cursor;
+        node_t* m_buffer_end;
 
     private:
         virtual void* v_allocate(u32 size, u32 alignment) final;
         virtual void  v_deallocate(void* ptr) final;
     };
-
-    linear_alloc_t* g_create_linear_allocator();
 
 }; // namespace ncore
 
