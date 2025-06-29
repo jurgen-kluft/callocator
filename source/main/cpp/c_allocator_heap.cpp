@@ -1,5 +1,7 @@
 #include "ccore/c_target.h"
+#include "ccore/c_allocator.h"
 #include "ccore/c_debug.h"
+#include "ccore/c_math.h"
 #include "ccore/c_memory.h"
 #include "ccore/c_vmem.h"
 
@@ -15,49 +17,52 @@ namespace ncore
 {
     namespace nheap
     {
-        static inline u32 s_ffs(u32 x)
-        {
-#ifdef CC_COMPILER_MSVC
-            unsigned long r = 0;
-            _BitScanForward(&r, x);
-            return (u32)(r + 1);
-#else
-            return __builtin_ffs(x);
-#endif
-        }
-
         enum ELevelCounts
         {
-#if CC_PLATFORM_PTR_SIZE == 8
             TLSF_SL_COUNT = 16,
+#if CC_PLATFORM_PTR_SIZE == 8
             TLSF_FL_COUNT = 32,
             TLSF_FL_MAX   = 38,
 #else
-            TLSF_SL_COUNT = 16,
             TLSF_FL_COUNT = 25,
             TLSF_FL_MAX   = 30,
 #endif
         };
 
-        struct block_t
+        struct block_t // size in bytes = 8 + 8 + 8 + 8 = 32 bytes
         {
             // Valid only if the previous block is free and is actually
             // stored at the end of the previous block.
             block_t* prev;
-            u64      header; // Size and block bits
-
+            u64      header;    // Size and block bits
             block_t* next_free; // Next and previous free blocks.
             block_t* prev_free; // Only valid if the corresponding block is free.
         };
 
-        struct context_t
+        struct context_t // size in bytes = 4 + (4) + 128 + 4096 + 8 = 4240
         {
-            u32      fl;
-            u32      sl[TLSF_FL_COUNT];
-            block_t* block[TLSF_FL_COUNT][TLSF_SL_COUNT];
-            u64      size;
+            u32      fl;                                  // 4 bytes, first level index
+            u32      sl[TLSF_FL_COUNT];                   // 32 * 4 bytes = 128 bytes, second level indices
+            block_t* block[TLSF_FL_COUNT][TLSF_SL_COUNT]; // 32 * 16 * 8 bytes = 4096 bytes, pointers to free blocks
+            u64      size;                                // 8 bytes, total size of the managed memory region
+            DCORE_CLASS_PLACEMENT_NEW_DELETE
+        };
+
+        class allocator_t : public alloc_t
+        {
+        public:
+            allocator_t(context_t* context);
+            virtual ~allocator_t();
+
+            virtual void* v_allocate(u32 size, u32 alignment) final;
+            virtual void  v_deallocate(void* ptr) final;
+
+            virtual bool  v_check(const char*& error_description) const;
+            virtual void* v_resize(u64 size) = 0;
 
             DCORE_CLASS_PLACEMENT_NEW_DELETE
+
+            context_t* m_context;
         };
 
 #define TLSF_MAX_SIZE (((uint_t)1 << (TLSF_FL_MAX - 1)) - sizeof(uint_t))
@@ -75,7 +80,7 @@ namespace ncore
             {
                 t->sl[i] = 0;
                 for (u32 j = 0; j < TLSF_SL_COUNT; ++j)
-                    t->block[i][j] = NULL;
+                    t->block[i][j] = nullptr;
             }
         }
 
@@ -83,7 +88,7 @@ namespace ncore
 #    define CC_UNLIKELY(x) __builtin_expect(!!(x), false)
 #endif
 
-/* All allocation sizes and addresses are aligned. */
+// All allocation sizes and addresses are aligned.
 #if CC_PLATFORM_PTR_SIZE == 8
 #    define ALIGN_SHIFT 3
 #else
@@ -123,37 +128,8 @@ namespace ncore
         static_assert(FL_COUNT == TLSF_FL_COUNT, "invalid level configuration");
         static_assert(SL_COUNT == TLSF_SL_COUNT, "invalid level configuration");
 
-        D_INLINE u32 bitmap_ffs(u32 x)
-        {
-            u32 i = (u32)s_ffs((s32)x);
-            ASSERTS(i, "no set bit found");
-            return i - 1U;
-        }
-
-        D_INLINE u32 log2floor(uint_t x)
-        {
-            ASSERTS(x > 0, "log2 of zero");
-#ifdef TARGET_64BIT
-            // return (u32)(63 - (u32)__builtin_clzll((unsigned long long)x));
-#    ifdef CC_COMPILER_MSVC
-            unsigned long r = 0;
-            _BitScanReverse64(&r, x);
-            return (u32)r;
-#    else
-            return (u32)(63 - (u32)__builtin_clzll((unsigned long long)x));
-#    endif
-
-#else
-            // return (u32)(31 - (u32)__builtin_clzl((unsigned long)x));
-#    ifdef CC_COMPILER_MSVC
-            unsigned long r = 0;
-            _BitScanReverse(&r, x);
-            return (u32)r;
-#    else
-            return (u32)(31 - (u32)__builtin_clzl((unsigned long)x));
-#    endif
-#endif
-        }
+        static D_INLINE u32 bitmap_ffs(u32 x) { return (u32)math::g_findFirstBit(x); }
+        static D_INLINE s8  log2floor(uint_t x) { return math::g_ilog2(x); }
 
         D_INLINE uint_t block_size(const block_t* block) { return block->header & ~BLOCK_BITS; }
         D_INLINE void   block_set_size(block_t* block, uint_t size)
@@ -183,14 +159,14 @@ namespace ncore
 
         D_INLINE block_t* block_from_payload(void* ptr) { return to_block((char*)ptr - CC_OFFSETOF(block_t, header) - BLOCK_OVERHEAD); }
 
-        /* Return location of previous block. */
+        // Return location of previous block.
         D_INLINE block_t* block_prev(const block_t* block)
         {
             ASSERTS(block_is_prev_free(block), "previous block must be free");
             return block->prev;
         }
 
-        /* Return location of next existing block. */
+        // Return location of next existing block.
         D_INLINE block_t* block_next(block_t* block)
         {
             block_t* next = to_block(block_payload(block) + block_size(block) - BLOCK_OVERHEAD);
@@ -198,7 +174,7 @@ namespace ncore
             return next;
         }
 
-        /* Link a new block with its neighbor, return the neighbor. */
+        // Link a new block with its neighbor, return the neighbor.
         D_INLINE block_t* block_link_next(block_t* block)
         {
             block_t* next = block_next(block);
@@ -214,17 +190,17 @@ namespace ncore
             block_set_prev_free(block_link_next(block), free);
         }
 
-        /* Adjust allocation size to be aligned, and no smaller than internal minimum.
-         */
+        // Adjust allocation size to be aligned, and no smaller than internal minimum.
         D_INLINE uint_t adjust_size(uint_t size, uint_t align)
         {
             size = align_up(size, align);
             return size < BLOCK_SIZE_MIN ? BLOCK_SIZE_MIN : size;
         }
 
-        /* Round up to the next block size */
+        // Round up to the next block size
         D_INLINE uint_t round_block_size(uint_t size)
         {
+            ASSERTS(size >= (1 << SL_SHIFT), "size must be greater than (1<<SL_SHIFT)");
             uint_t t = ((uint_t)1 << (log2floor(size) - SL_SHIFT)) - 1;
             return size >= BLOCK_SIZE_SMALL ? (size + t) & ~t : size;
         }
@@ -233,7 +209,7 @@ namespace ncore
         {
             if (size < BLOCK_SIZE_SMALL)
             {
-                /* Store small blocks in first list. */
+                // Store small blocks in first list.
                 *fl = 0;
                 *sl = (u32)size / (BLOCK_SIZE_SMALL / SL_COUNT);
             }
@@ -256,10 +232,10 @@ namespace ncore
             u32 sl_map = t->sl[*fl] & (~0U << *sl);
             if (!sl_map)
             {
-                /* No block exists. Search in the next largest first-level list. */
+                // No block exists. Search in the next largest first-level list.
                 u32 fl_map = t->fl & (u32)(~(u64)0 << (*fl + 1));
 
-                /* No free blocks available, memory has been exhausted. */
+                // No free blocks available, memory has been exhausted.
                 if (CC_UNLIKELY(!fl_map))
                     return NULL;
 
@@ -276,7 +252,7 @@ namespace ncore
             return t->block[*fl][*sl];
         }
 
-        /* Remove a free block from the free list. */
+        // Remove a free block from the free list.
         D_INLINE void remove_free_block(context_t* t, block_t* block, u32 fl, u32 sl)
         {
             ASSERTS(fl < FL_COUNT, "wrong first level");
@@ -289,24 +265,24 @@ namespace ncore
             if (prev)
                 prev->next_free = next;
 
-            /* If this block is the head of the free list, set new head. */
+            // If this block is the head of the free list, set new head.
             if (t->block[fl][sl] == block)
             {
                 t->block[fl][sl] = next;
 
-                /* If the new head is null, clear the bitmap. */
+                // If the new head is null, clear the bitmap.
                 if (!next)
                 {
                     t->sl[fl] &= ~(1U << sl);
 
-                    /* If the second bitmap is now empty, clear the fl bitmap. */
+                    // If the second bitmap is now empty, clear the fl bitmap.
                     if (!t->sl[fl])
                         t->fl &= ~(1U << fl);
                 }
             }
         }
 
-        /* Insert a free block into the free block list and mark the bitmaps. */
+        // Insert a free block into the free block list and mark the bitmaps.
         D_INLINE void insert_free_block(context_t* t, block_t* block, u32 fl, u32 sl)
         {
             block_t* current = t->block[fl][sl];
@@ -320,7 +296,7 @@ namespace ncore
             t->sl[fl] |= 1U << sl;
         }
 
-        /* Remove a given block from the free list. */
+        // Remove a given block from the free list.
         D_INLINE void block_remove(context_t* t, block_t* block)
         {
             u32 fl, sl;
@@ -328,7 +304,7 @@ namespace ncore
             remove_free_block(t, block, fl, sl);
         }
 
-        /* Insert a given block into the free list. */
+        // Insert a given block into the free list.
         D_INLINE void block_insert(context_t* t, block_t* block)
         {
             u32 fl, sl;
@@ -336,7 +312,7 @@ namespace ncore
             insert_free_block(t, block, fl, sl);
         }
 
-        /* Split a block into two, the second of which is free. */
+        // Split a block into two, the second of which is free.
         D_INLINE block_t* block_split(block_t* block, uint_t size)
         {
             block_t* rest      = to_block(block_payload(block) + size - BLOCK_OVERHEAD);
@@ -350,7 +326,7 @@ namespace ncore
             return rest;
         }
 
-        /* Absorb a free block's storage into an adjacent previous free block. */
+        // Absorb a free block's storage into an adjacent previous free block.
         D_INLINE block_t* block_absorb(block_t* prev, block_t* block)
         {
             ASSERTS(block_size(prev), "previous block can't be last");
@@ -360,7 +336,7 @@ namespace ncore
             return prev;
         }
 
-        /* Merge a just-freed block with an adjacent previous free block. */
+        // Merge a just-freed block with an adjacent previous free block.
         D_INLINE block_t* block_merge_prev(context_t* t, block_t* block)
         {
             if (block_is_prev_free(block))
@@ -374,7 +350,7 @@ namespace ncore
             return block;
         }
 
-        /* Merge a just-freed block with an adjacent free block. */
+        // Merge a just-freed block with an adjacent free block.
         D_INLINE block_t* block_merge_next(context_t* t, block_t* block)
         {
             block_t* next = block_next(block);
@@ -388,7 +364,7 @@ namespace ncore
             return block;
         }
 
-        /* Trim any trailing block space off the end of a block, return to pool. */
+        // Trim any trailing block space off the end of a block, return to pool.
         D_INLINE void block_rtrim_free(context_t* t, block_t* block, uint_t size)
         {
             ASSERTS(block_is_free(block), "block must be free");
@@ -400,7 +376,7 @@ namespace ncore
             block_insert(t, rest);
         }
 
-        /* Trim any trailing block space off the end of a used block, return to pool. */
+        // Trim any trailing block space off the end of a used block, return to pool.
         D_INLINE void block_rtrim_used(context_t* t, block_t* block, uint_t size)
         {
             ASSERTS(!block_is_free(block), "block must be used");
@@ -507,7 +483,7 @@ namespace ncore
         {
             uint_t adjust = adjust_size(size, ALIGN_SIZE);
 
-            if (CC_UNLIKELY(!size || ((align | size) & (align - 1)) /* align!=2**x, size!=n*align */ || adjust > TLSF_MAX_SIZE - align - sizeof(block_t) /* size is too large */))
+            if (CC_UNLIKELY(!size || ((align | size) & (align - 1)) /* align!=2**x, size!=n*align */ || adjust > TLSF_MAX_SIZE - align - sizeof(block_t)))
                 return NULL;
 
             if (align <= ALIGN_SIZE)
@@ -543,14 +519,14 @@ namespace ncore
 
         void* g_realloc(allocator_t* allocator, context_t* t, void* mem, uint_t size)
         {
-            /* Zero-size requests are treated as free. */
+            // Zero-size requests are treated as free.
             if (CC_UNLIKELY(mem && !size))
             {
                 g_free(allocator, t, mem);
                 return NULL;
             }
 
-            /* Null-pointer requests are treated as malloc. */
+            // Null-pointer requests are treated as malloc.
             if (CC_UNLIKELY(!mem))
                 return g_malloc(allocator, t, size);
 
@@ -562,10 +538,10 @@ namespace ncore
 
             ASSERTS(!block_is_free(block), "block already marked as free");
 
-            /* Do we need to expand to the next block? */
+            // Do we need to expand to the next block?
             if (size > avail)
             {
-                /* If the next block is used or too small, we must relocate and copy. */
+                // If the next block is used or too small, we must relocate and copy.
                 block_t* next = block_next(block);
                 if (!block_is_free(next) || size > avail + block_size(next) + BLOCK_OVERHEAD)
                 {
@@ -582,7 +558,7 @@ namespace ncore
                 block_set_prev_free(block_next(block), false);
             }
 
-            /* Trim the resulting block and return the original pointer. */
+            // Trim the resulting block and return the original pointer.
             block_rtrim_used(t, block, size);
             return mem;
         }
@@ -597,7 +573,7 @@ namespace ncore
                     uint_t   fl_map = t->fl & (1U << i), sl_list = t->sl[i], sl_map = sl_list & (1U << j);
                     block_t* block = t->block[i][j];
 
-                    /* Check that first- and second-level lists agree. */
+                    // Check that first- and second-level lists agree.
                     if (!fl_map)
                     {
                         if (!sl_map)
@@ -611,7 +587,7 @@ namespace ncore
                         continue;
                     }
 
-                    /* Check that there is at least one free block. */
+                    // Check that there is at least one free block.
                     if (sl_list)
                         return "no free blocks in second-level map";
 
@@ -639,16 +615,12 @@ namespace ncore
         }
 #endif
 
-        // ----------------------------------------------------------------------------
-        // allocator_t
-        // ----------------------------------------------------------------------------
-
         allocator_t::allocator_t(context_t* ctx) : m_context(ctx) { g_setup(ctx); }
         allocator_t::~allocator_t() {}
 
         void* allocator_t::v_allocate(u32 size, u32 alignment)
         {
-            if (alignment < 16)
+            if (alignment <= ALIGN_SIZE)
                 return g_malloc(this, m_context, size);
             return g_aalloc(this, m_context, alignment, size);
         }
@@ -674,6 +646,7 @@ namespace ncore
     class alloc_tlsf_vmem_t : public nheap::allocator_t
     {
     public:
+        int_t         m_base_size;
         vmem_arena_t* m_arena;
 
         alloc_tlsf_vmem_t(nheap::context_t* context, vmem_arena_t* arena);
@@ -689,6 +662,8 @@ namespace ncore
 
     void* alloc_tlsf_vmem_t::v_resize(u64 size)
     {
+        size += m_base_size;
+
         if (size > (m_arena->m_reserved_pages << m_arena->m_page_size_shift))
             return nullptr;
 
@@ -704,15 +679,17 @@ namespace ncore
     alloc_t* g_create_heap(int_t initial_size, int_t reserved_size)
     {
         vmem_arena_t a;
-        a.reserved(reserved_size);
-        a.committed(initial_size);
+        a.reserved(reserved_size + 4096 + 512);
+        a.committed(initial_size + 4096 + 512);
         vmem_arena_t* arena = (vmem_arena_t*)a.commit_and_zero(sizeof(vmem_arena_t));
-        *arena = a;
+        *arena              = a;
 
-        void*             mem1    = arena->commit(sizeof(nheap::context_t));
-        nheap::context_t* context = new (mem1) nheap::context_t();
-        void*              mem2  = arena->commit(sizeof(alloc_tlsf_vmem_t));
-        alloc_tlsf_vmem_t* alloc = new (mem2) alloc_tlsf_vmem_t(context, arena);
+        void*              mem1    = arena->commit(sizeof(nheap::context_t));
+        nheap::context_t*  context = new (mem1) nheap::context_t();
+        void*              mem2    = arena->commit(sizeof(alloc_tlsf_vmem_t));
+        alloc_tlsf_vmem_t* alloc   = new (mem2) alloc_tlsf_vmem_t(context, arena);
+
+        alloc->m_base_size = arena->save();
 
         return alloc;
     }

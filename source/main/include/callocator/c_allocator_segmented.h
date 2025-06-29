@@ -16,7 +16,7 @@ namespace ncore
         {
             static const T c_null = ~0;
             typedef T      node_t;
- 
+
             u8*     m_node_size;           // Size is '1 << (m_node_size[size_index] & 0x7F)', if the MSB is set the node is allocated
             node_t* m_node_next;           // Next node in the size list
             node_t* m_node_prev;           // Previous node in the size list
@@ -29,7 +29,7 @@ namespace ncore
             void teardown(alloc_t* allocator);
 
             bool allocate(u32 size, node_t& out_node); // Returns false if the size is not available
-            bool deallocate(node_t node);                 // Deallocates the node
+            bool deallocate(node_t node);              // Deallocates the node
 
             bool split(node_t node); // Splits the node into two nodes
 
@@ -53,7 +53,7 @@ namespace ncore
             if (m_max_span_2log < m_node_count_2log)
             {
 
-                u8 const span         = m_max_span_2log;
+                u8 const span = m_max_span_2log;
                 // Split the full range until we reach the maximum span
                 for (u32 n = 0; n < node_count; n += (1 << span))
                 {
@@ -78,7 +78,7 @@ namespace ncore
 
         template <typename T> bool allocator_t<T>::split(node_t node)
         {
-            const u8     span = m_node_size[node];
+            const u8 span = m_node_size[node];
             remove_size(span, node);
 
             // Split the node into two nodes
@@ -171,8 +171,8 @@ namespace ncore
 
             m_node_size[node] &= ~0x80; // Mark the node as free
 
-            u8     span  = m_node_size[node];
-            u8     index = span;
+            u8 span  = m_node_size[node];
+            u8 index = span;
 
             // Keep span smaller or equal to the largest span allowed
             while (span < m_max_span_2log)

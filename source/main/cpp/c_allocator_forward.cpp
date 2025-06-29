@@ -1,13 +1,16 @@
 #include "ccore/c_target.h"
 #include "ccore/c_memory.h"
 
-#include "callocator/c_allocator_linear.h"
+#include "callocator/c_allocator_forward.h"
 
 namespace ncore
 {
-    typedef linear_alloc_t::node_t lnode_t;
+    typedef forward_alloc_t::node_t lnode_t;
 
-    struct linear_alloc_t::node_t
+    // A forward allocator node is 8 bytes, and is part of a linked list (chain) of nodes.
+    // Each node represents an allocation, and when deallocating it will try to merge with
+    // the previous and next nodes in the chain.
+    struct forward_alloc_t::node_t
     {
         inline lnode_t* get_next() { return (m_next == 0) ? nullptr : this + m_next; }
         inline void     set_next(lnode_t* next) { m_next = (next == nullptr) ? 0 : ((u32)(next - this)); }
@@ -106,10 +109,10 @@ namespace ncore
         return cursor == end;
     }
 
-    linear_alloc_t::linear_alloc_t() : m_buffer_begin(nullptr), m_buffer_cursor(nullptr), m_buffer_end(nullptr) {}
-    linear_alloc_t::~linear_alloc_t() {}
+    forward_alloc_t::forward_alloc_t() : m_buffer_begin(nullptr), m_buffer_cursor(nullptr), m_buffer_end(nullptr) {}
+    forward_alloc_t::~forward_alloc_t() {}
 
-    void linear_alloc_t::setup(void* _beginAddress, u32 _size)
+    void forward_alloc_t::setup(void* _beginAddress, u32 _size)
     {
         // Align to 8 bytes
         void* const beginAddress = nmem::ptr_align(_beginAddress, (u32)sizeof(node_t));
@@ -130,14 +133,14 @@ namespace ncore
         ASSERT(s_validate_chain(m_buffer_begin, m_buffer_end));
     }
 
-    bool linear_alloc_t::is_valid() const { return m_buffer_begin != nullptr && m_buffer_cursor < m_buffer_cursor->get_next(); }
-    bool linear_alloc_t::is_empty() const
+    bool forward_alloc_t::is_valid() const { return m_buffer_begin != nullptr && m_buffer_cursor < m_buffer_cursor->get_next(); }
+    bool forward_alloc_t::is_empty() const
     {
         return m_buffer_cursor == m_buffer_begin + 1 && m_buffer_cursor->get_next() == m_buffer_end && m_buffer_cursor->get_prev() == m_buffer_begin && m_buffer_begin->get_next() == m_buffer_cursor && m_buffer_end->get_prev() == m_buffer_cursor;
     }
-    void linear_alloc_t::reset() { m_buffer_cursor = s_reset_cursor(m_buffer_begin, m_buffer_end); }
+    void forward_alloc_t::reset() { m_buffer_cursor = s_reset_cursor(m_buffer_begin, m_buffer_end); }
 
-    void* linear_alloc_t::v_allocate(u32 size, u32 alignment)
+    void* forward_alloc_t::v_allocate(u32 size, u32 alignment)
     {
         if (m_buffer_cursor == m_buffer_end)
             return nullptr;
@@ -190,7 +193,7 @@ namespace ncore
         return ptr;
     }
 
-    void linear_alloc_t::v_deallocate(void* ptr)
+    void forward_alloc_t::v_deallocate(void* ptr)
     {
         if (ptr == nullptr)
             return;
