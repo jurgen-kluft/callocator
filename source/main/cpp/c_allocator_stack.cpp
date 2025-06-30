@@ -9,13 +9,35 @@
 
 namespace ncore
 {
-    stack_allocator_t::stack_allocator_t() : m_arena(nullptr), m_allocation_count(0) {}
-
-    void stack_allocator_t::setup(vmem_arena_t* arena)
+    // Stack allocator
+    //
+    // The stack allocator is a specialized allocator. You can use it when you are allocating temporary
+    // objects that are only used in a limited scope, for example, in a function. Furthermore, it is
+    // not thread safe, so there should be one instance of the stack allocator per thread.
+    //
+    class stack_allocator_t : protected stack_alloc_t
     {
-        m_arena            = arena;
-        m_allocation_count = 0;
-    }
+    public:
+        stack_allocator_t(vmem_arena_t* arena);
+        virtual ~stack_allocator_t() {}
+
+        void          reset();
+
+        DCORE_CLASS_PLACEMENT_NEW_DELETE
+
+        vmem_arena_t* m_arena;
+        int_t         m_allocation_count;
+
+    protected:
+        virtual void* v_allocate(u32 size, u32 alignment) final;
+        virtual void  v_deallocate(void* ptr) final;
+        virtual void  v_restore_point(void* point) final;
+        virtual void* v_save_point() final;
+
+        friend class stack_alloc_scope_t;
+    };
+
+    stack_allocator_t::stack_allocator_t(vmem_arena_t* arena) : m_arena(arena), m_allocation_count(0) {}
 
     void stack_allocator_t::reset()
     {
@@ -54,6 +76,16 @@ namespace ncore
     {
         context_t context = g_current_context();
         m_allocator       = context.stack_alloc();
+    }
+
+    stack_allocator_t* g_create_stack_allocator(int_t initial_size, int_t reserved_size)
+    {
+
+    }
+
+    void g_destroy_stack_allocator(stack_allocator_t* allocator)
+    {
+
     }
 
 }; // namespace ncore

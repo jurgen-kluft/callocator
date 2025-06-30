@@ -11,27 +11,57 @@ namespace ncore
 {
     namespace nsegmented
     {
-        // Note: What about a binmap per size ?
+        // Note: What about a bitset per size ?
         // Example: range 256 GB, smallest is 64 MB
         //          38 bits.    , 26 bits
         // Difference is 12 bits, so we can have max 4096 segments of 64 MB.
         // So also 12 different sizes.
-        // Smallest size is 4096 | 128 | 4, bits = u32[128] + u32[4] + u32 = 532 bytes
-        //                  2048 | 64  | 3, bits = u32[64] + u32[2] + u32 = 268 bytes
-        //                  1024 | 32  | 2, bits = u32[32] + u32 = 132 bytes
-        //                   512 | 16  | 1, bits = u32[16] + u32 = 68 bytes
-        //                   256 | 8   | 0, bits = u32[8] + u32 = 36 bytes
-        //                   128 | 4   | 0, bits = u32[4] + u32 = 20 bytes
-        //                    64 | 2   | 0, bits = u32[2] + u32 = 12 bytes
-        //                    32 | 1   | 0, bits = u32 = 4 bytes
-        //                    16 | 0   | 0, bits = u32 = 4 bytes
-        //                    8  | 0   | 0, bits = u32 = 4 bytes
-        //                    4  | 0   | 0, bits = u32 = 4 bytes
-        //                    2  | 0   | 0, bits = u32 = 4 bytes
-        //                    1  | 0   | 0, bits = u32 = 4 bytes
-        // Total = 532 + 268 + 132 + 68 + 36 + 20 + 12 + 4 + 4 + 4 + 4 + 4 + 4 = 1096 bytes
+        // Smallest size is 4096 | 128 | 4, bits = u32[128] + s32[4]
+        //                  2048 | 64  | 3, bits = u32[64] + s32[4]
+        //                  1024 | 32  | 2, bits = u32[32] + s32[4]
+        //                   512 | 16  | 1, bits = u32[16] + s32[4]
+        //                   256 | 8   | 0, bits = u32[8] + s32[4]
+        //                   128 | 4   | 0, bits = u32[4] + s32[4]
+        //                    64 | 2   | 0, bits = u32[2] + s32[4]
+        //                    32 | 1   | 0, bits = u32[1] + s32[4]
+        //                    16 | 0   | 0, bits = u32[1] + s32[4]
+        //                    8  | 0   | 0, bits = u32[1] + s32[4]
+        //                    4  | 0   | 0, bits = u32[1] + s32[4]
+        //                    2  | 0   | 0, bits = u32[1] + s32[4]
+        //
+        // Total = 512 + 256 + 128 + 64 + 32 + 16 + 8 + 4 + 4 + 4 + 4 + 4 = 1036 bytes + 16*12 = 1036 + 192 = 1228 bytes
         //
         // Approach below using nodes, takes 2 bytes per node, 2^12 nodes = 4096 nodes, so 8192 bytes.
+        //
+        // So from a memory usage point of view, the binmap approach is much better.
+        //
+        // So let's detail out a bit some pseudo code for the binmap approach:
+        //
+        // struct node_t
+        // {
+        //     inline s8 level() const { return m_index >> 24;}
+        //     inline u32 index() const { return m_index & 0xFFFFFF; }
+        // private:
+        //     u32 m_index; // 24 bits for the index, 8 bits for the level
+        // };
+        //
+        // Allocate(size int_t) (node node_t):
+        // - Compute binmap index from size
+        // - Check binmap[index], if this has a free element, use it and return it
+        // - If not, check every next higher level binmap index, if this has a free element
+        //   - If we found a free element at a higher level, we can split it into two elements of the lower level and do this
+        //     until we reach the level of the requested size.
+        //   - Let's see how many bits and levels we need to touch:
+        //     - Top level, set 1 bit, take 1 bit to next level
+        //     - Next level, set 1 bit, take 1 bit to next level
+        //     - etc..
+        //     - So with 12 levels, we need to set 12 bits, and take 12 bits to the next level.
+        // Deallocate(node node_t):
+        //   - Merging:
+        //     - We now have 2 bits set at an even+odd bit position, so we need to up one level and
+        //       set a bit there. When we again have 2 bits set at an even+odd bit position, we set
+        //       the next level bit, and so on. Again N levels to go up.
+        //
 
         // A segmented allocator that allocates memory in segments of 2^N
         template <typename T> struct allocator_t
