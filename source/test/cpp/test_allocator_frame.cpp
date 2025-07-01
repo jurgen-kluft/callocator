@@ -11,23 +11,8 @@ UNITTEST_SUITE_BEGIN(frame)
     {
         UNITTEST_ALLOCATOR;
 
-        byte* frame_alloc_mem1 = nullptr;
-        byte* frame_alloc_mem2 = nullptr;
-        byte* frame_alloc_mem3 = nullptr;
-
-        UNITTEST_FIXTURE_SETUP()
-        {
-            frame_alloc_mem1 = g_allocate_array<byte>(Allocator, 1 * cMB);
-            frame_alloc_mem2 = g_allocate_array<byte>(Allocator, 1 * cMB);
-            frame_alloc_mem3 = g_allocate_array<byte>(Allocator, 1 * cMB);
-        }
-
-        UNITTEST_FIXTURE_TEARDOWN()
-        {
-            g_deallocate_array(Allocator, frame_alloc_mem1);
-            g_deallocate_array(Allocator, frame_alloc_mem2);
-            g_deallocate_array(Allocator, frame_alloc_mem3);
-        }
+        UNITTEST_FIXTURE_SETUP() {}
+        UNITTEST_FIXTURE_TEARDOWN() {}
 
         UNITTEST_TEST(alloc3_free3)
         {
@@ -46,7 +31,7 @@ UNITTEST_SUITE_BEGIN(frame)
                 }
 
                 const s32 frame_id = alloc.new_frame();
-                frame_ids[i % 3] = frame_id;
+                frame_ids[i % 3]   = frame_id;
 
                 void* mem1 = alloc.allocate(512, 8);
                 void* mem2 = alloc.allocate(1024, 16);

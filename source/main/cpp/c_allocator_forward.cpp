@@ -5,6 +5,30 @@
 
 namespace ncore
 {
+    class forward_alloc_t : public alloc_t
+    {
+    public:
+        forward_alloc_t();
+        virtual ~forward_alloc_t();
+
+        void setup(void* beginAddress, u32 size);
+
+        bool is_empty() const;
+        void reset();
+
+        DCORE_CLASS_PLACEMENT_NEW_DELETE
+
+        struct node_t;
+        void*   m_base_address;
+        node_t* m_buffer_begin;
+        node_t* m_buffer_cursor;
+        node_t* m_buffer_end;
+
+    private:
+        virtual void* v_allocate(u32 size, u32 alignment) final;
+        virtual void  v_deallocate(void* ptr) final;
+    };
+
     typedef forward_alloc_t::node_t lnode_t;
 
     // A forward allocator node is 8 bytes, and is part of a linked list (chain) of nodes.
@@ -234,5 +258,19 @@ namespace ncore
 
         ASSERT(s_validate_chain(m_buffer_begin, m_buffer_end));
     }
+
+    forward_alloc_t* g_create_forward_allocator(void* beginAddress, u32 size)
+    {
+        forward_alloc_t* allocator = new (beginAddress) forward_alloc_t();
+        void* end_address = nmem::ptr_add(beginAddress, size);
+        allocator->m_base_address = beginAddress;
+        beginAddress = nmem::ptr_add(beginAddress, sizeof(forward_alloc_t));
+        beginAddress = nmem::ptr_align(beginAddress, 64);
+        allocator->setup(beginAddress, (u32)nmem::ptr_diff(end_address, beginAddress));
+        return allocator;
+
+    }
+
+    void g_destroy_forward_allocator(forward_alloc_t* allocator) {}
 
 }; // namespace ncore

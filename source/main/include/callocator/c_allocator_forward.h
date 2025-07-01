@@ -20,28 +20,10 @@ namespace ncore
     //
     // This allocator is pretty optimal in allocating O(1) and deallocating O(1).
     //
-    class forward_alloc_t : public alloc_t
-    {
-    public:
-        forward_alloc_t();
-        virtual ~forward_alloc_t();
 
-        void setup(void* beginAddress, u32 size);
-
-        bool is_empty() const;
-        void reset();
-
-        DCORE_CLASS_PLACEMENT_NEW_DELETE
-
-        struct node_t;
-        node_t* m_buffer_begin;
-        node_t* m_buffer_cursor;
-        node_t* m_buffer_end;
-
-    private:
-        virtual void* v_allocate(u32 size, u32 alignment) final;
-        virtual void  v_deallocate(void* ptr) final;
-    };
+    class forward_alloc_t;
+    forward_alloc_t* g_create_forward_allocator(void* beginAddress, u32 size);
+    void             g_destroy_forward_allocator(forward_alloc_t* allocator);
 
 }; // namespace ncore
 
