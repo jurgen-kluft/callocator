@@ -9,9 +9,6 @@
 
 namespace ncore
 {
-    struct vmem_arena_t;
-    class stack_alloc_scope_t;
-
     class stack_alloc_t : public alloc_t
     {
     public:
@@ -23,24 +20,18 @@ namespace ncore
         virtual void* v_save_point()               = 0;
     };
 
-    class stack_alloc_scope_t : public alloc_t
+    class stack_alloc_scope_t
     {
         stack_alloc_t* m_allocator;
         void*          m_point;
 
     public:
-        stack_alloc_scope_t();
-        stack_alloc_scope_t(stack_allocator_t* allocator) : m_allocator(allocator) { m_point = m_allocator->save_point(); }
+        stack_alloc_scope_t(stack_alloc_t* allocator) : m_allocator(allocator) { m_point = m_allocator->save_point(); }
         ~stack_alloc_scope_t() { m_allocator->restore_point(m_point); }
-
-    protected:
-        virtual void* v_allocate(u32 size, u32 alignment) final { return m_allocator->allocate(size, alignment); }
-        virtual void  v_deallocate(void* ptr) final { m_allocator->deallocate(ptr); }
     };
 
-    class stack_allocator_t;
-    stack_allocator_t* g_create_stack_allocator(int_t initial_size, int_t reserved_size);
-    void g_destroy_stack_allocator(stack_allocator_t* allocator);
+    stack_alloc_t* g_create_stack_allocator(int_t initial_size, int_t reserved_size);
+    void           g_destroy_stack_allocator(stack_alloc_t* allocator);
 }; // namespace ncore
 
 #endif

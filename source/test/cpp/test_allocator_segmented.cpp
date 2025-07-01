@@ -3,7 +3,7 @@
 #include "cbase/c_integer.h"
 #include "cbase/c_memory.h"
 
-#include "callocator/c_allocator_segmented.h"
+#include "callocator/c_allocator_segment.h"
 
 #include "cunittest/cunittest.h"
 

@@ -133,7 +133,6 @@ namespace ncore
         ASSERT(s_validate_chain(m_buffer_begin, m_buffer_end));
     }
 
-    bool forward_alloc_t::is_valid() const { return m_buffer_begin != nullptr && m_buffer_cursor < m_buffer_cursor->get_next(); }
     bool forward_alloc_t::is_empty() const
     {
         return m_buffer_cursor == m_buffer_begin + 1 && m_buffer_cursor->get_next() == m_buffer_end && m_buffer_cursor->get_prev() == m_buffer_begin && m_buffer_begin->get_next() == m_buffer_cursor && m_buffer_end->get_prev() == m_buffer_cursor;

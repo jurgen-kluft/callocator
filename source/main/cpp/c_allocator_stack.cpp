@@ -72,18 +72,12 @@ namespace ncore
         m_arena->restore(pos);
     }
 
-    stack_alloc_scope_t::stack_alloc_scope_t()
+    stack_alloc_t* g_create_stack_allocator(int_t initial_size, int_t reserved_size)
     {
-        context_t context = g_current_context();
-        m_allocator       = context.stack_alloc();
+        return nullptr;
     }
 
-    stack_allocator_t* g_create_stack_allocator(int_t initial_size, int_t reserved_size)
-    {
-
-    }
-
-    void g_destroy_stack_allocator(stack_allocator_t* allocator)
+    void g_destroy_stack_allocator(stack_alloc_t* allocator)
     {
 
     }

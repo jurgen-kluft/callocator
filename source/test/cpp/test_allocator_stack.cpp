@@ -13,96 +13,88 @@ UNITTEST_SUITE_BEGIN(stack)
     {
         UNITTEST_ALLOCATOR;
 
-        vmem_arena_t*      arena       = nullptr;
-        stack_allocator_t* stack_alloc = nullptr;
+        int_t stack_initial_size = 1 * cMB;  // Initial size of the stack allocator
+        int_t stack_reserved_size = 64 * cMB;  // Reserved size for the stack allocator
+        stack_alloc_t* stack_alloc = nullptr;
 
         UNITTEST_FIXTURE_SETUP()
         {
-            vmem_arena_t a;
-            a.reserved(1 * cMB);
-            a.committed(64 * cKB);
-            arena = (vmem_arena_t*)a.commit(sizeof(vmem_arena_t));
-
-            stack_alloc     = g_construct<stack_allocator_t>(Allocator);
-            stack_alloc->setup(arena);
+            stack_alloc = g_create_stack_allocator(stack_initial_size, stack_reserved_size);
         }
 
         UNITTEST_FIXTURE_TEARDOWN()
         {
-            Allocator->deallocate(stack_alloc);
-            stack_alloc = nullptr;
-            arena->release();
-            arena = nullptr;
+            g_destroy_stack_allocator(stack_alloc);
         }
 
         UNITTEST_TEST(allocN_freeN)
         {
-            CHECK_TRUE(stack_alloc->m_allocation_count == 0);
+            CHECK_TRUE(*((int_t*)stack_alloc->save_point()) == 0);
 
             for (s32 i = 0; i < 12; ++i)
             {
                 stack_alloc_scope_t scope(stack_alloc);
 
-                void* mem1 = scope.allocate(512, 8);
-                void* mem2 = scope.allocate(1024, 16);
-                void* mem3 = scope.allocate(512, 32);
-                void* mem4 = scope.allocate(1024, 256);
-                void* mem5 = scope.allocate(256, 32);
+                void* mem1 = stack_alloc->allocate(512, 8);
+                void* mem2 = stack_alloc->allocate(1024, 16);
+                void* mem3 = stack_alloc->allocate(512, 32);
+                void* mem4 = stack_alloc->allocate(1024, 256);
+                void* mem5 = stack_alloc->allocate(256, 32);
                 CHECK_NOT_NULL(mem1);
                 CHECK_NOT_NULL(mem2);
                 CHECK_NOT_NULL(mem3);
                 CHECK_NOT_NULL(mem4);
                 CHECK_NOT_NULL(mem5);
 
-                scope.deallocate(mem4);
+                stack_alloc->deallocate(mem4);
                 mem4 = nullptr;
 
                 {
                     stack_alloc_scope_t scope2(stack_alloc);
-                    void*               mem6 = scope.allocate(8, 8);
+                    void*               mem6 = stack_alloc->allocate(8, 8);
                     CHECK_NOT_NULL(mem6);
-                    scope.deallocate(mem6);
+                    stack_alloc->deallocate(mem6);
                     mem6 = nullptr;
                 }
 
-                void* mem7 = scope.allocate(2048, 256);
-                void* mem8 = scope.allocate(1024, 256);
+                void* mem7 = stack_alloc->allocate(2048, 256);
+                void* mem8 = stack_alloc->allocate(1024, 256);
                 CHECK_NOT_NULL(mem7);
                 CHECK_NOT_NULL(mem8);
 
-                scope.deallocate(mem1);
+                stack_alloc->deallocate(mem1);
                 mem1 = nullptr;
-                scope.deallocate(mem3);
+                stack_alloc->deallocate(mem3);
                 mem3 = nullptr;
-                scope.deallocate(mem2);
+                stack_alloc->deallocate(mem2);
                 mem2 = nullptr;
 
-                void* mem9 = scope.allocate(16, 8);
+                void* mem9 = stack_alloc->allocate(16, 8);
                 CHECK_NOT_NULL(mem9);
 
-                scope.deallocate(mem7);
+                stack_alloc->deallocate(mem7);
                 mem7 = nullptr;
-                scope.deallocate(mem5);
+                stack_alloc->deallocate(mem5);
                 mem5 = nullptr;
 
                 // This should wrap around
-                void* mema = scope.allocate(2048, 8);
+                void* mema = stack_alloc->allocate(2048, 8);
                 CHECK_NOT_NULL(mema);
 
-                scope.deallocate(mem9);
+                stack_alloc->deallocate(mem9);
                 mem9 = nullptr;
-                scope.deallocate(mem8);
+                stack_alloc->deallocate(mem8);
                 mem8 = nullptr;
-                scope.deallocate(mema);
+                stack_alloc->deallocate(mema);
                 mema = nullptr;
             }
 
-            CHECK_TRUE(stack_alloc->m_allocation_count == 0);
+            CHECK_TRUE(*((int_t*)stack_alloc->save_point()) == 0);
         }
 
         UNITTEST_TEST(construct_destruct)
         {
-            CHECK_TRUE(stack_alloc->m_allocation_count == 0);
+            CHECK_TRUE(*((int_t*)stack_alloc->save_point()) == 0);
 
             for (s32 i = 0; i < 12; ++i)
             {
@@ -117,16 +109,16 @@ UNITTEST_SUITE_BEGIN(stack)
                     s32 d;
                 };
 
-                test_t* test = g_construct<test_t>(&scope);
+                test_t* test = g_construct<test_t>(stack_alloc);
                 CHECK_NOT_NULL(test);
                 test->a = 1;
                 test->b = 2;
                 test->c = 3;
                 test->d = 4;
-                g_destruct(&scope, test);
+                g_destruct(stack_alloc, test);
             }
 
-            CHECK_TRUE(stack_alloc->m_allocation_count == 0);
+            CHECK_TRUE(*((int_t*)stack_alloc->save_point()) == 0);
         }
     }
 }

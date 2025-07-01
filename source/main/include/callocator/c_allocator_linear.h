@@ -9,8 +9,6 @@
 
 namespace ncore
 {
-    struct vmem_arena_t;
-
     // Linear allocator
     // The linear allocator is a specialized allocator. You can use it when you are allocating different size blocks that
     // all have a life-time that are all part of one group which later can be deallocated all at once.
@@ -18,21 +16,15 @@ namespace ncore
     class linear_alloc_t : public alloc_t
     {
     public:
-        inline linear_alloc_t(vmem_arena_t* arena) : m_arena(arena) {}
-        virtual ~linear_alloc_t();
+        inline void reset() { v_reset(); }
 
-        void reset();
-
-        DCORE_CLASS_PLACEMENT_NEW_DELETE
-
-        vmem_arena_t* m_arena;
-
-    private:
-        virtual void* v_allocate(u32 size, u32 alignment) final;
-        virtual void  v_deallocate(void* ptr) final;
+    protected:
+        virtual void v_reset() = 0;
     };
 
-    linear_alloc_t* g_create_linear_allocator();
+    linear_alloc_t* g_create_linear_allocator(int_t initial_size, int_t reserved_size);
+    int_t           g_current_size(linear_alloc_t* allocator);
+    void            g_destroy_allocator(linear_alloc_t*);
 
 }; // namespace ncore
 
