@@ -7,7 +7,7 @@
 
 namespace ncore
 {
-    // Note: What about a bitset/bitmap per size ?
+    // Note: What about a hierarchical bitset per size ?
     //
     // So from a memory usage point of view, the bitmap approach is 1/8th to 1/16th
     // the size of the node approach.
@@ -16,21 +16,17 @@ namespace ncore
     //
     // Allocate(size int_t) (node node_t):
     // - Compute index from size
-    // - Compute bitmap offset and count from size
-    // - Check m_size_free[index], if the bit is set it means at that size we have free elements
-    // - If not, check every next higher size-bitmap, if this has a free element
+    // - Get bitmap for that size
+    // - Use m_size_free to get a size index that has free elements
+    // - If we did not find a bit in m_size_free, then we are out of memory
     //   - If we found a free element at a higher size-bitmap, we can split it into two elements of
     //     the lower level and do this until we reach the size-bitmap of the requested size.
-    //   - Let's see how many bits and size-bitmaps we need to touch:
-    //     - Top size-bitmap, set 1 bit, take 1 bit to next size-bitmap
-    //     - Next size-bitmap, set 1 bit, take 1 bit to next size-bitmap
-    //     - etc..
-    //     - So with 12 sizes, we need to set 12 bits, one at each size bitmap
     // Deallocate(node node_t):
     //   - Merging:
-    //     - We now have 2 bits set at an even+odd bit position, so we need to up one size-bitmap
-    //       and set a bit there. When we again have 2 bits set at an even+odd bit position, we set
-    //       the next size-bitmap bit, and so on. Again N size-bitmap to go up.
+    //     - We now have 2 bits set at an even+odd bit position, so we need clear these 2 bits and go
+    //       up one size-bitmap and set a bit there. When we again have 2 bits set at an even+odd bit
+    //       position, we clear them and set the next size-bitmap bit, and so on.
+    //     - Q: do we need to merge immediately, or can we delay this in some way ?
     //
 
     struct segment_alloc_t
@@ -140,8 +136,7 @@ namespace ncore
             {
                 m_size_free &= ~(1 << size_shift); // No more free elements at this size
             }
-
-            return 0;
+            return bit;
         }
 
         void set_bit(s8 size_shift, s32 bit)
@@ -152,30 +147,66 @@ namespace ncore
             u32 count, offset;
             get_offset0(size_shift, count, offset);
 
-            u64* bits0 = &m_level0[offset];
-            u32  bo    = (bit >> 6);
-            u32  bi    = (bit & (64 - 1));
-            bits0[bo] |= (1 << bi);
+            u32  bo = (bit >> 6);
+            u64& l0 = m_level0[offset + bo];
+            u32  bi = (bit & (64 - 1));
+            l0      = l0 | (1 << bi);
 
             if (get_offset1(size_shift, count, offset))
             {
                 bit = bit >> 6; // To level 1
 
                 // Set the bit in the level 1 bitmap
-                u64* bits1 = &m_level1[offset];
-                bo         = (bit >> 6);
-                bi         = (bit & (64 - 1));
-                bits1[bo] |= (1 << bi);
+                bo      = (bit >> 6);
+                u64& l1 = m_level1[offset + bo];
+                bi      = (bit & (64 - 1));
+                l1      = l1 | (1 << bi);
 
                 if (get_offset2(size_shift, count, offset))
                 {
                     bit = bit >> 6; // To level 2
 
                     // Set the bit in the level 2 bitmap
-                    u64* bits2 = &m_level2[offset];
-                    bo         = (bit >> 6);
-                    bi         = (bit & (64 - 1));
-                    bits2[bo] |= (1 << bi);
+                    bo      = (bit >> 6);
+                    u64& l2 = m_level2[offset + bo];
+                    bi      = (bit & (64 - 1));
+                    l2      = l2 | (1 << bi);
+                }
+            }
+        }
+
+        void set_2bits(s8 size_shift, s32 bit)
+        {
+            ASSERT(bit >= 0 && ((bit & 3) == 0 || (bit & 3) == 2 || (bit & 3) == 4 || (bit & 3) == 6));
+
+            // Set the bit in the level 0 bitmap
+            u32 count, offset;
+            get_offset0(size_shift, count, offset);
+
+            u32  bo = (bit >> 6);
+            u64& l0 = m_level0[offset + bo];
+            u32  bi = (bit & (64 - 1));
+            l0      = l0 | (0b11 << bi);
+
+            if (get_offset1(size_shift, count, offset))
+            {
+                bit = bit >> 6; // To level 1
+
+                // Set the bit in the level 1 bitmap
+                bo      = (bit >> 6);
+                u64& l1 = m_level1[offset + bo];
+                bi      = (bit & (64 - 1));
+                l1      = l1 | (1 << bi);
+
+                if (get_offset2(size_shift, count, offset))
+                {
+                    bit = bit >> 6; // To level 2
+
+                    // Set the bit in the level 2 bitmap
+                    bo      = (bit >> 6);
+                    u64& l2 = m_level2[offset + bo];
+                    bi      = (bit & (64 - 1));
+                    l2      = l2 | (1 << bi);
                 }
             }
         }
@@ -200,22 +231,33 @@ namespace ncore
             s8  size_with_free_element_index = math::g_findLastBit(size_with_free_elements_bits);
             s32 bit                          = find_bit(size_with_free_element_index);
 
+            // Note:
+            // Size bitmap at index 0 has (1 << (m_min_size_shift)) bits
+            // Size bitmap at (m_num_levels - 1) effectively only has 1 bit
+
             while (size_with_free_element_index > size_index)
             {
-                clr_bit(size_with_free_element_index, bit);
+                if (clr_bit(size_with_free_element_index, bit) == 0)
+                {
+                    m_size_free &= ~(1 << size_with_free_element_index);
+                }
 
                 size_with_free_element_index--;
 
                 bit = (bit << 1);
 
-                set_bit(size_with_free_element_index, bit + 1);
+                // Set both bits
+                set_2bits(size_with_free_element_index, bit);
 
                 // Mark the bit in 'size_free bitmap' to indicate that we have a free element at this size
                 m_size_free |= (1 << size_with_free_element_index);
             }
 
-            // We now should be able to find a '1' bit in the bitmap at 'size_index'.
-            bit = find_and_clr_bit(size_index);
+            // Clear the bit in the bitmap at size_index
+            if (clr_bit(size_index, bit) == 0)
+            {
+                m_size_free &= ~(1 << size_index);
+            }
 
             // Return the actual allocated offset
             offset = ((s64)1 << (m_min_size_shift + size_index)) * bit;
@@ -226,6 +268,68 @@ namespace ncore
         {
             // compute the bit from the offset and size
 
+            // set bit in the bitmap at size_index
+
+            // Merge:
+            // if there are now 2 bits set (even+odd) in the bitmap at size_index,
+            // then we need to clear them and set the bitmap of (size_index + 1)
+            // and set the bit in that bitmap, etc..
+        }
+
+        void initialize(alloc_t* allocator, int_t min_size, int_t max_size)
+        {
+            ASSERT(min_size < max_size && math::g_ispo2(min_size) && math::g_ispo2(max_size));
+
+            s8 min_size_shift = math::g_ilog2(min_size);
+            s8 max_size_shift = math::g_ilog2(max_size);
+            s8 num_sizes      = max_size_shift - min_size_shift;
+
+            // Allocate the count and offsets array's
+            m_countandoffsets_0 = g_allocate_array_and_clear<s32>(allocator, num_sizes * 2);
+            m_countandoffsets_1 = g_allocate_array_and_clear<s32>(allocator, num_sizes * 2);
+            m_countandoffsets_2 = g_allocate_array_and_clear<s32>(allocator, num_sizes * 2);
+
+            // Determine the size and offsets for level 0
+            u32 level0_size_in_bits = 0;
+            u32 level1_size_in_bits = 0;
+            u32 level2_size_in_bits = 0;
+
+            u32 size = 1 << min_size_shift;
+            for (s8 i = 0; i < num_sizes; ++i)
+            {
+                // How many bits on each level for this size?
+                m_countandoffsets_0[(i*2)+0] = size;
+                m_countandoffsets_1[(i*2)+0] = size >> 6;
+                m_countandoffsets_2[(i*2)+0] = size >> 12;
+
+                // Note: Offset is the number of u64
+                m_countandoffsets_0[(i*2)+1] = (level0_size_in_bits >> 6);
+                m_countandoffsets_1[(i*2)+1] = (level1_size_in_bits >> 6);
+                m_countandoffsets_2[(i*2)+1] = (level2_size_in_bits >> 6);
+
+                level0_size_in_bits += size;
+                level0_size_in_bits = math::g_alignUp(level0_size_in_bits, 64);
+
+                level1_size_in_bits += (size >> 6);
+                level1_size_in_bits = math::g_alignUp(level1_size_in_bits, 64);
+
+                level2_size_in_bits += (size >> 12);
+                level2_size_in_bits = math::g_alignUp(level2_size_in_bits, 64);
+
+                size = math::g_max(size >> 1, (u32)64);
+            }
+
+            m_level0 = g_allocate_array_and_clear<u64>(allocator, level0_size_in_bits >> 6);
+            m_level1 = g_allocate_array_and_clear<u64>(allocator, level1_size_in_bits >> 6);
+            m_level2 = g_allocate_array_and_clear<u64>(allocator, level2_size_in_bits >> 6);
+
+            m_min_size_shift = min_size_shift;
+            m_max_size_shift = max_size_shift;
+            m_num_sizes      = num_sizes;
+
+            // Initialize the size_free bitmap and the highest size bitmap
+            m_size_free = (1 << m_num_sizes);
+            m_level2[m_num_sizes - 1] = 1;
         }
     };
 
