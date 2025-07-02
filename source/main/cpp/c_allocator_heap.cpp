@@ -700,7 +700,6 @@ namespace ncore
         if (alloc->m_arena)
         {
             alloc->m_arena->release();
-            alloc->m_arena = nullptr;
         }
     }
 

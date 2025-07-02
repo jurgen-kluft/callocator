@@ -105,7 +105,7 @@ UNITTEST_SUITE_BEGIN(offset)
 
         UNITTEST_FIXTURE_SETUP()
         {
-            allocator = new (Allocator) ncore::noffset::allocator_t(Allocator, 1024 * 1024 * 256);
+            allocator = new (Allocator->allocate(sizeof(ncore::noffset::allocator_t))) ncore::noffset::allocator_t(Allocator, 1024 * 1024 * 256);
             allocator->setup();
         }
 

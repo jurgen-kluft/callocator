@@ -1,336 +1,609 @@
 #include "ccore/c_target.h"
+#include "ccore/c_allocator.h"
 #include "ccore/c_math.h"
 #include "ccore/c_memory.h"
 #include "ccore/c_vmem.h"
 
-#include "callocator/c_allocator_linear.h"
+#include "callocator/c_allocator_segment.h"
 
 namespace ncore
 {
-    // Note: What about a hierarchical bitset per size ?
-    //
-    // So from a memory usage point of view, the bitmap approach is 1/8th to 1/16th
-    // the size of the node approach.
-    //
-    // This is significant and might even allow us to track free chunks instead of sections.
-    //
-    // Allocate(size int_t) (node node_t):
-    // - Compute index from size
-    // - Get bitmap for that size
-    // - Use m_size_free to get a size index that has free elements
-    // - If we did not find a bit in m_size_free, then we are out of memory
-    //   - If we found a free element at a higher size-bitmap, we can split it into two elements of
-    //     the lower level and do this until we reach the size-bitmap of the requested size.
-    // Deallocate(node node_t):
-    //   - Merging:
-    //     - We now have 2 bits set at an even+odd bit position, so we need clear these 2 bits and go
-    //       up one size-bitmap and set a bit there. When we again have 2 bits set at an even+odd bit
-    //       position, we clear them and set the next size-bitmap bit, and so on.
-    //     - Q: do we need to merge immediately, or can we delay this in some way ?
-    //
-
-    struct segment_alloc_t
+    namespace nsegmented
     {
-        s8   m_min_size_shift;    // The minimum size of a segment in log2
-        s8   m_max_size_shift;    // The maximum size of a segment in log2
-        s8   m_num_sizes;         // The number of sizes available
-        u32  m_size_free;         // One bit per size, indicating if there is one or more free segments at that size.
-        u64* m_level0;            // Level 0 for each size
-        s32* m_countandoffsets_0; // Offsets for level 0, one per size
-        u64* m_level1;            // Level 1
-        s32* m_countandoffsets_1; // Offsets for level 0, one per size (-1 means no level 1 bitmap)
-        u64* m_level2;            // Level 2
-        s32* m_countandoffsets_2; // Offsets for level 0, one per size (-1 means no level 2 bitmap)
+        // Note: What about a hierarchical bitset per size ?
+        //
+        // So from a memory usage point of view, the bitmap approach is 1/8th to 1/16th
+        // the size of the node approach.
+        //
+        // This is significant and might even allow us to track free chunks instead of sections.
+        //
+        // Allocate(size int_t) (node node_t):
+        // - Compute size-index from size
+        // - Use m_size_free to get a size index that has free elements
+        // - If we did not find a bit in m_size_free, then we are out of memory
+        //   - If we found a free element at a higher size-bitmap, we can keep splitting it into two
+        //     elements for a lower level and do this until we reach the size-index of the requested size.
+        // Deallocate(node node_t):
+        //   - Merging:
+        //     - We now have 2 bits set at an even+odd bit position, so we need clear these 2 bits and go
+        //       up one size-bitmap and set a bit there. When we again have 2 bits set at an even+odd bit
+        //       position, we clear them and set the next size-bitmap bit, and so on.
+        //     - Q: do we need to merge immediately, or can we delay this in some way ?
+        //
 
-        // note: remove 'count' if we don't need it
-
-        // size_shift is already normalized (0 <= size_shift < m_num_sizes)
-        void get_offset0(s8 size_shift, u32& count, u32& offset) const
+        struct segment_bitmap_alloc_t
         {
-            count  = m_countandoffsets_0[(size_shift << 1) + 0];
-            offset = m_countandoffsets_0[(size_shift << 1) + 1];
-        }
-        bool get_offset1(s8 size_shift, u32& count, u32& offset) const
-        {
-            count  = m_countandoffsets_1[(size_shift << 1) + 0];
-            offset = m_countandoffsets_1[(size_shift << 1) + 1];
-            return count > 0;
-        }
-        bool get_offset2(s8 size_shift, u32& count, u32& offset) const
-        {
-            count  = m_countandoffsets_2[(size_shift << 1) + 0];
-            offset = m_countandoffsets_2[(size_shift << 1) + 1];
-            return count > 0;
-        }
+            s8   m_min_size_shift;   // The minimum size of a segment in log2
+            s8   m_max_size_shift;   // The maximum size of a segment in log2
+            s8   m_total_size_shift; // The total size of the segment in log2
+            s8   m_num_sizes;        // The number of sizes available
+            u32  m_size_free;        // One bit per size, indicating if there is one or more free segments at that size.
+            u64* m_level0;           // Level 0 for each size
+            s32* m_offsets_0;        // Offsets for level 0, one per size
+            u64* m_level1;           // Level 1
+            s32* m_offsets_1;        // Offsets for level 0, one per size (-1 means no level 1 bitmap)
+            u64* m_level2;           // Level 2
+            s32* m_offsets_2;        // Offsets for level 0, one per size (-1 means no level 2 bitmap)
 
-        u64 clr_bit(s8 size_shift, s32 bit)
-        {
-            ASSERT(bit >= 0 && ((bit & 3) == 0 || (bit & 3) == 2 || (bit & 3) == 4 || (bit & 3) == 6));
-
-            // Clear the bit in the level 0 bitmap
-            u32 count, offset;
-            get_offset0(size_shift, count, offset);
-
-            u32  bo = (bit >> 6);
-            u64& l0 = m_level0[offset + bo];
-            u32  bi = (bit & (64 - 1));
-            l0 &= ~(1ULL << bi);
-
-            u64 state = l0;
-
-            if (get_offset1(size_shift, count, offset))
+            // note: remove 'count' if we don't need it
+            void initialize(alloc_t* allocator, int_t min_size, int_t max_size, int_t total_size)
             {
-                bit = bit >> 6; // To level 1
+                ASSERT(min_size < max_size && math::g_ispo2(min_size) && math::g_ispo2(max_size));
 
-                // Clear the bit in the level 1 bitmap
-                bo      = (bit >> 6);
-                u64& l1 = m_level1[offset + bo];
-                bi      = (bit & (64 - 1));
-                l1 &= ~(1ULL << bi);
+                const s8 min_size_shift = math::g_ilog2(min_size);
+                const s8 max_size_shift = math::g_ilog2(max_size);
+                const s8 tot_size_shift = math::g_ilog2(total_size);
+                const s8 num_sizes      = max_size_shift - min_size_shift;
 
-                state = l1;
+                // Allocate the count and offsets array's
+                m_offsets_0 = g_allocate_array_and_clear<s32>(allocator, num_sizes);
+                m_offsets_1 = g_allocate_array_and_clear<s32>(allocator, num_sizes);
+                m_offsets_2 = g_allocate_array_and_clear<s32>(allocator, num_sizes);
 
-                if (get_offset2(size_shift, count, offset))
+                // Determine the size and offsets for level 0
+                s32 level0_size_in_bits = 0;
+                s32 level1_size_in_bits = 0;
+                s32 level2_size_in_bits = 0;
+
+                s32 size = 1 << (tot_size_shift - min_size_shift);
+                for (s8 i = 0; i < num_sizes; ++i)
                 {
-                    bit = bit >> 6; // To level 2
+                    // Note: Offset is the number of u64
+                    m_offsets_0[i] = size > 0 ? (level0_size_in_bits >> 6) : -1;
+                    m_offsets_1[i] = ((size >> 6) > 0) ? (level1_size_in_bits >> 6) : -1;
+                    m_offsets_2[i] = ((size >> 12) > 0) ? (level2_size_in_bits >> 6) : -1;
 
-                    // Clear the bit in the level 2 bitmap
-                    bo      = (bit >> 6);
-                    u64& l2 = m_level2[offset + bo];
-                    bi      = (bit & (64 - 1));
-                    l2 &= ~(1ULL << bi);
+                    level0_size_in_bits += size;
+                    level0_size_in_bits = math::g_alignUp(level0_size_in_bits, 64);
 
-                    state = l2;
+                    level1_size_in_bits += (size >> 6);
+                    level1_size_in_bits = math::g_alignUp(level1_size_in_bits, 64);
+
+                    level2_size_in_bits += (size >> 12);
+                    level2_size_in_bits = math::g_alignUp(level2_size_in_bits, 64);
+
+                    size = math::g_max(size >> 1, (s32)64);
+                }
+
+                m_level0 = g_allocate_array_and_clear<u64>(allocator, level0_size_in_bits >> 6);
+                m_level1 = g_allocate_array_and_clear<u64>(allocator, level1_size_in_bits >> 6);
+                m_level2 = g_allocate_array_and_clear<u64>(allocator, level2_size_in_bits >> 6);
+
+                m_min_size_shift   = min_size_shift;
+                m_max_size_shift   = max_size_shift;
+                m_total_size_shift = tot_size_shift;
+                m_num_sizes        = num_sizes;
+
+                // Initialize the size_free bitmap and the highest size bitmap
+                m_size_free               = (1 << m_num_sizes);
+                m_level2[m_num_sizes - 1] = 1;
+            }
+
+            void teardown(alloc_t* allocator)
+            {
+                g_deallocate_array(allocator, m_level0);
+                g_deallocate_array(allocator, m_level1);
+                g_deallocate_array(allocator, m_level2);
+                g_deallocate_array(allocator, m_offsets_0);
+                g_deallocate_array(allocator, m_offsets_1);
+                g_deallocate_array(allocator, m_offsets_2);
+            }
+
+            static inline void s_set_level_bit(s8 size_index, s32 offset, s32 bit, u64* level)
+            {
+                const s32 bo = (bit >> 6);
+                const s32 bi = (bit & (64 - 1));
+                level[offset + bo] |= (1 << bi);
+            }
+
+            static inline u64 s_clr_level_bit(s8 size_index, s32 offset, s32 bit, u64* level)
+            {
+                const s32 bo = (bit >> 6);
+                const s32 bi = (bit & (64 - 1));
+                u64&      lv = level[offset + bo];
+                lv           = lv & ~((u64)1 << bi);
+                return lv;
+            }
+
+            u64 clr_bit(s8 size_index, s32 bit)
+            {
+                ASSERT(bit >= 0 && ((bit & 3) == 0 || (bit & 3) == 2 || (bit & 3) == 4 || (bit & 3) == 6));
+
+                s32 offset = m_offsets_0[size_index];
+                u64 state  = s_clr_level_bit(size_index, offset, bit, m_level0);
+
+                offset = m_offsets_1[size_index];
+                if (offset >= 0)
+                {
+                    bit   = bit >> 6; // To level 1
+                    state = s_clr_level_bit(size_index, offset, bit, m_level1);
+
+                    offset = m_offsets_2[size_index];
+                    if (offset >= 0)
+                    {
+                        bit   = bit >> 6; // To level 2
+                        state = s_clr_level_bit(size_index, offset, bit, m_level2);
+                    }
+                }
+
+                return state;
+            }
+
+            s32 find_bit(s8 size_index) const
+            {
+                s32 bit = 0;
+
+                s32 offset = m_offsets_2[size_index];
+                if (offset >= 0)
+                {
+                    bit = math::g_findFirstBit(m_level2[offset]);
+                }
+                offset = m_offsets_1[size_index];
+                if (offset >= 0)
+                {
+                    bit = math::g_findFirstBit(m_level1[offset + bit]);
+                }
+
+                offset = m_offsets_0[size_index];
+                return (bit << 6) + math::g_findFirstBit(m_level0[offset + bit]);
+            }
+
+            s32 find_and_clr_bit(s8 size_index)
+            {
+                const s32 bit = find_bit(size_index);
+                if (clr_bit(size_index, bit) == 0)
+                {
+                    m_size_free &= ~(1 << size_index); // No more free elements at this size
+                }
+                return bit;
+            }
+
+            bool set_level0_bit(s8 size_index, s32 offset, s32 bit)
+            {
+                u64&      l0 = m_level0[offset + (bit >> 6)];
+                const u32 bi = (bit & (64 - 1));
+                l0           = l0 | (1 << bi);
+                return ((l0 >> (bi & 0xfe)) == 3);
+            }
+
+            bool get_level0_bit(s8 size_index, s32 offset, s32 bit)
+            {
+                u64&      l0 = m_level0[offset + (bit >> 6)];
+                const u32 bi = (bit & (64 - 1));
+                return (l0 & (1 << bi)) != 0;
+            }
+
+            void set_level0_pair(s8 size_index, s32 offset, s32 bit)
+            {
+                const u32 bo = (bit >> 6);
+                const u32 bi = (bit & (64 - 1));
+                u64&      l0 = m_level0[offset + bo];
+                l0           = l0 | (3 << bi);
+            }
+
+            // returns 0 when setting the bit resulted in an odd+even pair of bits and clearing the other bit
+            //           resulted in a bitmap that has no more bits set.
+            // returns 2 when setting the bit resulted in an odd+even pair of bits, but clearing the other bit
+            //           resulted in a bitmap that still has bits set.
+            // returns 1 when setting the bit resulted in a single bit set.
+            s8 set_bit(s8 size_index, s32 bit)
+            {
+                ASSERT(bit >= 0 && ((bit & 3) == 0 || (bit & 3) == 2 || (bit & 3) == 4 || (bit & 3) == 6));
+                s32 offset = m_offsets_0[size_index];
+                if (get_level0_bit(size_index, offset, bit ^ 1))
+                {
+                    if (clr_bit(size_index, bit ^ 1) == 0)
+                        return 0;
+                    return 2;
+                }
+
+                set_level0_bit(size_index, offset, bit);
+                offset = m_offsets_1[size_index];
+                if (offset >= 0)
+                {
+                    bit = bit >> 6; // To level 1
+                    s_set_level_bit(size_index, offset, bit, m_level1);
+
+                    offset = m_offsets_2[size_index];
+                    if (offset >= 0)
+                    {
+                        bit = bit >> 6; // To level 2
+                        s_set_level_bit(size_index, offset, bit, m_level2);
+                    }
+                }
+
+                return 1;
+            }
+
+            void set_2bits(s8 size_index, s32 bit)
+            {
+                ASSERT(bit >= 0 && ((bit & 3) == 0 || (bit & 3) == 2 || (bit & 3) == 4 || (bit & 3) == 6));
+
+                s32 offset = m_offsets_0[size_index];
+                set_level0_pair(size_index, offset, bit);
+
+                offset = m_offsets_1[size_index];
+                if (offset >= 0)
+                {
+                    bit = bit >> 6;
+                    s_set_level_bit(size_index, offset, bit, m_level1);
+
+                    offset = m_offsets_2[size_index];
+                    if (offset >= 0)
+                    {
+                        bit = bit >> 6;
+                        s_set_level_bit(size_index, offset, bit, m_level2);
+                    }
                 }
             }
 
-            return state;
-        }
-
-        s32 find_bit(s8 size_shift) const
-        {
-            s32 bit = 0;
-            u64 l;
-
-            u32 count, offset;
-            if (get_offset2(size_shift, count, offset))
+            inline s8 size_to_index(s64 size) const
             {
-                l   = m_level2[offset];
-                bit = math::g_findFirstBit(l);
+                ASSERT(math::g_ispo2(size));
+                ASSERT(size >= (1 << m_min_size_shift) && size <= (1 << m_max_size_shift));
+                return math::g_ilog2(size) - m_min_size_shift;
             }
-            if (get_offset1(size_shift, count, offset))
+
+            bool allocate(s64 size, s64& offset)
             {
-                l   = m_level1[offset + bit];
-                bit = math::g_findFirstBit(l);
-            }
-            get_offset0(size_shift, count, offset);
+                const s8 size_index = size_to_index(size);
 
-            l = m_level0[offset + bit];
-            return (bit << 6) + math::g_findFirstBit(l);
-        }
-
-        s32 find_and_clr_bit(s8 size_shift)
-        {
-            const s32 bit = find_bit(size_shift);
-            if (clr_bit(size_shift, bit) == 0)
-            {
-                m_size_free &= ~(1 << size_shift); // No more free elements at this size
-            }
-            return bit;
-        }
-
-        void set_bit(s8 size_shift, s32 bit)
-        {
-            ASSERT(bit >= 0 && ((bit & 3) == 0 || (bit & 3) == 2 || (bit & 3) == 4 || (bit & 3) == 6));
-
-            // Set the bit in the level 0 bitmap
-            u32 count, offset;
-            get_offset0(size_shift, count, offset);
-
-            u32  bo = (bit >> 6);
-            u64& l0 = m_level0[offset + bo];
-            u32  bi = (bit & (64 - 1));
-            l0      = l0 | (1 << bi);
-
-            if (get_offset1(size_shift, count, offset))
-            {
-                bit = bit >> 6; // To level 1
-
-                // Set the bit in the level 1 bitmap
-                bo      = (bit >> 6);
-                u64& l1 = m_level1[offset + bo];
-                bi      = (bit & (64 - 1));
-                l1      = l1 | (1 << bi);
-
-                if (get_offset2(size_shift, count, offset))
+                // We can detect bits set in m_size_free directly
+                const u32 size_free = (m_size_free & ((1 << (size_index + 1)) - 1));
+                if (size_free == 0)
                 {
-                    bit = bit >> 6; // To level 2
-
-                    // Set the bit in the level 2 bitmap
-                    bo      = (bit >> 6);
-                    u64& l2 = m_level2[offset + bo];
-                    bi      = (bit & (64 - 1));
-                    l2      = l2 | (1 << bi);
-                }
-            }
-        }
-
-        void set_2bits(s8 size_shift, s32 bit)
-        {
-            ASSERT(bit >= 0 && ((bit & 3) == 0 || (bit & 3) == 2 || (bit & 3) == 4 || (bit & 3) == 6));
-
-            // Set the bit in the level 0 bitmap
-            u32 count, offset;
-            get_offset0(size_shift, count, offset);
-
-            u32  bo = (bit >> 6);
-            u64& l0 = m_level0[offset + bo];
-            u32  bi = (bit & (64 - 1));
-            l0      = l0 | (0b11 << bi);
-
-            if (get_offset1(size_shift, count, offset))
-            {
-                bit = bit >> 6; // To level 1
-
-                // Set the bit in the level 1 bitmap
-                bo      = (bit >> 6);
-                u64& l1 = m_level1[offset + bo];
-                bi      = (bit & (64 - 1));
-                l1      = l1 | (1 << bi);
-
-                if (get_offset2(size_shift, count, offset))
-                {
-                    bit = bit >> 6; // To level 2
-
-                    // Set the bit in the level 2 bitmap
-                    bo      = (bit >> 6);
-                    u64& l2 = m_level2[offset + bo];
-                    bi      = (bit & (64 - 1));
-                    l2      = l2 | (1 << bi);
-                }
-            }
-        }
-
-        bool allocate(s32 size, s64& offset)
-        {
-            ASSERT(math::g_ispo2(size));
-            ASSERT(size >= (1 << m_min_size_shift) && size <= (1 << m_max_size_shift));
-
-            const s8 size_index = math::g_ilog2(size) - m_min_size_shift;
-
-            // We can detect bits set in m_size_free directly
-            const u32 size_with_free_elements_bits = (m_size_free & ((1 << (size_index + 1)) - 1));
-            if (size_with_free_elements_bits == 0)
-            {
-                // OOM ?
-                offset = -1;
-                return false;
-            }
-
-            // Which (highest) bit is set in m_size_free?
-            s8  size_with_free_element_index = math::g_findLastBit(size_with_free_elements_bits);
-            s32 bit                          = find_bit(size_with_free_element_index);
-
-            // Note:
-            // Size bitmap at index 0 has (1 << (m_min_size_shift)) bits
-            // Size bitmap at (m_num_levels - 1) effectively only has 1 bit
-
-            while (size_with_free_element_index > size_index)
-            {
-                if (clr_bit(size_with_free_element_index, bit) == 0)
-                {
-                    m_size_free &= ~(1 << size_with_free_element_index);
+                    // Fragmented or OOM ?
+                    offset = -1;
+                    return false;
                 }
 
-                size_with_free_element_index--;
+                // Which (highest) bit is set in size_free?
+                s8  free_index = math::g_findFirstBit(size_free);
+                s32 bit        = find_bit(free_index);
 
-                bit = (bit << 1);
+                // Note:
+                // Size bitmap at index 0 has (1 << (m_min_size_shift)) bits
+                // Size bitmap at (m_num_levels - 1) effectively only has 1 bit
 
-                // Set both bits
-                set_2bits(size_with_free_element_index, bit);
+                while (free_index > size_index)
+                {
+                    if (clr_bit(free_index, bit) == 0)
+                    {
+                        m_size_free &= ~(1 << free_index);
+                    }
 
-                // Mark the bit in 'size_free bitmap' to indicate that we have a free element at this size
-                m_size_free |= (1 << size_with_free_element_index);
+                    free_index--;
+
+                    bit = (bit << 1);
+
+                    // Set both bits
+                    set_2bits(free_index, bit);
+
+                    // Mark the bit in 'size_free bitmap' to indicate that we have a free element at this size
+                    m_size_free |= (1 << free_index);
+                }
+
+                // Clear the bit in the bitmap at size_index
+                if (clr_bit(size_index, bit) == 0)
+                {
+                    m_size_free &= ~(1 << size_index);
+                }
+
+                // Return the actual allocated offset
+                offset = ((s64)1 << (m_min_size_shift + size_index)) * bit;
+                return true;
             }
 
-            // Clear the bit in the bitmap at size_index
-            if (clr_bit(size_index, bit) == 0)
+            bool deallocate(s64 ptr, s64 size)
             {
-                m_size_free &= ~(1 << size_index);
-            }
+                if (ptr < 0 || size <= 0 || ptr >= (1 << m_total_size_shift) || size > (1 << m_max_size_shift))
+                {
+                    return false; // Invalid pointer or size
+                }
 
-            // Return the actual allocated offset
-            offset = ((s64)1 << (m_min_size_shift + size_index)) * bit;
+                s8  size_index = size_to_index(size);                           // get the size index from the size
+                s32 bit        = (s32)(ptr >> (m_min_size_shift + size_index)); // the bit index of the bitmap at size_index
+                while (size_index >= 0)
+                {
+                    const s8 result = set_bit(size_index, bit);
+                    if (result == 1)
+                        break;
+                    if (result == 0)
+                        m_size_free &= ~(1 << size_index);
+                    bit = (bit >> 1);
+                    size_index--;
+                }
+                return true;
+            }
+        };
+
+        // A segmented allocator that allocates memory in segments of 2^N
+        template <typename T> struct segment_node_alloc_t
+        {
+            static const T c_null = ~0;
+            typedef T      node_t;
+
+            u8*     m_node_size;           // Size is '1 << (m_node_size[size_index] & 0x7F)', if the MSB is set the node is allocated
+            node_t* m_node_next;           // Next node in the size list
+            node_t* m_node_prev;           // Previous node in the size list
+            u64     m_size_list_occupancy; // Which size list is non-empty
+            node_t* m_size_lists;          // Every size has its own list
+            s8      m_min_size_shift;      // The minimum size of a segment in log2
+            s8      m_max_size_shift;      // The maximum size of a segment in log2
+            s8      m_total_size_shift;    // The total size of the segment in log2
+            s8      m_node_count_2log;     // The number of sizes available
+
+            void setup(alloc_t* allocator, int_t min_size, int_t max_size, int_t total_size);
+            void teardown(alloc_t* allocator);
+
+            // bool allocate(u32 size, node_t& out_node); // Returns false if the size is not available
+            // void deallocate(node_t node);              // Deallocates the node
+            bool allocate(s64 size, s64& out_ptr); // Returns false if the size is not available
+            bool deallocate(s64 ptr, s64 size);    // Deallocates the node
+
+            bool split(node_t node); // Splits the node into two nodes
+
+            void add_size(u8 size_index, node_t node);
+            void remove_size(u8 size_index, node_t node);
+        };
+
+        // template <typename T> void segment_node_alloc_t<T>::setup(alloc_t* allocator, u8 node_count_2log, u8 max_span_2log)
+        template <typename T> void segment_node_alloc_t<T>::setup(alloc_t* allocator, int_t min_size, int_t max_size, int_t total_size)
+        {
+            const s8 min_size_shift = math::g_ilog2(min_size);
+            const s8 max_size_shift = math::g_ilog2(max_size);
+            const s8 tot_size_shift = math::g_ilog2(total_size);
+            const s8 num_sizes      = max_size_shift - min_size_shift;
+
+            m_min_size_shift   = min_size_shift;                  // The minimum size of a segment in log2
+            m_max_size_shift   = max_size_shift;                  // The maximum size of a segment in log2
+            m_total_size_shift = tot_size_shift;                  // The total size of the segment in log2
+            m_node_count_2log  = tot_size_shift - min_size_shift; // The number of bits needed to represent the total size
+
+            u32 const max_node_count = 1 << m_node_count_2log;
+            m_node_size              = g_allocate_array_and_clear<u8>(allocator, max_node_count);
+            m_node_next              = g_allocate_array_and_clear<node_t>(allocator, max_node_count);
+            m_node_prev              = g_allocate_array_and_clear<node_t>(allocator, max_node_count);
+
+            u32 const size_list_count = m_node_count_2log + 1;
+            m_size_lists              = g_allocate_array_and_memset<node_t>(allocator, size_list_count, 0xFFFFFFFF);
+            m_size_list_occupancy     = 0;
+
+            // Split the full range into nodes of the maximum size
+            u32 const node_count = 1 << (tot_size_shift - max_size_shift);
+            for (u32 n = 0; n < node_count; n += (1 << max_size_shift))
+            {
+                m_node_size[n] = max_size_shift;
+                add_size(max_size_shift, n);
+            }
+        }
+
+        template <typename T> void segment_node_alloc_t<T>::teardown(alloc_t* allocator)
+        {
+            allocator->deallocate(m_node_size);
+            allocator->deallocate(m_node_next);
+            allocator->deallocate(m_node_prev);
+            allocator->deallocate(m_size_lists);
+        }
+
+        template <typename T> bool segment_node_alloc_t<T>::split(node_t node)
+        {
+            const u8 span = m_node_size[node];
+            remove_size(span, node);
+
+            // Split the node into two nodes
+            node_t const insert = node + (1 << (span - 1));
+            m_node_size[node]   = span - 1;
+            m_node_size[insert] = span - 1;
+
+            // Invalidate the next and previous pointers of the new node (debugging)
+            m_node_next[insert] = (node_t)c_null;
+            m_node_prev[insert] = (node_t)c_null;
+
+            // Add node and insert into the size list that is (index - 1)
+            add_size(span - 1, node);
+            add_size(span - 1, insert);
+
             return true;
         }
 
-        void deallocate(s64 offset, s32 size)
+        template <typename T> void segment_node_alloc_t<T>::add_size(u8 index, node_t node)
         {
-            // compute the bit from the offset and size
-
-            // set bit in the bitmap at size_index
-
-            // Merge:
-            // if there are now 2 bits set (even+odd) in the bitmap at size_index,
-            // then we need to clear them and set the bitmap of (size_index + 1)
-            // and set the bit in that bitmap, etc..
-        }
-
-        void initialize(alloc_t* allocator, int_t min_size, int_t max_size)
-        {
-            ASSERT(min_size < max_size && math::g_ispo2(min_size) && math::g_ispo2(max_size));
-
-            s8 min_size_shift = math::g_ilog2(min_size);
-            s8 max_size_shift = math::g_ilog2(max_size);
-            s8 num_sizes      = max_size_shift - min_size_shift;
-
-            // Allocate the count and offsets array's
-            m_countandoffsets_0 = g_allocate_array_and_clear<s32>(allocator, num_sizes * 2);
-            m_countandoffsets_1 = g_allocate_array_and_clear<s32>(allocator, num_sizes * 2);
-            m_countandoffsets_2 = g_allocate_array_and_clear<s32>(allocator, num_sizes * 2);
-
-            // Determine the size and offsets for level 0
-            u32 level0_size_in_bits = 0;
-            u32 level1_size_in_bits = 0;
-            u32 level2_size_in_bits = 0;
-
-            u32 size = 1 << min_size_shift;
-            for (s8 i = 0; i < num_sizes; ++i)
+            node_t& head = m_size_lists[index];
+            if (head == (node_t)c_null)
             {
-                // How many bits on each level for this size?
-                m_countandoffsets_0[(i*2)+0] = size;
-                m_countandoffsets_1[(i*2)+0] = size >> 6;
-                m_countandoffsets_2[(i*2)+0] = size >> 12;
-
-                // Note: Offset is the number of u64
-                m_countandoffsets_0[(i*2)+1] = (level0_size_in_bits >> 6);
-                m_countandoffsets_1[(i*2)+1] = (level1_size_in_bits >> 6);
-                m_countandoffsets_2[(i*2)+1] = (level2_size_in_bits >> 6);
-
-                level0_size_in_bits += size;
-                level0_size_in_bits = math::g_alignUp(level0_size_in_bits, 64);
-
-                level1_size_in_bits += (size >> 6);
-                level1_size_in_bits = math::g_alignUp(level1_size_in_bits, 64);
-
-                level2_size_in_bits += (size >> 12);
-                level2_size_in_bits = math::g_alignUp(level2_size_in_bits, 64);
-
-                size = math::g_max(size >> 1, (u32)64);
+                head              = node;
+                m_node_next[node] = node;
+                m_node_prev[node] = node;
+                m_size_list_occupancy |= ((u64)1 << index);
+                return;
             }
 
-            m_level0 = g_allocate_array_and_clear<u64>(allocator, level0_size_in_bits >> 6);
-            m_level1 = g_allocate_array_and_clear<u64>(allocator, level1_size_in_bits >> 6);
-            m_level2 = g_allocate_array_and_clear<u64>(allocator, level2_size_in_bits >> 6);
+            node_t const prev = m_node_prev[head];
+            m_node_next[prev] = node;
+            m_node_prev[head] = node;
+            m_node_next[node] = head;
+            m_node_prev[node] = prev;
 
-            m_min_size_shift = min_size_shift;
-            m_max_size_shift = max_size_shift;
-            m_num_sizes      = num_sizes;
-
-            // Initialize the size_free bitmap and the highest size bitmap
-            m_size_free = (1 << m_num_sizes);
-            m_level2[m_num_sizes - 1] = 1;
+            m_size_list_occupancy |= ((u64)1 << index);
         }
-    };
 
+        template <typename T> void segment_node_alloc_t<T>::remove_size(u8 index, node_t node)
+        {
+            ASSERT(index >= 0 && index <= (m_node_count_2log + 1));
+            node_t& head                   = m_size_lists[index];
+            head                           = (head == node) ? m_node_next[node] : head;
+            head                           = (head == node) ? (node_t)c_null : head;
+            m_node_next[m_node_prev[node]] = m_node_next[node];
+            m_node_prev[m_node_next[node]] = m_node_prev[node];
+            m_node_next[node]              = (node_t)c_null;
+            m_node_prev[node]              = (node_t)c_null;
+
+            if (head == (node_t)c_null)
+                m_size_list_occupancy &= ~((u64)1 << index);
+        }
+
+        //        template <typename T> bool segment_node_alloc_t<T>::allocate(u32 size, node_t& out_node)
+        template <typename T> bool segment_node_alloc_t<T>::allocate(s64 size, s64& out_ptr)
+        {
+            u8 const span  = math::g_ilog2(size);
+            u8 const index = span;
+
+            node_t node = m_size_lists[index];
+            if (node == (node_t)c_null)
+            {
+                // In the occupancy find a bit set that is above our size
+                // Mask out the bits below size and then do a find first bit
+                u64 const occupancy = m_size_list_occupancy & ~(((u64)1 << index) - 1);
+                if (occupancy == 0) // There are no free sizes available
+                    return false;
+
+                u8 occ = math::g_findFirstBit(occupancy);
+                node   = m_size_lists[occ];
+                while (occ > index)
+                {
+                    split(node); // Split the node until we reach the size
+                    occ -= 1;
+                }
+            }
+
+            remove_size(index, node);
+
+            m_node_size[node] |= 0x80; // Mark the node as allocated
+
+            // out_node = node;
+            // compute the pointer from 'node'
+            out_ptr = ((s64)1 << m_min_size_shift) * node;
+
+            return true;
+        }
+
+        //        template <typename T> void segment_node_alloc_t<T>::deallocate(node_t node)
+        template <typename T> bool segment_node_alloc_t<T>::deallocate(s64 ptr, s64 size)
+        {
+            node_t node = (node_t)(ptr >> m_min_size_shift);
+
+            if (node == c_null || node >= (1 << m_node_count_2log))
+                return false;
+
+            m_node_size[node] &= ~0x80; // Mark the node as free
+
+            u8 span  = m_node_size[node];
+            u8 index = span;
+
+            // Keep span smaller or equal to the largest span allowed
+            while (span < m_max_size_shift)
+            {
+                // Could be that we are freeing the largest size allocation, this means
+                // that we should not merge the node with its sibling.
+                if (index == m_node_count_2log)
+                    break;
+
+                const node_t sibling = ((node & ((2 << span) - 1)) == 0) ? node + (1 << span) : node - (1 << span);
+
+                // Check if the sibling is free
+                if ((m_node_size[sibling] & 0x80) == 0x80)
+                    break;
+
+                remove_size(index, sibling);                           // Sibling is being merged, remove it
+                node_t const merged = node < sibling ? node : sibling; // Always take the left node as the merged node
+                node_t const other  = node < sibling ? sibling : node; // Always take the right node as the other node
+                m_node_size[merged] = span + 1;                        // Double the span (size) of the node
+                m_node_size[other]  = 0;                               // Invalidate the node that is merged into 'merged'
+
+                node  = merged;
+                span  = m_node_size[node] & 0x7F;
+                index = span;
+            }
+
+            add_size(index, node); // Add the merged node to the size list
+            return true;
+        }
+
+        class segment_alloc_imp_t : public segment_alloc_t
+        {
+        public:
+            void release(alloc_t* allocator) { v_release(allocator); }
+
+        protected:
+            virtual void v_release(alloc_t* allocator) = 0;
+        };
+
+        class segment_bitmap_allocator_t : public segment_alloc_imp_t
+        {
+        public:
+            segment_bitmap_alloc_t m_allocator;
+
+            virtual void v_release(alloc_t* allocator) final
+            {
+                m_allocator.teardown(allocator);
+                allocator->deallocate(this);
+            }
+
+            virtual bool v_allocate(s64 size, s64& out_ptr) final { return m_allocator.allocate(size, out_ptr); }
+            virtual bool v_deallocate(s64 ptr, s64 size) final { return m_allocator.deallocate(ptr, size); }
+        };
+
+        segment_alloc_t* g_create_segment_b_allocator(alloc_t* allocator, int_t min_size, int_t max_size, int_t total_size)
+        {
+            segment_bitmap_allocator_t* alloc = g_allocate<segment_bitmap_allocator_t>(allocator);
+            if (alloc == nullptr)
+                return nullptr;
+            alloc->m_allocator.initialize(allocator, min_size, max_size, total_size);
+            return alloc;
+        }
+
+        class segment_node16_allocator_t : public segment_alloc_imp_t
+        {
+        public:
+            segment_node_alloc_t<u16> m_allocator;
+
+            virtual void v_release(alloc_t* allocator) final
+            {
+                m_allocator.teardown(allocator);
+                allocator->deallocate(this);
+            }
+
+            virtual bool v_allocate(s64 size, s64& out_ptr) final { return m_allocator.allocate(size, out_ptr); }
+            virtual bool v_deallocate(s64 ptr, s64 size) final { return m_allocator.deallocate(ptr, size); }
+        };
+
+        segment_alloc_t* g_create_segment_n_allocator(alloc_t* allocator, int_t min_size, int_t max_size, int_t total_size)
+        {
+            // Figure out from the min_size, max_size and total_size which type we need for the
+            // segment node allocator, u8, u16 or u32.
+
+            segment_node16_allocator_t* alloc = g_allocate<segment_node16_allocator_t>(allocator);
+            if (alloc == nullptr)
+                return nullptr;
+            alloc->m_allocator.setup(allocator, min_size, max_size, total_size);
+            return alloc;
+        }
+
+        void g_teardown(alloc_t* alloc, segment_alloc_t* allocator)
+        {
+            segment_alloc_imp_t* imp = static_cast<segment_alloc_imp_t*>(allocator);
+            imp->release(alloc);
+        }
+    }; // namespace nsegmented
 }; // namespace ncore

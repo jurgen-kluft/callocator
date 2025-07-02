@@ -21,6 +21,7 @@ namespace ncore
         {
             m_active_frames[i] = 0;
             m_ended_frames[i]  = 0;
+            m_frames[i]        = nullptr;
             m_arena[i]         = nullptr;
         }
     }
@@ -37,8 +38,7 @@ namespace ncore
         {
             m_active_frames[i] = 0;
             m_ended_frames[i]  = 0;
-            m_arena[i]->reset();
-            m_arena[i]->commit(sizeof(frame_t) * m_max_active_frames, alignof(frame_t));
+            m_arena[i]->restore(m_save_points[i]);
         }
         m_active_lane = 0;
         // m_max_active_frames = ?;
@@ -51,12 +51,14 @@ namespace ncore
         for (s32 i = 0; i < 2; i++)
         {
             vmem_arena_t a;
-            a.reserved(max_reserved_size);
-            a.committed((sizeof(frame_t) * max_active_frames) + average_frame_size * max_active_frames);
-
+            a.reserved((sizeof(frame_t) * max_active_frames) + sizeof(vmem_arena_t) + max_reserved_size);
             vmem_arena_t* arena = (vmem_arena_t*)a.commit(sizeof(vmem_arena_t));
+            a.committed((sizeof(frame_t) * max_active_frames) + average_frame_size * max_active_frames);
+            m_frames[i] = (frame_t*)a.commit_and_zero(sizeof(frame_t) * max_active_frames);
+
             *arena = a;
 
+            m_save_points[i] = arena->save();
             m_arena[i] = arena;
         }
         reset();
@@ -71,14 +73,28 @@ namespace ncore
         {
             // We have reached the maximum number of active frames, switch lanes.
             // Before we switch we need to ensure that the first arena is not occupied anymore.
-            ASSERT(m_active_lane == 0 || m_arena[0]->m_pos == 0);
-            m_active_lane = 1 - m_active_lane;
+            const s32 new_lane = 1 - m_active_lane;
 
-            if (m_active_frames[m_active_lane] == m_ended_frames[m_active_lane])
+            // Did all the frames in this new lane end
+            for (s32 i = 0; i < m_active_frames[new_lane]; i++)
             {
-                m_active_frames[m_active_lane] = 0;
-                m_ended_frames[m_active_lane]  = 0;
-                m_arena[m_active_lane]->reset(); // Reset the arena for the new lane
+                frame_t* frame_array = (frame_t*)m_frames[new_lane];
+                if (frame_array[i].m_frame_number != -1)
+                {
+                    // If we find a frame that is not ended, we cannot switch lanes
+                    ASSERT(false);
+                    return -1; // Indicate an error
+                }
+            }
+
+            if (m_active_frames[new_lane] == m_ended_frames[new_lane])
+            {
+                m_active_frames[new_lane] = 0;
+                m_ended_frames[new_lane]  = 0;
+
+                m_arena[new_lane]->reset(); // Reset the arena for the new lane
+                m_arena[new_lane]->commit(sizeof(vmem_arena_t));
+                m_frames[new_lane] = (frame_t*)m_arena[new_lane]->commit_and_zero(sizeof(frame_t) * m_max_active_frames);
             }
             else
             {
@@ -86,9 +102,11 @@ namespace ncore
                 // This should not happen, as we are supposed to end all frames before switching lanes.
                 ASSERT(false);
             }
+
+            m_active_lane = new_lane;
         }
 
-        frame_t* frame_array           = (frame_t*)m_arena[m_active_lane]->m_base;
+        frame_t* frame_array           = (frame_t*)m_frames[m_active_lane];
         frame_t* new_frame             = &frame_array[m_active_frames[m_active_lane]];
         new_frame->m_frame_number      = m_active_frames[m_active_lane];
         new_frame->m_num_allocations   = 0;
@@ -105,6 +123,7 @@ namespace ncore
     {
         ASSERT(m_current_frame != nullptr && m_current_frame->m_ended == 0);
         m_current_frame->m_ended = 1;
+        ASSERT(m_ended_frames[m_active_lane] < m_max_active_frames);
         m_ended_frames[m_active_lane]++;
         m_current_frame = nullptr;
         return true;
@@ -117,7 +136,7 @@ namespace ncore
         ASSERT(lane >= 0 && lane < 2);
         ASSERT(frame_number >= 0 && frame_number < m_max_active_frames);
 
-        frame_t* frame_array = (frame_t*)m_arena[lane]->m_base;
+        frame_t* frame_array = (frame_t*)m_frames[lane];
         frame_t* frame       = &frame_array[frame_number];
 
         if (frame->m_frame_number != frame_number)

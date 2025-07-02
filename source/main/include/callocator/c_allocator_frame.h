@@ -54,6 +54,8 @@ namespace ncore
         s32           m_active_lane;       // Current lane, either 0 or 1, used for switching between two arenas
         s32           m_max_active_frames; // Maximum number of active frames, used for switching between two arenas
         frame_t*      m_current_frame;     // Current frame, used for allocating memory
+        frame_t*      m_frames[2];         // N frames per lane
+        s64           m_save_points[2];    // Arena save points for each lane
         vmem_arena_t* m_arena[2];          // Virtual memory arenas
 
     private:

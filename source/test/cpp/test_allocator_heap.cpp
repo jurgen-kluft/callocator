@@ -6,7 +6,7 @@
 
 using namespace ncore;
 
-UNITTEST_SUITE_BEGIN(tlfs)
+UNITTEST_SUITE_BEGIN(heap)
 {
     UNITTEST_FIXTURE(main)
     {
