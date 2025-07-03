@@ -34,7 +34,7 @@ namespace ncore
                 const s8 min_size_shift = math::g_ilog2(min_size);
                 const s8 max_size_shift = math::g_ilog2(max_size);
                 const s8 tot_size_shift = math::g_ilog2(total_size);
-                const s8 num_sizes      = max_size_shift - min_size_shift;
+                const s8 num_sizes      = 1 + max_size_shift - min_size_shift;
 
                 // Allocate the count and offsets array's
                 m_offsets_0 = g_allocate_array_and_clear<s32>(allocator, num_sizes);
@@ -46,24 +46,32 @@ namespace ncore
                 s32 level1_size_in_bits = 0;
                 s32 level2_size_in_bits = 0;
 
-                s32 size = 1 << (tot_size_shift - min_size_shift);
+                s32 size_in_bits = 1 << (tot_size_shift - min_size_shift);
                 for (s8 i = 0; i < num_sizes; ++i)
                 {
                     // Note: Offset is the number of u64
-                    m_offsets_0[i] = size > 0 ? (level0_size_in_bits >> 6) : -1;
-                    m_offsets_1[i] = ((size >> 6) > 0) ? (level1_size_in_bits >> 6) : -1;
-                    m_offsets_2[i] = ((size >> 12) > 0) ? (level2_size_in_bits >> 6) : -1;
+                    const s32 offset0 = level0_size_in_bits >> 6;
+                    const s32 offset1 = level1_size_in_bits >> 6;
+                    const s32 offset2 = level2_size_in_bits >> 6;
 
-                    level0_size_in_bits += size;
+                    const s32 count0 = size_in_bits;
+                    const s32 count1 = size_in_bits >> 6;
+                    const s32 count2 = size_in_bits >> 12;
+
+                    m_offsets_0[i] = offset0;
+                    m_offsets_1[i] = count1 > 0 ? offset1 : -1;
+                    m_offsets_2[i] = count2 > 0 ? offset2 : -1;
+
+                    level0_size_in_bits += count0;
                     level0_size_in_bits = math::g_alignUp(level0_size_in_bits, 64);
 
-                    level1_size_in_bits += (size >> 6);
+                    level1_size_in_bits += count1;
                     level1_size_in_bits = math::g_alignUp(level1_size_in_bits, 64);
 
-                    level2_size_in_bits += (size >> 12);
+                    level2_size_in_bits += count2;
                     level2_size_in_bits = math::g_alignUp(level2_size_in_bits, 64);
 
-                    size = math::g_max(size >> 1, (s32)64);
+                    size_in_bits = math::g_max(size_in_bits >> 1, (s32)1);
                 }
 
                 m_level0 = g_allocate_array_and_clear<u64>(allocator, level0_size_in_bits >> 6);
@@ -76,8 +84,8 @@ namespace ncore
                 m_num_sizes        = num_sizes;
 
                 // Initialize the size_free bitmap and the highest size bitmap
-                m_size_free               = (1 << m_num_sizes);
-                m_level2[m_num_sizes - 1] = 1;
+                m_size_free = (1 << (m_num_sizes - 1));
+                DVERIFY(set_bit(m_num_sizes - 1, 0), 1); // Set the highest size bit to indicate that it is available
             }
 
             void teardown(alloc_t* allocator)
@@ -90,14 +98,14 @@ namespace ncore
                 g_deallocate_array(allocator, m_offsets_2);
             }
 
-            static inline void s_set_level_bit(s8 size_index, s32 offset, s32 bit, u64* level)
+            static inline void s_set_level_bit(s32 offset, s32 bit, u64* level)
             {
                 const s32 bo = (bit >> 6);
                 const s32 bi = (bit & (64 - 1));
                 level[offset + bo] |= (1 << bi);
             }
 
-            static inline u64 s_clr_level_bit(s8 size_index, s32 offset, s32 bit, u64* level)
+            static inline u64 s_clr_level_bit(s32 offset, s32 bit, u64* level)
             {
                 const s32 bo = (bit >> 6);
                 const s32 bi = (bit & (64 - 1));
@@ -108,22 +116,23 @@ namespace ncore
 
             u64 clr_bit(s8 size_index, s32 bit)
             {
+                ASSERT(size_index >= 0 && size_index < m_num_sizes);
                 ASSERT(bit >= 0 && ((bit & 3) == 0 || (bit & 3) == 2 || (bit & 3) == 4 || (bit & 3) == 6));
 
                 s32 offset = m_offsets_0[size_index];
-                u64 state  = s_clr_level_bit(size_index, offset, bit, m_level0);
+                u64 state  = s_clr_level_bit(offset, bit, m_level0);
 
                 offset = m_offsets_1[size_index];
                 if (offset >= 0)
                 {
                     bit   = bit >> 6; // To level 1
-                    state = s_clr_level_bit(size_index, offset, bit, m_level1);
+                    state = s_clr_level_bit(offset, bit, m_level1);
 
                     offset = m_offsets_2[size_index];
                     if (offset >= 0)
                     {
                         bit   = bit >> 6; // To level 2
-                        state = s_clr_level_bit(size_index, offset, bit, m_level2);
+                        state = s_clr_level_bit(offset, bit, m_level2);
                     }
                 }
 
@@ -132,6 +141,7 @@ namespace ncore
 
             s32 find_bit(s8 size_index) const
             {
+                ASSERT(size_index >= 0 && size_index < m_num_sizes);
                 s32 bit = 0;
 
                 s32 offset = m_offsets_2[size_index];
@@ -159,22 +169,21 @@ namespace ncore
                 return bit;
             }
 
-            bool set_level0_bit(s8 size_index, s32 offset, s32 bit)
+            void set_level0_bit(s32 offset, s32 bit)
             {
                 u64&      l0 = m_level0[offset + (bit >> 6)];
                 const u32 bi = (bit & (64 - 1));
                 l0           = l0 | (1 << bi);
-                return ((l0 >> (bi & 0xfe)) == 3);
             }
 
-            bool get_level0_bit(s8 size_index, s32 offset, s32 bit)
+            bool get_level0_bit(s32 offset, s32 bit)
             {
                 u64&      l0 = m_level0[offset + (bit >> 6)];
                 const u32 bi = (bit & (64 - 1));
                 return (l0 & (1 << bi)) != 0;
             }
 
-            void set_level0_pair(s8 size_index, s32 offset, s32 bit)
+            void set_level0_pair(s32 offset, s32 bit)
             {
                 const u32 bo = (bit >> 6);
                 const u32 bi = (bit & (64 - 1));
@@ -189,27 +198,28 @@ namespace ncore
             // returns 1 when setting the bit resulted in a single bit set.
             s8 set_bit(s8 size_index, s32 bit)
             {
+                ASSERT(size_index >= 0 && size_index < m_num_sizes);
                 ASSERT(bit >= 0 && ((bit & 3) == 0 || (bit & 3) == 2 || (bit & 3) == 4 || (bit & 3) == 6));
                 s32 offset = m_offsets_0[size_index];
-                if (get_level0_bit(size_index, offset, bit ^ 1))
+                if (get_level0_bit(offset, bit ^ 1))
                 {
                     if (clr_bit(size_index, bit ^ 1) == 0)
                         return 0;
                     return 2;
                 }
 
-                set_level0_bit(size_index, offset, bit);
+                set_level0_bit(offset, bit);
                 offset = m_offsets_1[size_index];
                 if (offset >= 0)
                 {
                     bit = bit >> 6; // To level 1
-                    s_set_level_bit(size_index, offset, bit, m_level1);
+                    s_set_level_bit(offset, bit, m_level1);
 
                     offset = m_offsets_2[size_index];
                     if (offset >= 0)
                     {
                         bit = bit >> 6; // To level 2
-                        s_set_level_bit(size_index, offset, bit, m_level2);
+                        s_set_level_bit(offset, bit, m_level2);
                     }
                 }
 
@@ -218,22 +228,23 @@ namespace ncore
 
             void set_2bits(s8 size_index, s32 bit)
             {
+                ASSERT(size_index >= 0 && size_index < m_num_sizes);
                 ASSERT(bit >= 0 && ((bit & 3) == 0 || (bit & 3) == 2 || (bit & 3) == 4 || (bit & 3) == 6));
 
                 s32 offset = m_offsets_0[size_index];
-                set_level0_pair(size_index, offset, bit);
+                set_level0_pair(offset, bit);
 
                 offset = m_offsets_1[size_index];
                 if (offset >= 0)
                 {
                     bit = bit >> 6;
-                    s_set_level_bit(size_index, offset, bit, m_level1);
+                    s_set_level_bit(offset, bit, m_level1);
 
                     offset = m_offsets_2[size_index];
                     if (offset >= 0)
                     {
                         bit = bit >> 6;
-                        s_set_level_bit(size_index, offset, bit, m_level2);
+                        s_set_level_bit(offset, bit, m_level2);
                     }
                 }
             }
@@ -250,7 +261,7 @@ namespace ncore
                 const s8 size_index = size_to_index(size);
 
                 // We can detect bits set in m_size_free directly
-                const u32 size_free = (m_size_free & ((1 << (size_index + 1)) - 1));
+                const u32 size_free = (m_size_free & ~((1 << size_index) - 1));
                 if (size_free == 0)
                 {
                     // Fragmented or OOM ?
@@ -259,29 +270,29 @@ namespace ncore
                 }
 
                 // Which (highest) bit is set in size_free?
-                s8  free_index = math::g_findFirstBit(size_free);
-                s32 bit        = find_bit(free_index);
+                s8  size_free_index = math::g_findFirstBit(size_free);
+                s32 bit             = find_bit(size_free_index);
 
                 // Note:
                 // Size bitmap at index 0 has (1 << (m_min_size_shift)) bits
                 // Size bitmap at (m_num_levels - 1) effectively only has 1 bit
 
-                while (free_index > size_index)
+                while (size_free_index > size_index)
                 {
-                    if (clr_bit(free_index, bit) == 0)
+                    if (clr_bit(size_free_index, bit) == 0)
                     {
-                        m_size_free &= ~(1 << free_index);
+                        m_size_free &= ~(1 << size_free_index);
                     }
 
-                    free_index--;
+                    size_free_index--;
 
                     bit = (bit << 1);
 
                     // Set both bits
-                    set_2bits(free_index, bit);
+                    set_2bits(size_free_index, bit);
 
                     // Mark the bit in 'size_free bitmap' to indicate that we have a free element at this size
-                    m_size_free |= (1 << free_index);
+                    m_size_free |= (1 << size_free_index);
                 }
 
                 // Clear the bit in the bitmap at size_index
