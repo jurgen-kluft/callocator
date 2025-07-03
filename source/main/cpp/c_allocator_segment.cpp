@@ -10,29 +10,10 @@ namespace ncore
 {
     namespace nsegmented
     {
-        // Note: What about a hierarchical bitset per size ?
-        //
-        // So from a memory usage point of view, the bitmap approach is 1/8th to 1/16th
-        // the size of the node approach.
-        //
-        // This is significant and might even allow us to track free chunks instead of sections.
-        //
-        // Allocate(size int_t) (node node_t):
-        // - Compute size-index from size
-        // - Use m_size_free to get a size index that has free elements
-        // - If we did not find a bit in m_size_free, then we are out of memory
-        //   - If we found a free element at a higher size-bitmap, we can keep splitting it into two
-        //     elements for a lower level and do this until we reach the size-index of the requested size.
-        // Deallocate(node node_t):
-        //   - Merging:
-        //     - We now have 2 bits set at an even+odd bit position, so we need clear these 2 bits and go
-        //       up one size-bitmap and set a bit there. When we again have 2 bits set at an even+odd bit
-        //       position, we clear them and set the next size-bitmap bit, and so on.
-        //     - Q: do we need to merge immediately, or can we delay this in some way ?
-        //
-
         struct segment_bitmap_alloc_t
         {
+            DCORE_CLASS_PLACEMENT_NEW_DELETE
+
             s8   m_min_size_shift;   // The minimum size of a segment in log2
             s8   m_max_size_shift;   // The maximum size of a segment in log2
             s8   m_total_size_shift; // The total size of the segment in log2
@@ -340,6 +321,8 @@ namespace ncore
         // A segmented allocator that allocates memory in segments of 2^N
         template <typename T> struct segment_node_alloc_t
         {
+            DCORE_CLASS_PLACEMENT_NEW_DELETE
+
             static const T c_null = ~0;
             typedef T      node_t;
 
@@ -348,10 +331,10 @@ namespace ncore
             node_t* m_node_prev;           // Previous node in the size list
             u64     m_size_list_occupancy; // Which size list is non-empty
             node_t* m_size_lists;          // Every size has its own list
-            s8      m_min_size_shift;      // The minimum size of a segment in log2
-            s8      m_max_size_shift;      // The maximum size of a segment in log2
-            s8      m_total_size_shift;    // The total size of the segment in log2
-            s8      m_node_count_2log;     // The number of sizes available
+            u8      m_min_size_shift;      // The minimum size of a segment in log2
+            u8      m_max_size_shift;      // The maximum size of a segment in log2
+            u8      m_total_size_shift;    // The total size of the segment in log2
+            u8      m_node_count_shift;    // The number of sizes available
 
             void setup(alloc_t* allocator, int_t min_size, int_t max_size, int_t total_size);
             void teardown(alloc_t* allocator);
@@ -370,32 +353,42 @@ namespace ncore
         // template <typename T> void segment_node_alloc_t<T>::setup(alloc_t* allocator, u8 node_count_2log, u8 max_span_2log)
         template <typename T> void segment_node_alloc_t<T>::setup(alloc_t* allocator, int_t min_size, int_t max_size, int_t total_size)
         {
-            const s8 min_size_shift = math::g_ilog2(min_size);
-            const s8 max_size_shift = math::g_ilog2(max_size);
-            const s8 tot_size_shift = math::g_ilog2(total_size);
-            const s8 num_sizes      = max_size_shift - min_size_shift;
+            ASSERT(math::g_ispo2(min_size) && math::g_ispo2(max_size) && math::g_ispo2(total_size));
+            ASSERT(min_size < max_size && max_size <= total_size);
+
+            const u8 min_size_shift = math::g_ilog2(min_size);
+            const u8 max_size_shift = math::g_ilog2(max_size);
+            const u8 tot_size_shift = math::g_ilog2(total_size);
 
             m_min_size_shift   = min_size_shift;                  // The minimum size of a segment in log2
             m_max_size_shift   = max_size_shift;                  // The maximum size of a segment in log2
             m_total_size_shift = tot_size_shift;                  // The total size of the segment in log2
-            m_node_count_2log  = tot_size_shift - min_size_shift; // The number of bits needed to represent the total size
+            m_node_count_shift = tot_size_shift - min_size_shift; // The number of bits needed to represent the largest node span
+            ASSERT(m_node_count_shift <= sizeof(node_t) * 8);     // Ensure that the maximum node index fits in a node_t
 
-            u32 const max_node_count = 1 << m_node_count_2log;
+            u32 const max_node_count = 1 << m_node_count_shift;
             m_node_size              = g_allocate_array_and_clear<u8>(allocator, max_node_count);
             m_node_next              = g_allocate_array_and_clear<node_t>(allocator, max_node_count);
             m_node_prev              = g_allocate_array_and_clear<node_t>(allocator, max_node_count);
-
-            u32 const size_list_count = m_node_count_2log + 1;
-            m_size_lists              = g_allocate_array_and_memset<node_t>(allocator, size_list_count, 0xFFFFFFFF);
-            m_size_list_occupancy     = 0;
+            m_size_lists             = g_allocate_array_and_memset<node_t>(allocator, m_node_count_shift + 1, 0xFFFFFFFF);
 
             // Split the full range into nodes of the maximum size
-            u32 const node_count = 1 << (tot_size_shift - max_size_shift);
-            for (u32 n = 0; n < node_count; n += (1 << max_size_shift))
+            u32 const node_span_shift = (max_size_shift - min_size_shift);
+            u32 const node_count      = (1 << m_node_count_shift);
+            u32 const node_span       = (1 << node_span_shift);
+            u32       prev            = node_count - node_span;
+            for (u32 n = 0; n < node_count; n += node_span)
             {
-                m_node_size[n] = max_size_shift;
-                add_size(max_size_shift, n);
+                m_node_size[n] = node_span_shift;
+
+                m_node_next[prev] = n;
+                m_node_prev[n]    = prev;
+
+                prev = n;
             }
+
+            m_size_list_occupancy |= ((u64)1 << node_span_shift);
+            m_size_lists[node_span_shift] = 0;
         }
 
         template <typename T> void segment_node_alloc_t<T>::teardown(alloc_t* allocator)
@@ -427,31 +420,32 @@ namespace ncore
             return true;
         }
 
-        template <typename T> void segment_node_alloc_t<T>::add_size(u8 index, node_t node)
+        template <typename T> void segment_node_alloc_t<T>::add_size(u8 span, node_t node)
         {
-            node_t& head = m_size_lists[index];
+            node_t& head = m_size_lists[span];
             if (head == (node_t)c_null)
             {
-                head              = node;
                 m_node_next[node] = node;
                 m_node_prev[node] = node;
-                m_size_list_occupancy |= ((u64)1 << index);
-                return;
+            }
+            else
+            {
+                node_t const prev = m_node_prev[head];
+                m_node_next[prev] = node;
+                m_node_prev[head] = node;
+                m_node_next[node] = head;
+                m_node_prev[node] = prev;
             }
 
-            node_t const prev = m_node_prev[head];
-            m_node_next[prev] = node;
-            m_node_prev[head] = node;
-            m_node_next[node] = head;
-            m_node_prev[node] = prev;
+            head = node;
 
-            m_size_list_occupancy |= ((u64)1 << index);
+            m_size_list_occupancy |= ((u64)1 << span);
         }
 
-        template <typename T> void segment_node_alloc_t<T>::remove_size(u8 index, node_t node)
+        template <typename T> void segment_node_alloc_t<T>::remove_size(u8 span, node_t node)
         {
-            ASSERT(index >= 0 && index <= (m_node_count_2log + 1));
-            node_t& head                   = m_size_lists[index];
+            ASSERT(span >= 0 && span <= (m_max_size_shift - m_min_size_shift));
+            node_t& head                   = m_size_lists[span];
             head                           = (head == node) ? m_node_next[node] : head;
             head                           = (head == node) ? (node_t)c_null : head;
             m_node_next[m_node_prev[node]] = m_node_next[node];
@@ -460,34 +454,32 @@ namespace ncore
             m_node_prev[node]              = (node_t)c_null;
 
             if (head == (node_t)c_null)
-                m_size_list_occupancy &= ~((u64)1 << index);
+                m_size_list_occupancy &= ~((u64)1 << span);
         }
 
-        //        template <typename T> bool segment_node_alloc_t<T>::allocate(u32 size, node_t& out_node)
         template <typename T> bool segment_node_alloc_t<T>::allocate(s64 size, s64& out_ptr)
         {
-            u8 const span  = math::g_ilog2(size);
-            u8 const index = span;
+            u8 const span = math::g_ilog2(size) - m_min_size_shift;
 
-            node_t node = m_size_lists[index];
+            node_t node = m_size_lists[span];
             if (node == (node_t)c_null)
             {
                 // In the occupancy find a bit set that is above our size
                 // Mask out the bits below size and then do a find first bit
-                u64 const occupancy = m_size_list_occupancy & ~(((u64)1 << index) - 1);
+                u64 const occupancy = m_size_list_occupancy & ~(((u64)1 << span) - 1);
                 if (occupancy == 0) // There are no free sizes available
                     return false;
 
                 u8 occ = math::g_findFirstBit(occupancy);
                 node   = m_size_lists[occ];
-                while (occ > index)
+                while (occ > span)
                 {
                     split(node); // Split the node until we reach the size
                     occ -= 1;
                 }
             }
 
-            remove_size(index, node);
+            remove_size(span, node);
 
             m_node_size[node] |= 0x80; // Mark the node as allocated
 
@@ -498,45 +490,37 @@ namespace ncore
             return true;
         }
 
-        //        template <typename T> void segment_node_alloc_t<T>::deallocate(node_t node)
         template <typename T> bool segment_node_alloc_t<T>::deallocate(s64 ptr, s64 size)
         {
             node_t node = (node_t)(ptr >> m_min_size_shift);
 
-            if (node == c_null || node >= (1 << m_node_count_2log))
+            if (node == c_null || node >= (1 << m_node_count_shift))
                 return false;
 
             m_node_size[node] &= ~0x80; // Mark the node as free
 
-            u8 span  = m_node_size[node];
-            u8 index = span;
+            u8 span = m_node_size[node];
 
             // Keep span smaller or equal to the largest span allowed
-            while (span < m_max_size_shift)
+            while (span < (m_max_size_shift - m_min_size_shift))
             {
-                // Could be that we are freeing the largest size allocation, this means
-                // that we should not merge the node with its sibling.
-                if (index == m_node_count_2log)
-                    break;
-
                 const node_t sibling = ((node & ((2 << span) - 1)) == 0) ? node + (1 << span) : node - (1 << span);
 
                 // Check if the sibling is free
                 if ((m_node_size[sibling] & 0x80) == 0x80)
                     break;
 
-                remove_size(index, sibling);                           // Sibling is being merged, remove it
+                remove_size(span, sibling);                            // Sibling is being merged, remove it
                 node_t const merged = node < sibling ? node : sibling; // Always take the left node as the merged node
                 node_t const other  = node < sibling ? sibling : node; // Always take the right node as the other node
                 m_node_size[merged] = span + 1;                        // Double the span (size) of the node
                 m_node_size[other]  = 0;                               // Invalidate the node that is merged into 'merged'
 
-                node  = merged;
-                span  = m_node_size[node] & 0x7F;
-                index = span;
+                node = merged;
+                span = m_node_size[node] & 0x7F;
             }
 
-            add_size(index, node); // Add the merged node to the size list
+            add_size(span, node); // Add the merged node to the size list
             return true;
         }
 
@@ -552,6 +536,8 @@ namespace ncore
         class segment_bitmap_allocator_t : public segment_alloc_imp_t
         {
         public:
+            DCORE_CLASS_PLACEMENT_NEW_DELETE
+
             segment_bitmap_alloc_t m_allocator;
 
             virtual void v_release(alloc_t* allocator) final
@@ -566,7 +552,7 @@ namespace ncore
 
         segment_alloc_t* g_create_segment_b_allocator(alloc_t* allocator, int_t min_size, int_t max_size, int_t total_size)
         {
-            segment_bitmap_allocator_t* alloc = g_allocate<segment_bitmap_allocator_t>(allocator);
+            segment_bitmap_allocator_t* alloc = g_construct<segment_bitmap_allocator_t>(allocator);
             if (alloc == nullptr)
                 return nullptr;
             alloc->m_allocator.initialize(allocator, min_size, max_size, total_size);
@@ -576,6 +562,8 @@ namespace ncore
         class segment_node16_allocator_t : public segment_alloc_imp_t
         {
         public:
+            DCORE_CLASS_PLACEMENT_NEW_DELETE
+
             segment_node_alloc_t<u16> m_allocator;
 
             virtual void v_release(alloc_t* allocator) final
@@ -592,8 +580,7 @@ namespace ncore
         {
             // Figure out from the min_size, max_size and total_size which type we need for the
             // segment node allocator, u8, u16 or u32.
-
-            segment_node16_allocator_t* alloc = g_allocate<segment_node16_allocator_t>(allocator);
+            segment_node16_allocator_t* alloc = g_construct<segment_node16_allocator_t>(allocator);
             if (alloc == nullptr)
                 return nullptr;
             alloc->m_allocator.setup(allocator, min_size, max_size, total_size);

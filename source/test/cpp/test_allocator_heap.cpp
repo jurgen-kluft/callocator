@@ -34,6 +34,11 @@ UNITTEST_SUITE_BEGIN(heap)
             void* mem1 = tlsf->allocate(512, 8);
             void* mem2 = tlsf->allocate(1024, 16);
             void* mem3 = tlsf->allocate(256, 32);
+
+            CHECK_NOT_NULL(mem1);
+            CHECK_NOT_NULL(mem2);
+            CHECK_NOT_NULL(mem3);
+
             tlsf->deallocate(mem2);
             tlsf->deallocate(mem1);
             tlsf->deallocate(mem3);

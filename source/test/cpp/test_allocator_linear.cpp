@@ -100,6 +100,8 @@ UNITTEST_SUITE_BEGIN(linear)
                 memfull = nullptr;
                 alloc->deallocate(mema);
                 mema = nullptr;
+
+                alloc->reset();
             }
 
             CHECK_EQUAL(0, g_current_size(alloc));

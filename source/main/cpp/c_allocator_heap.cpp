@@ -41,11 +41,12 @@ namespace ncore
 
         struct context_t // size in bytes = 4 + (4) + 128 + 4096 + 8 = 4240
         {
+            DCORE_CLASS_PLACEMENT_NEW_DELETE
+
             u32      fl;                                  // 4 bytes, first level index
             u32      sl[TLSF_FL_COUNT];                   // 32 * 4 bytes = 128 bytes, second level indices
             block_t* block[TLSF_FL_COUNT][TLSF_SL_COUNT]; // 32 * 16 * 8 bytes = 4096 bytes, pointers to free blocks
             u64      size;                                // 8 bytes, total size of the managed memory region
-            DCORE_CLASS_PLACEMENT_NEW_DELETE
         };
 
         class allocator_t : public alloc_t
@@ -128,8 +129,14 @@ namespace ncore
         static_assert(FL_COUNT == TLSF_FL_COUNT, "invalid level configuration");
         static_assert(SL_COUNT == TLSF_SL_COUNT, "invalid level configuration");
 
-        static D_INLINE u32 bitmap_ffs(u32 x) { return (u32)math::g_findFirstBit(x); }
-        static D_INLINE s8  log2floor(uint_t x) { return math::g_ilog2(x); }
+        static D_INLINE u32 bitmap_ffs(u32 x)
+        {
+            return (u32)math::g_findFirstBit(x);
+        }
+        static D_INLINE s8  log2floor(uint_t x)
+        {
+            return math::g_ilog2(x);
+        }
 
         D_INLINE uint_t block_size(const block_t* block) { return block->header & ~BLOCK_BITS; }
         D_INLINE void   block_set_size(block_t* block, uint_t size)
@@ -673,7 +680,7 @@ namespace ncore
             m_arena->committed(size);
         }
 
-        return m_arena->m_base;
+        return m_arena->m_base + m_base_size;
     }
 
     alloc_t* g_create_heap(int_t initial_size, int_t reserved_size)

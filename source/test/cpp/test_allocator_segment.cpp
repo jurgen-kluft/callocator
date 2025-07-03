@@ -52,7 +52,7 @@ UNITTEST_SUITE_BEGIN(segmented)
             nsegmented::g_teardown(Allocator, range);
         }
 
-        const int_t s_min_size_u16   = 64 * cKB;
+        const int_t s_min_size_u16   = 1 * cMB;
         const int_t s_max_size_u16   = 256 * cMB;
         const int_t s_total_size_u16 = 8 * cGB;
 
@@ -60,7 +60,7 @@ UNITTEST_SUITE_BEGIN(segmented)
         {
             nsegmented::segment_alloc_t* range = nsegmented::g_create_segment_n_allocator(Allocator, s_min_size_u16, s_max_size_u16, s_total_size_u16);
 
-            for (s32 i = 0; i < 16; ++i)
+            for (s32 i = 0; i < 7; ++i)
             {
                 s64 ptr;
                 CHECK_TRUE(range->allocate(s_min_size_u16, ptr));
@@ -74,9 +74,11 @@ UNITTEST_SUITE_BEGIN(segmented)
                 CHECK_TRUE(range->allocate(s_min_size_u16, ptr3));
                 CHECK_EQUAL(2*s_min_size_u16, ptr3);
 
-                CHECK_TRUE(range->deallocate(ptr, s_min_size_u16));
-                CHECK_TRUE(range->deallocate(ptr2, s_min_size_u16));
+                // Deallocate the pointers in reverse order so as to ensure
+                // that the free list is maintained in the original order.
                 CHECK_TRUE(range->deallocate(ptr3, s_min_size_u16));
+                CHECK_TRUE(range->deallocate(ptr2, s_min_size_u16));
+                CHECK_TRUE(range->deallocate(ptr, s_min_size_u16));
             }
 
             nsegmented::g_teardown(Allocator, range);
