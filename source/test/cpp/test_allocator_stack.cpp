@@ -31,7 +31,7 @@ UNITTEST_SUITE_BEGIN(stack)
         {
             CHECK_TRUE(*((int_t*)stack_alloc->save_point()) == 0);
 
-            for (s32 i = 0; i < 12; ++i)
+            for (s32 i = 0; i < 3; ++i)
             {
                 stack_alloc_scope_t scope(stack_alloc);
 

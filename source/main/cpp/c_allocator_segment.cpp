@@ -46,18 +46,21 @@ namespace ncore
                 s32 level1_size_in_bits = 0;
                 s32 level2_size_in_bits = 0;
 
+                // Note: Offset is the number of u64
+                s32 offset0 = 0;
+                s32 offset1 = 0;
+                s32 offset2 = 0;
+
                 s32 size_in_bits = 1 << (tot_size_shift - min_size_shift);
-                for (s8 i = 0; i < num_sizes; ++i)
+                ASSERT(size_in_bits <= (1 << 3*6));
+
+                s32 count0 = size_in_bits;
+                s32 count1 = size_in_bits >> 6;
+                s32 count2 = size_in_bits >> 12;
+
+                s32 i = 0;
+                while (true)
                 {
-                    // Note: Offset is the number of u64
-                    const s32 offset0 = level0_size_in_bits >> 6;
-                    const s32 offset1 = level1_size_in_bits >> 6;
-                    const s32 offset2 = level2_size_in_bits >> 6;
-
-                    const s32 count0 = size_in_bits;
-                    const s32 count1 = size_in_bits >> 6;
-                    const s32 count2 = size_in_bits >> 12;
-
                     m_offsets_0[i] = offset0;
                     m_offsets_1[i] = count1 > 0 ? offset1 : -1;
                     m_offsets_2[i] = count2 > 0 ? offset2 : -1;
@@ -71,12 +74,48 @@ namespace ncore
                     level2_size_in_bits += count2;
                     level2_size_in_bits = math::g_alignUp(level2_size_in_bits, 64);
 
+                    i += 1;
+                    if (i == num_sizes)
+                        break;
+
                     size_in_bits = math::g_max(size_in_bits >> 1, (s32)1);
+
+                    offset0 = level0_size_in_bits >> 6;
+                    offset1 = level1_size_in_bits >> 6;
+                    offset2 = level2_size_in_bits >> 6;
+                    count0 = size_in_bits;
+                    count1 = size_in_bits >> 6;
+                    count2 = size_in_bits >> 12;
                 }
 
                 m_level0 = g_allocate_array_and_clear<u64>(allocator, level0_size_in_bits >> 6);
                 m_level1 = g_allocate_array_and_clear<u64>(allocator, level1_size_in_bits >> 6);
                 m_level2 = g_allocate_array_and_clear<u64>(allocator, level2_size_in_bits >> 6);
+
+                if (count2 > 0)
+                {
+                    m_level2[offset2] = (count2 == 64) ? 0xFFFFFFFFFFFFFFFULL : ~(0xFFFFFFFFFFFFFFFULL << count2);
+                }
+                if (count1 > 0)
+                {
+                    s32 offset = offset1;
+                    while (count1 > 64)
+                    {
+                        m_level1[offset++] = 0xFFFFFFFFFFFFFFFULL;
+                        count1 -= 64;
+                    }
+                    m_level1[offset] = (count1 == 64) ? 0xFFFFFFFFFFFFFFFULL : ~(0xFFFFFFFFFFFFFFFULL << count1);
+                }
+                if (count0 > 0)
+                {
+                    s32 offset = offset0;
+                    while (count0 > 64)
+                    {
+                        m_level0[offset++] = 0xFFFFFFFFFFFFFFFULL;
+                        count0 -= 64;
+                    }
+                    m_level0[offset] = (count0 == 64) ? 0xFFFFFFFFFFFFFFFULL : ~(0xFFFFFFFFFFFFFFFULL << count0);
+                }
 
                 m_min_size_shift   = min_size_shift;
                 m_max_size_shift   = max_size_shift;
@@ -85,7 +124,6 @@ namespace ncore
 
                 // Initialize the size_free bitmap and the highest size bitmap
                 m_size_free = (1 << (m_num_sizes - 1));
-                DVERIFY(set_bit(m_num_sizes - 1, 0), 1); // Set the highest size bit to indicate that it is available
             }
 
             void teardown(alloc_t* allocator)
@@ -98,11 +136,13 @@ namespace ncore
                 g_deallocate_array(allocator, m_offsets_2);
             }
 
-            static inline void s_set_level_bit(s32 offset, s32 bit, u64* level)
+            static inline u64 s_set_level_bit(s32 offset, s32 bit, u64* level)
             {
                 const s32 bo = (bit >> 6);
                 const s32 bi = (bit & (64 - 1));
-                level[offset + bo] |= (1 << bi);
+                const u64 lc = level[offset + bo];
+                level[offset + bo] |= ((u64)1 << bi);
+                return lc;
             }
 
             static inline u64 s_clr_level_bit(s32 offset, s32 bit, u64* level)
@@ -114,25 +154,24 @@ namespace ncore
                 return lv;
             }
 
-            u64 clr_bit(s8 size_index, s32 bit)
+            inline u64 clr_bit(s8 size_index, s32 bit) 
             {
                 ASSERT(size_index >= 0 && size_index < m_num_sizes);
-                ASSERT(bit >= 0 && ((bit & 3) == 0 || (bit & 3) == 2 || (bit & 3) == 4 || (bit & 3) == 6));
 
-                s32 offset = m_offsets_0[size_index];
-                u64 state  = s_clr_level_bit(offset, bit, m_level0);
+                const s32 offset0 = m_offsets_0[size_index];
+                u64 state = s_clr_level_bit(offset0, bit, m_level0);
 
-                offset = m_offsets_1[size_index];
-                if (offset >= 0)
+                const s32 offset1 = m_offsets_1[size_index];
+                if (offset1 >= 0 && state == 0)
                 {
                     bit   = bit >> 6; // To level 1
-                    state = s_clr_level_bit(offset, bit, m_level1);
+                    state = s_clr_level_bit(offset1, bit, m_level1);
 
-                    offset = m_offsets_2[size_index];
-                    if (offset >= 0)
+                    const s32 offset2 = m_offsets_2[size_index];
+                    if (offset2 >= 0 && state == 0)
                     {
                         bit   = bit >> 6; // To level 2
-                        state = s_clr_level_bit(offset, bit, m_level2);
+                        state = s_clr_level_bit(offset2, bit, m_level2);
                     }
                 }
 
@@ -169,26 +208,30 @@ namespace ncore
                 return bit;
             }
 
-            void set_level0_bit(s32 offset, s32 bit)
+            u64 set_level0_bit(s32 offset, s32 bit)
             {
                 u64&      l0 = m_level0[offset + (bit >> 6)];
                 const u32 bi = (bit & (64 - 1));
-                l0           = l0 | (1 << bi);
+                u64       lc = l0;
+                l0           = l0 | ((u64)1 << bi);
+                return lc;
             }
 
-            bool get_level0_bit(s32 offset, s32 bit)
+            inline bool get_level0_bit(s32 offset, s32 bit) const
             {
                 u64&      l0 = m_level0[offset + (bit >> 6)];
                 const u32 bi = (bit & (64 - 1));
-                return (l0 & (1 << bi)) != 0;
+                return (l0 & ((u64)1 << bi)) != 0;
             }
 
-            void set_level0_pair(s32 offset, s32 bit)
+            inline u64 set_level0_pair(s32 offset, s32 bit)
             {
                 const u32 bo = (bit >> 6);
                 const u32 bi = (bit & (64 - 1));
                 u64&      l0 = m_level0[offset + bo];
-                l0           = l0 | (3 << bi);
+                const u64 lc = l0;
+                l0           = l0 | ((u64)3 << bi);
+                return lc;
             }
 
             // returns 0 when setting the bit resulted in an odd+even pair of bits and clearing the other bit
@@ -208,15 +251,15 @@ namespace ncore
                     return 2;
                 }
 
-                set_level0_bit(offset, bit);
+                const u64 bits0 = set_level0_bit(offset, bit);
                 offset = m_offsets_1[size_index];
-                if (offset >= 0)
+                if (offset >= 0 && bits0 == 0)
                 {
                     bit = bit >> 6; // To level 1
-                    s_set_level_bit(offset, bit, m_level1);
+                    const u64 bits1 = s_set_level_bit(offset, bit, m_level1);
 
                     offset = m_offsets_2[size_index];
-                    if (offset >= 0)
+                    if (offset >= 0 && bits1 == 0)
                     {
                         bit = bit >> 6; // To level 2
                         s_set_level_bit(offset, bit, m_level2);
@@ -232,16 +275,16 @@ namespace ncore
                 ASSERT(bit >= 0 && ((bit & 3) == 0 || (bit & 3) == 2 || (bit & 3) == 4 || (bit & 3) == 6));
 
                 s32 offset = m_offsets_0[size_index];
-                set_level0_pair(offset, bit);
+                const u64 bits0 = set_level0_pair(offset, bit);
 
                 offset = m_offsets_1[size_index];
-                if (offset >= 0)
+                if (offset >= 0 && bits0 == 0)
                 {
                     bit = bit >> 6;
-                    s_set_level_bit(offset, bit, m_level1);
+                    const u64 bits1 = s_set_level_bit(offset, bit, m_level1);
 
                     offset = m_offsets_2[size_index];
-                    if (offset >= 0)
+                    if (offset >= 0 && bits1 == 0)
                     {
                         bit = bit >> 6;
                         s_set_level_bit(offset, bit, m_level2);
@@ -252,7 +295,7 @@ namespace ncore
             inline s8 size_to_index(s64 size) const
             {
                 ASSERT(math::g_ispo2(size));
-                ASSERT(size >= (1 << m_min_size_shift) && size <= (1 << m_max_size_shift));
+                ASSERT(size >= ((s64)1 << m_min_size_shift) && size <= ((s64)1 << m_max_size_shift));
                 return math::g_ilog2(size) - m_min_size_shift;
             }
 
@@ -308,7 +351,7 @@ namespace ncore
 
             bool deallocate(s64 ptr, s64 size)
             {
-                if (ptr < 0 || size <= 0 || ptr >= (1 << m_total_size_shift) || size > (1 << m_max_size_shift))
+                if (ptr < 0 || size <= 0 || ptr >= ((s64)1 << m_total_size_shift) || size > ((s64)1 << m_max_size_shift))
                 {
                     return false; // Invalid pointer or size
                 }

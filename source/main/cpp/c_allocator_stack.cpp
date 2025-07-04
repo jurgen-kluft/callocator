@@ -15,17 +15,18 @@ namespace ncore
     // objects that are only used in a limited scope, for example, in a function. Furthermore, it is
     // not thread safe, so there should be one instance of the stack allocator per thread.
     //
-    class stack_allocator_t : protected stack_alloc_t
+    class stack_allocator_t : public stack_alloc_t
     {
     public:
+        DCORE_CLASS_PLACEMENT_NEW_DELETE
+
         stack_allocator_t(vmem_arena_t* arena);
         virtual ~stack_allocator_t() {}
 
         void          reset();
 
-        DCORE_CLASS_PLACEMENT_NEW_DELETE
-
         vmem_arena_t* m_arena;
+        int_t         m_base_pos;
         int_t         m_allocation_count;
 
     protected:
@@ -41,11 +42,15 @@ namespace ncore
 
     void stack_allocator_t::reset()
     {
-        m_arena->reset();
+        m_arena->restore(m_base_pos);
         m_allocation_count = 0;
     }
 
-    void* stack_allocator_t::v_allocate(u32 size, u32 alignment) { return m_arena->commit(size, alignment); }
+    void* stack_allocator_t::v_allocate(u32 size, u32 alignment) 
+    { 
+        m_allocation_count++;
+        return m_arena->commit(size, alignment);
+    }
 
     void stack_allocator_t::v_deallocate(void* ptr)
     {
@@ -67,19 +72,34 @@ namespace ncore
         // Has the user forgotten to deallocate one or more allocations?
         int_t* allocation_count = (int_t*)point;
         ASSERT(m_allocation_count == *allocation_count);
-        uint_t pos         = g_ptr_diff_in_bytes(point, m_arena->m_base);
+        const uint_t pos         = g_ptr_diff_in_bytes(m_arena->m_base, point);
         m_allocation_count = *allocation_count;
         m_arena->restore(pos);
     }
 
     stack_alloc_t* g_create_stack_allocator(int_t initial_size, int_t reserved_size)
     {
-        return nullptr;
+        vmem_arena_t a;
+        a.reserved(reserved_size);
+        a.committed(initial_size);
+
+        vmem_arena_t* arena = (vmem_arena_t*)a.commit(sizeof(vmem_arena_t));
+        *arena              = a;
+
+        void*               mem       = arena->commit_and_zero(sizeof(stack_allocator_t));
+        stack_allocator_t* allocator = new (mem) stack_allocator_t(arena);
+        allocator->m_base_pos         = arena->save();
+        return allocator;
     }
 
     void g_destroy_stack_allocator(stack_alloc_t* allocator)
     {
+        if (allocator == nullptr)
+            return;
 
+        stack_allocator_t* impl  = static_cast<stack_allocator_t*>(allocator);
+        vmem_arena_t*      arena = impl->m_arena;
+        arena->release();
     }
 
 }; // namespace ncore
