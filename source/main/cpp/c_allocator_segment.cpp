@@ -2,6 +2,7 @@
 #include "ccore/c_allocator.h"
 #include "ccore/c_math.h"
 #include "ccore/c_memory.h"
+#include "ccore/c_limits.h"
 #include "ccore/c_vmem.h"
 
 #include "callocator/c_allocator_segment.h"
@@ -94,27 +95,27 @@ namespace ncore
 
                 if (count2 > 0)
                 {
-                    m_level2[offset2] = (count2 == 64) ? 0xFFFFFFFFFFFFFFFULL : ~(0xFFFFFFFFFFFFFFFULL << count2);
+                    m_level2[offset2] = (count2 == 64) ? u64_max : ~(u64_max << count2);
                 }
                 if (count1 > 0)
                 {
                     s32 offset = offset1;
                     while (count1 > 64)
                     {
-                        m_level1[offset++] = 0xFFFFFFFFFFFFFFFULL;
+                        m_level1[offset++] = u64_max;
                         count1 -= 64;
                     }
-                    m_level1[offset] = (count1 == 64) ? 0xFFFFFFFFFFFFFFFULL : ~(0xFFFFFFFFFFFFFFFULL << count1);
+                    m_level1[offset] = (count1 == 64) ? u64_max : ~(u64_max << count1);
                 }
                 if (count0 > 0)
                 {
                     s32 offset = offset0;
                     while (count0 > 64)
                     {
-                        m_level0[offset++] = 0xFFFFFFFFFFFFFFFULL;
+                        m_level0[offset++] = u64_max;
                         count0 -= 64;
                     }
-                    m_level0[offset] = (count0 == 64) ? 0xFFFFFFFFFFFFFFFULL : ~(0xFFFFFFFFFFFFFFFULL << count0);
+                    m_level0[offset] = (count0 == 64) ? u64_max : ~(u64_max << count0);
                 }
 
                 m_min_size_shift   = min_size_shift;
@@ -154,7 +155,7 @@ namespace ncore
                 return lv;
             }
 
-            inline u64 clr_bit(s8 size_index, s32 bit) 
+            inline u64 clr_bit(s8 size_index, s32 bit)
             {
                 ASSERT(size_index >= 0 && size_index < m_num_sizes);
 
