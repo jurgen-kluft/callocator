@@ -258,6 +258,10 @@ namespace ncore
             if (node.binListNext != node_t::NIL)
                 m_nodes[node.binListNext].binListPrev = node_t::NIL;
 
+            // Are 'node.binListNext' and 'node.binListPrev' still used after this?
+            // Could we re-use them as neighbor next and prev?
+            // If we can, then we can save another 8 bytes of memory per node.
+
             m_freeStorage -= nodeTotalSize;
 #ifdef DEBUG_VERBOSE
             printf("Free storage: %u (-%u) (allocate)\n", m_freeStorage, nodeTotalSize);
@@ -276,10 +280,10 @@ namespace ncore
             }
 
             // Push back remaining N elements to a lower bin
-            const u32 reminderSize = nodeTotalSize - size;
-            if (reminderSize > 0)
+            const u32 remainderSize = nodeTotalSize - size;
+            if (remainderSize > 0)
             {
-                const u32 newNodeIndex = insertNodeIntoBin(reminderSize, node.dataOffset + size);
+                const u32 newNodeIndex = insertNodeIntoBin(remainderSize, node.dataOffset + size);
 
                 // Link new node after the current node so that we can merge them later if both are free
                 // And update the old next neighbor to point to the new node (in middle)
