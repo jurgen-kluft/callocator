@@ -1,4 +1,5 @@
 #include "ccore/c_allocator.h"
+#include "ccore/c_math.h"
 #include "ccore/c_memory.h"
 
 #include "callocator/c_allocator_offset.h"
@@ -7,7 +8,8 @@ namespace ncore
 {
     // Implementation by Sebastian Aaltonen
     // https://github.com/sebbbi/OffsetAllocator
-    // Adjustments made by me to reduce memory consumption.
+
+    // Note: Adjustments made to reduce memory consumption.
     namespace noffset
     {
         inline u32 lzcnt_nonzero(u32 v)
@@ -38,9 +40,29 @@ namespace ncore
             static constexpr u32 MANTISSA_VALUE = 1 << MANTISSA_BITS;
             static constexpr u32 MANTISSA_MASK  = MANTISSA_VALUE - 1;
 
+            u32 SizeToBinCeil(u32 size)
+            {
+                const s8 bin = (size >= 8) ? math::g_ilog2(size >> TOP_BINS_INDEX_SHIFT) : 0;
+                size += ((1 << bin) - 1);                             // Round up to next leaf bin
+                return (bin << TOP_BINS_INDEX_SHIFT) + (size >> bin); // Top bin index + leaf bin index
+            }
+
+            u32 SizeToBinFloor(u32 size)
+            {
+                const s8 bin = (size >= 8) ? math::g_ilog2(size >> TOP_BINS_INDEX_SHIFT) : 0;
+                return (bin << TOP_BINS_INDEX_SHIFT) + (size >> bin); // Top bin index + leaf bin index
+            }
+
+            u32 BinToSize(u8 bin)
+            {
+                // top=((bin>>3) - 1), base=(1<<top), size=(base<<3 + (bin&7)<<top)
+                const s8 top = ((bin >> TOP_BINS_INDEX_SHIFT) - 1);
+                return top >= 0 ? ((((u32)1 << top) << 3) + ((u32)(bin & LEAF_BINS_INDEX_MASK) << top)) >> 1 : bin;
+            }
+
             // Bin sizes follow floating point (exponent + mantissa) distribution (piecewise linear log approx)
             // This ensures that for each size class, the average overhead percentage stays the same
-            u32 uintToFloatRoundUp(u32 size)
+            u32 U32ToF32RoundUp(u32 size)
             {
                 u32 exp      = 0;
                 u32 mantissa = 0;
@@ -70,7 +92,7 @@ namespace ncore
                 return (exp << MANTISSA_BITS) + mantissa; // + allows mantissa->exp overflow for round up
             }
 
-            u32 uintToFloatRoundDown(u32 size)
+            u32 U32ToF32RoundDown(u32 size)
             {
                 u32 exp      = 0;
                 u32 mantissa = 0;
@@ -94,7 +116,7 @@ namespace ncore
                 return (exp << MANTISSA_BITS) | mantissa;
             }
 
-            u32 floatToUint(u32 floatValue)
+            u32 F32ToU32(u32 floatValue)
             {
                 u32 exponent = floatValue >> MANTISSA_BITS;
                 u32 mantissa = floatValue & MANTISSA_MASK;
@@ -111,7 +133,7 @@ namespace ncore
         } // namespace nfloat
 
         // Utility functions
-        u32 findLowestSetBitAfter(u32 bitMask, u32 startBitIndex)
+        static u32 s_findLowestSetBitAfter(u32 bitMask, u32 startBitIndex)
         {
             u32 maskBeforeStartIndex = (1 << startBitIndex) - 1;
             u32 maskAfterStartIndex  = ~maskBeforeStartIndex;
@@ -210,7 +232,7 @@ namespace ncore
 
             // Round up to bin index to ensure that alloc >= bin
             // Gives us min bin index that fits the size
-            const u32 minBinIndex = nfloat::uintToFloatRoundUp(size);
+            const u32 minBinIndex = nfloat::U32ToF32RoundUp(size);
 
             const u32 minTopBinIndex  = minBinIndex >> TOP_BINS_INDEX_SHIFT;
             const u32 minLeafBinIndex = minBinIndex & LEAF_BINS_INDEX_MASK;
@@ -221,13 +243,13 @@ namespace ncore
             // If top bin exists, scan its leaf bin. This can fail (NO_SPACE).
             if (m_usedBinsTop & (1 << topBinIndex))
             {
-                leafBinIndex = findLowestSetBitAfter(m_usedBins[topBinIndex], minLeafBinIndex);
+                leafBinIndex = s_findLowestSetBitAfter(m_usedBins[topBinIndex], minLeafBinIndex);
             }
 
             // If we didn't find space in top bin, we search top bin from +1
             if (leafBinIndex == allocation_t::NO_SPACE)
             {
-                topBinIndex = findLowestSetBitAfter(m_usedBinsTop, minTopBinIndex + 1);
+                topBinIndex = s_findLowestSetBitAfter(m_usedBinsTop, minTopBinIndex + 1);
 
                 // Out of space?
                 if (topBinIndex == allocation_t::NO_SPACE)
@@ -247,11 +269,10 @@ namespace ncore
             const u32 binIndex = (topBinIndex << TOP_BINS_INDEX_SHIFT) | leafBinIndex;
 
             // Pop the top node of the bin. Bin top = node.next.
-            const u32   nodeIndex     = m_binIndices[binIndex];
-            node_t&     node          = m_nodes[nodeIndex];
-            neighbor_t& neighbor      = m_neighbors[nodeIndex];
-            const u32   nodeTotalSize = node.dataSize;
-            node.dataSize             = size;
+            const u32 nodeIndex     = m_binIndices[binIndex];
+            node_t&   node          = m_nodes[nodeIndex];
+            const u32 nodeTotalSize = node.dataSize;
+            node.dataSize           = size;
             setNodeUsed(nodeIndex);
             m_binIndices[binIndex] = node.binListNext;
             if (node.binListNext != node_t::NIL)
@@ -260,6 +281,8 @@ namespace ncore
             // Are 'node.binListNext' and 'node.binListPrev' still used after this?
             // Could we re-use them as neighbor next and prev?
             // If we can, then we can save another 8 bytes of memory per node.
+            node.binListNext = 0xCDCDCDCD; // Clear bin list next
+            node.binListPrev = 0xCDCDCDCD; // Clear bin list prev
 
             m_freeStorage -= nodeTotalSize;
 #ifdef DEBUG_VERBOSE
@@ -283,6 +306,8 @@ namespace ncore
             if (remainderSize > 0)
             {
                 const u32 newNodeIndex = insertNodeIntoBin(remainderSize, node.dataOffset + size);
+
+                neighbor_t& neighbor = m_neighbors[nodeIndex];
 
                 // Link new node after the current node so that we can merge them later if both are free
                 // And update the old next neighbor to point to the new node (in middle)
@@ -310,7 +335,7 @@ namespace ncore
             neighbor_t& neighbor  = m_neighbors[nodeIndex];
 
             // Double delete check
-            ASSERT(isUsed(nodeIndex));
+            ASSERT(isNodeUsed(nodeIndex));
 
             // Merge with neighbors...
             u32 offset = node.dataOffset;
@@ -386,7 +411,7 @@ namespace ncore
         u32 allocator_t::insertNodeIntoBin(u32 size, u32 dataOffset)
         {
             // Round down to bin index to ensure that bin >= alloc
-            u32 binIndex = nfloat::uintToFloatRoundDown(size);
+            u32 binIndex = nfloat::U32ToF32RoundDown(size);
 
             u32 topBinIndex  = binIndex >> TOP_BINS_INDEX_SHIFT;
             u32 leafBinIndex = binIndex & LEAF_BINS_INDEX_MASK;
@@ -456,13 +481,12 @@ namespace ncore
             }
             else
             {
-                // Hard case: We are the first node in a bin. Find the bin.
-
+                // We are the first node in a bin. Find the bin.
                 // Round down to bin index to ensure that bin >= alloc
-                u32 binIndex = nfloat::uintToFloatRoundDown(node.dataSize);
+                const u32 binIndex = nfloat::U32ToF32RoundDown(node.dataSize);
 
-                u32 topBinIndex  = binIndex >> TOP_BINS_INDEX_SHIFT;
-                u32 leafBinIndex = binIndex & LEAF_BINS_INDEX_MASK;
+                const u32 topBinIndex  = binIndex >> TOP_BINS_INDEX_SHIFT;
+                const u32 leafBinIndex = binIndex & LEAF_BINS_INDEX_MASK;
 
                 m_binIndices[binIndex] = node.binListNext;
                 if (node.binListNext != node_t::NIL)
@@ -528,7 +552,7 @@ namespace ncore
                 {
                     u32 topBinIndex   = 31 - lzcnt_nonzero(m_usedBinsTop);
                     u32 leafBinIndex  = 31 - lzcnt_nonzero(m_usedBins[topBinIndex]);
-                    largestFreeRegion = nfloat::floatToUint((topBinIndex << TOP_BINS_INDEX_SHIFT) | leafBinIndex);
+                    largestFreeRegion = nfloat::F32ToU32((topBinIndex << TOP_BINS_INDEX_SHIFT) | leafBinIndex);
                     ASSERT(freeStorage >= largestFreeRegion);
                 }
             }
@@ -551,7 +575,7 @@ namespace ncore
                     nodeIndex = m_nodes[nodeIndex].binListNext;
                     count++;
                 }
-                report.freeRegions[i].size  = nfloat::floatToUint(i);
+                report.freeRegions[i].size  = nfloat::F32ToU32(i);
                 report.freeRegions[i].count = count;
             }
             return report;
