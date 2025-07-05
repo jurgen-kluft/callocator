@@ -67,9 +67,9 @@ namespace ncore
             u32  insertNodeIntoBin(u32 size, u32 dataOffset);
             void removeNodeFromBin(u32 nodeIndex);
 
-            inline bool isUsed(u32 index) const { return (m_used[index >> 5] & (1 << (index & 31))) != 0; }
-            inline void setUsed(u32 index) { m_used[index >> 5] |= (1 << (index & 31)); }
-            inline void setUnused(u32 index) { m_used[index >> 5] &= ~(1 << (index & 31)); }
+            inline bool isNodeUsed(u32 index) const { return (m_nodeUsed[index >> 5] & (1 << (index & 31))) != 0; }
+            inline void setNodeUsed(u32 index) { m_nodeUsed[index >> 5] |= (1 << (index & 31)); }
+            inline void setNodeUnused(u32 index) { m_nodeUsed[index >> 5] &= ~(1 << (index & 31)); }
 
             struct node_t
             {
@@ -96,7 +96,7 @@ namespace ncore
             u32         m_binIndices[NUM_LEAF_BINS];
             node_t*     m_nodes;
             neighbor_t* m_neighbors;
-            u32*        m_used;
+            u32*        m_nodeUsed;
             u32         m_freeIndex;
             u32         m_freeListHead;
             u32         m_freeOffset;

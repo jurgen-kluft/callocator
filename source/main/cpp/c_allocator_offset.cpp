@@ -122,14 +122,14 @@ namespace ncore
         }
 
         allocator_t::allocator_t(alloc_t* allocator, u32 size, u32 maxAllocs)
-            : m_allocator(allocator), m_size(size), m_maxAllocs(maxAllocs), m_freeStorage(0), m_usedBinsTop(0), m_nodes(nullptr), m_neighbors(nullptr), m_used(nullptr), m_freeIndex(0), m_freeListHead(node_t::NIL), m_freeOffset(maxAllocs - 1)
+            : m_allocator(allocator), m_size(size), m_maxAllocs(maxAllocs), m_freeStorage(0), m_usedBinsTop(0), m_nodes(nullptr), m_neighbors(nullptr), m_nodeUsed(nullptr), m_freeIndex(0), m_freeListHead(node_t::NIL), m_freeOffset(maxAllocs - 1)
         {
             ASSERT(m_size < 0x80000000); // Size must be less than 2^31
         }
 
         allocator_t::allocator_t(allocator_t&& other)
-            : m_allocator(other.m_allocator), m_size(other.m_size), m_maxAllocs(other.m_maxAllocs), m_freeStorage(other.m_freeStorage), m_usedBinsTop(other.m_usedBinsTop), m_nodes(other.m_nodes), m_neighbors(other.m_neighbors), m_used(other.m_used),
-              m_freeIndex(other.m_freeIndex), m_freeListHead(other.m_freeListHead), m_freeOffset(other.m_freeOffset)
+            : m_allocator(other.m_allocator), m_size(other.m_size), m_maxAllocs(other.m_maxAllocs), m_freeStorage(other.m_freeStorage), m_usedBinsTop(other.m_usedBinsTop), m_nodes(other.m_nodes), m_neighbors(other.m_neighbors),
+              m_nodeUsed(other.m_nodeUsed), m_freeIndex(other.m_freeIndex), m_freeListHead(other.m_freeListHead), m_freeOffset(other.m_freeOffset)
         {
             nmem::memcpy(m_usedBins, other.m_usedBins, sizeof(u8) * NUM_TOP_BINS);
             nmem::memcpy(m_binIndices, other.m_binIndices, sizeof(u32) * NUM_LEAF_BINS);
@@ -137,7 +137,7 @@ namespace ncore
             other.m_allocator    = nullptr;
             other.m_nodes        = nullptr;
             other.m_neighbors    = nullptr;
-            other.m_used         = nullptr;
+            other.m_nodeUsed     = nullptr;
             other.m_freeIndex    = 0;
             other.m_freeListHead = node_t::NIL;
             other.m_freeOffset   = 0;
@@ -149,7 +149,7 @@ namespace ncore
         {
             m_nodes     = g_allocate_array<node_t>(m_allocator, m_maxAllocs);
             m_neighbors = g_allocate_array<neighbor_t>(m_allocator, m_maxAllocs);
-            m_used      = g_allocate_array<u32>(m_allocator, (m_maxAllocs >> 5));
+            m_nodeUsed  = g_allocate_array<u32>(m_allocator, (m_maxAllocs >> 5));
 
             reset();
         }
@@ -158,14 +158,14 @@ namespace ncore
         {
             g_deallocate_array<node_t>(m_allocator, m_nodes);
             g_deallocate_array<neighbor_t>(m_allocator, m_neighbors);
-            g_deallocate_array<u32>(m_allocator, m_used);
+            g_deallocate_array<u32>(m_allocator, m_nodeUsed);
 
             m_freeStorage  = 0;
             m_usedBinsTop  = 0;
             m_freeOffset   = m_maxAllocs - 1;
             m_nodes        = nullptr;
             m_neighbors    = nullptr;
-            m_used         = nullptr;
+            m_nodeUsed     = nullptr;
             m_freeIndex    = 0;
             m_freeListHead = node_t::NIL;
         }
@@ -194,7 +194,7 @@ namespace ncore
         {
             g_deallocate_array<node_t>(m_allocator, m_nodes);
             g_deallocate_array<neighbor_t>(m_allocator, m_neighbors);
-            g_deallocate_array<u32>(m_allocator, m_used);
+            g_deallocate_array<u32>(m_allocator, m_nodeUsed);
         }
 
         allocation_t allocator_t::allocate(u32 size)
@@ -202,7 +202,6 @@ namespace ncore
             // Out of allocations?
             if (m_freeOffset == 0)
             {
-                // return {.offset = allocation_t::NO_SPACE, .metadata = allocation_t::NO_SPACE};
                 allocation_t a;
                 a.offset   = allocation_t::NO_SPACE;
                 a.metadata = allocation_t::NO_SPACE;
@@ -253,7 +252,7 @@ namespace ncore
             neighbor_t& neighbor      = m_neighbors[nodeIndex];
             const u32   nodeTotalSize = node.dataSize;
             node.dataSize             = size;
-            setUsed(nodeIndex);
+            setNodeUsed(nodeIndex);
             m_binIndices[binIndex] = node.binListNext;
             if (node.binListNext != node_t::NIL)
                 m_nodes[node.binListNext].binListPrev = node_t::NIL;
@@ -317,7 +316,7 @@ namespace ncore
             u32 offset = node.dataOffset;
             u32 size   = node.dataSize;
 
-            if ((neighbor.prev != node_t::NIL) && (isUsed(neighbor.prev) == false))
+            if ((neighbor.prev != node_t::NIL) && (isNodeUsed(neighbor.prev) == false))
             {
                 // Previous (contiguous) free node: Change offset to previous node offset. Sum sizes
                 node_t&     prevNode     = m_nodes[neighbor.prev];
@@ -332,7 +331,7 @@ namespace ncore
                 neighbor.prev = prevNeighbor.prev;
             }
 
-            if ((neighbor.next != node_t::NIL) && (isUsed(neighbor.next) == false))
+            if ((neighbor.next != node_t::NIL) && (isNodeUsed(neighbor.next) == false))
             {
                 // Next (contiguous) free node: Offset remains the same. Sum sizes.
                 neighbor_t& nextNeighbor = m_neighbors[neighbor.next];
@@ -430,7 +429,7 @@ namespace ncore
 
             m_neighbors[nodeIndex].prev = node_t::NIL;
             m_neighbors[nodeIndex].next = node_t::NIL;
-            setUnused(nodeIndex);
+            setNodeUnused(nodeIndex);
 
             if (topNodeIndex != node_t::NIL)
                 m_nodes[topNodeIndex].binListPrev = nodeIndex;
