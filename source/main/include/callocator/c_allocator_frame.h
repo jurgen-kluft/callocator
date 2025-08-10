@@ -23,13 +23,11 @@ namespace ncore
     };
 
     // Frame allocator (frame scope allocator)
-    // The frame allocator is a specialized allocator. You can use it when you are requesting specific
+    // The frame allocator is a specialized allocator, you can use it when you are requesting specific
     // allocations that only have to live for N frames, like a single frame of a game, or when passing
     // an allocator to a JSON parser that will allocate a lot of small blocks and then deallocate them
     // all at once. So you do not (really) have to worry about deallocation of allocated memory.
-    // This allocator is very very fast in allocating O(1) and deallocating O(1).
-    // NOTE: We could make virtual memory version of this allocator, so that each frame does not have
-    //       to know beforehand how much memory would need to be reserved.
+    // This allocator is very fast in allocating O(1) and deallocating O(1).
     class frame_allocator_t : public frame_alloc_t
     {
     public:
@@ -52,7 +50,7 @@ namespace ncore
         s32           m_active_frames[2];  // keeping track of the number of active frames in each lane
         s32           m_ended_frames[2];   // keeping track of the number of ended frames in each lane
         s32           m_active_lane;       // Current lane, either 0 or 1, used for switching between two arenas
-        s32           m_max_active_frames; // Maximum number of active frames, used for switching between two arenas
+        s32           m_max_active_frames; // Maximum number of active frames per lane
         frame_t*      m_current_frame;     // Current frame, used for allocating memory
         frame_t*      m_frames[2];         // N frames per lane
         s64           m_save_points[2];    // Arena save points for each lane

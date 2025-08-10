@@ -13,7 +13,7 @@ namespace ncore
     // We have two memory arenas, the first one is used until we reach the maximum number of active frames.
     // Now we are switching to the second arena, which is used for creating new frames, when we here reach
     // the maximum number of active frames, the first arena 'should' be unoccupied, so we can reuse it.
-    // An ASSERT will be triggered if we try to allocate a new frame when the first arena is still occupied.
+    // An ASSERT will be triggered if we switch lanes and the target lane is still occupied.
 
     frame_allocator_t::frame_allocator_t() : m_active_lane(0), m_max_active_frames(0), m_current_frame(nullptr)
     {
