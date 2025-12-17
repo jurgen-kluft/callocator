@@ -10,7 +10,7 @@ UNITTEST_SUITE_BEGIN(linear)
 {
     UNITTEST_FIXTURE(main)
     {
-        UNITTEST_ALLOCATOR;
+        //UNITTEST_ALLOCATOR;
 
         const u32 alloc_committed_size = 16 * cKB;
         const u32 alloc_reserved_size  = 128 * cKB;

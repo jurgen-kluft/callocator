@@ -30,10 +30,10 @@ UNITTEST_SUITE_BEGIN(nstring)
             void* mem = Allocator->allocate(1024 * 1024);
             nstring::storage_t* storage = nstring::g_create_storage_utf8(mem, 1024 * 1024);
 
-            crunes_t str1 = make_crunes("Hello, World!", 0, 13, 13);
+            crunes_t str1 = ascii::make_crunes("Hello, World!", 0, 13, 13);
             nstring::str_t const* str = storage->put(str1);
             CHECK_NOT_NULL(str);
-            crunes_t str2 = make_crunes(str->m_str, 0, str->m_len, str->m_len);
+            crunes_t str2 = utf8::make_crunes(str->m_str, 0, str->m_len, str->m_len);
             CHECK_EQUAL(0, nrunes::compare(str1, str2));
 
             nstring::g_destroy_storage(storage);
@@ -45,10 +45,10 @@ UNITTEST_SUITE_BEGIN(nstring)
             void* mem = Allocator->allocate(1024 * 1024);
             nstring::storage_t* storage = nstring::g_create_storage_utf8(mem, 1024 * 1024);
 
-            crunes_t str1 = make_crunes("Hello, World!", 0, 13, 13);
+            crunes_t str1 = ascii::make_crunes("Hello, World!", 0, 13, 13);
             nstring::str_t const* str = storage->put(str1);
             CHECK_NOT_NULL(str);
-            crunes_t str2 = make_crunes(str->m_str, 0, str->m_len, str->m_len);
+            crunes_t str2 = utf8::make_crunes(str->m_str, 0, str->m_len, str->m_len);
             CHECK_EQUAL(0, nrunes::compare(str1, str2));
 
             nstring::g_destroy_storage(storage);

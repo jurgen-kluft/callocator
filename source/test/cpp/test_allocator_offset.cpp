@@ -23,7 +23,7 @@ UNITTEST_SUITE_BEGIN(offset)
 {
     UNITTEST_FIXTURE(small_float)
     {
-        UNITTEST_ALLOCATOR;
+        //UNITTEST_ALLOCATOR;
 
         UNITTEST_FIXTURE_SETUP() {}
         UNITTEST_FIXTURE_TEARDOWN() {}
@@ -52,8 +52,8 @@ UNITTEST_SUITE_BEGIN(offset)
                 CHECK_EQUAL(bin, bin2);
             }
 
-            CHECK_EQUAL(45, ncore::noffset::nfloat::SizeToBinCeil(200));
-            CHECK_EQUAL(90, ncore::noffset::nfloat::SizeToBinCeil(9500));
+            CHECK_EQUAL((u32)45, ncore::noffset::nfloat::SizeToBinCeil(200));
+            CHECK_EQUAL((u32)90, ncore::noffset::nfloat::SizeToBinCeil(9500));
         }
 
         UNITTEST_TEST(uintToFloat)
@@ -157,7 +157,7 @@ UNITTEST_SUITE_BEGIN(offset)
 
             ncore::noffset::allocation_t a      = alloc.allocate(1337);
             u32                          offset = a.offset;
-            CHECK_EQUAL(0, offset);
+            CHECK_EQUAL((u32)0, offset);
             alloc.free(a);
 
             alloc.teardown();
@@ -167,16 +167,16 @@ UNITTEST_SUITE_BEGIN(offset)
         {
             // Free merges neighbor empty nodes. Next allocation should also have offset = 0
             ncore::noffset::allocation_t a = allocator->allocate(0);
-            CHECK_EQUAL(0, a.offset);
+            CHECK_EQUAL((u32)0, a.offset);
 
             ncore::noffset::allocation_t b = allocator->allocate(1);
-            CHECK_EQUAL(0, b.offset);
+            CHECK_EQUAL((u32)0, b.offset);
 
             ncore::noffset::allocation_t c = allocator->allocate(123);
-            CHECK_EQUAL(1, c.offset);
+            CHECK_EQUAL((u32)1, c.offset);
 
             ncore::noffset::allocation_t d = allocator->allocate(1234);
-            CHECK_EQUAL(124, d.offset);
+            CHECK_EQUAL((u32)124, d.offset);
 
             allocator->free(a);
             allocator->free(b);
@@ -185,7 +185,7 @@ UNITTEST_SUITE_BEGIN(offset)
 
             // End: Validate that allocator has no fragmentation left. Should be 100% clean.
             ncore::noffset::allocation_t validateAll = allocator->allocate(1024 * 1024 * 256);
-            CHECK_EQUAL(0, validateAll.offset);
+            CHECK_EQUAL((u32)0, validateAll.offset);
             allocator->free(validateAll);
         }
 
@@ -193,16 +193,16 @@ UNITTEST_SUITE_BEGIN(offset)
         {
             // Free merges neighbor empty nodes. Next allocation should also have offset = 0
             ncore::noffset::allocation_t a = allocator->allocate(1337);
-            CHECK_EQUAL(0, a.offset);
+            CHECK_EQUAL((u32)0, a.offset);
             allocator->free(a);
 
             ncore::noffset::allocation_t b = allocator->allocate(1337);
-            CHECK_EQUAL(0, b.offset);
+            CHECK_EQUAL((u32)0, b.offset);
             allocator->free(b);
 
             // End: Validate that allocator has no fragmentation left. Should be 100% clean.
             ncore::noffset::allocation_t validateAll = allocator->allocate(1024 * 1024 * 256);
-            CHECK_EQUAL(0, validateAll.offset);
+            CHECK_EQUAL((u32)0, validateAll.offset);
             allocator->free(validateAll);
         }
 
@@ -210,22 +210,20 @@ UNITTEST_SUITE_BEGIN(offset)
         {
             // Allocator should reuse node freed by A since the allocation C fits in the same bin (using pow2 size to be sure)
             ncore::noffset::allocation_t a = allocator->allocate(1024);
-            CHECK_EQUAL(0, a.offset);
+            CHECK_EQUAL((u32)0, a.offset);
 
             ncore::noffset::allocation_t b = allocator->allocate(3456);
-            CHECK_EQUAL(1024, b.offset);
-
+            CHECK_EQUAL((u32)1024, b.offset);
             allocator->free(a);
 
             ncore::noffset::allocation_t c = allocator->allocate(1024);
-            CHECK_EQUAL(0, c.offset);
-
+            CHECK_EQUAL((u32)0, c.offset);
             allocator->free(c);
             allocator->free(b);
 
             // End: Validate that allocator has no fragmentation left. Should be 100% clean.
             ncore::noffset::allocation_t validateAll = allocator->allocate(1024 * 1024 * 256);
-            CHECK_EQUAL(0, validateAll.offset);
+            CHECK_EQUAL((u32)0, validateAll.offset);
             allocator->free(validateAll);
         }
 
@@ -234,24 +232,24 @@ UNITTEST_SUITE_BEGIN(offset)
             // Allocator should not reuse node freed by A since the allocation C doesn't fits in the same bin
             // However node D and E fit there and should reuse node from A
             ncore::noffset::allocation_t a = allocator->allocate(1024);
-            CHECK_EQUAL(0, a.offset);
+            CHECK_EQUAL((u32)0, a.offset);
 
             ncore::noffset::allocation_t b = allocator->allocate(3456);
-            CHECK_EQUAL(1024, b.offset);
+            CHECK_EQUAL((u32)1024, b.offset);
 
             allocator->free(a);
 
             ncore::noffset::allocation_t c = allocator->allocate(2345);
-            CHECK_EQUAL(1024 + 3456, c.offset);
+            CHECK_EQUAL((u32)(1024 + 3456), c.offset);
 
             ncore::noffset::allocation_t d = allocator->allocate(456);
-            CHECK_EQUAL(0, d.offset);
+            CHECK_EQUAL((u32)0, d.offset);
 
             ncore::noffset::allocation_t e = allocator->allocate(512);
-            CHECK_EQUAL(456, e.offset);
+            CHECK_EQUAL((u32)456, e.offset);
 
             ncore::noffset::storage_report_t report = allocator->storageReport();
-            CHECK_EQUAL(1024 * 1024 * 256 - 3456 - 2345 - 456 - 512, report.totalFreeSpace);
+            CHECK_EQUAL((u32)1024 * 1024 * 256 - 3456 - 2345 - 456 - 512, report.totalFreeSpace);
             CHECK_NOT_EQUAL(report.totalFreeSpace, report.largestFreeRegion);
 
             allocator->free(c);
@@ -261,7 +259,7 @@ UNITTEST_SUITE_BEGIN(offset)
 
             // End: Validate that allocator has no fragmentation left. Should be 100% clean.
             ncore::noffset::allocation_t validateAll = allocator->allocate(1024 * 1024 * 256);
-            CHECK_EQUAL(0, validateAll.offset);
+            CHECK_EQUAL((u32)0, validateAll.offset);
             allocator->free(validateAll);
         }
 
@@ -277,8 +275,8 @@ UNITTEST_SUITE_BEGIN(offset)
             }
 
             ncore::noffset::storage_report_t report = allocator->storageReport();
-            CHECK_EQUAL(0, report.totalFreeSpace);
-            CHECK_EQUAL(0, report.largestFreeRegion);
+            CHECK_EQUAL((u32)0, report.totalFreeSpace);
+            CHECK_EQUAL((u32)0, report.largestFreeRegion);
 
             // Free four random slots
             allocator->free(allocations[243]);
@@ -312,12 +310,12 @@ UNITTEST_SUITE_BEGIN(offset)
             }
 
             ncore::noffset::storage_report_t report2 = allocator->storageReport();
-            CHECK_EQUAL(1024 * 1024 * 256, report2.totalFreeSpace);
-            CHECK_EQUAL(1024 * 1024 * 256, report2.largestFreeRegion);
+            CHECK_EQUAL((u32)1024 * 1024 * 256, report2.totalFreeSpace);
+            CHECK_EQUAL((u32)1024 * 1024 * 256, report2.largestFreeRegion);
 
             // End: Validate that allocator has no fragmentation left. Should be 100% clean.
             ncore::noffset::allocation_t validateAll = allocator->allocate(1024 * 1024 * 256);
-            CHECK_EQUAL(0, validateAll.offset);
+            CHECK_EQUAL((u32)0, validateAll.offset);
             allocator->free(validateAll);
         }
     }

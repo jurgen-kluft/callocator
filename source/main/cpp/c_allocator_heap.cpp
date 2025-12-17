@@ -129,14 +129,8 @@ namespace ncore
         static_assert(FL_COUNT == TLSF_FL_COUNT, "invalid level configuration");
         static_assert(SL_COUNT == TLSF_SL_COUNT, "invalid level configuration");
 
-        static D_INLINE u32 bitmap_ffs(u32 x)
-        {
-            return (u32)math::g_findFirstBit(x);
-        }
-        static D_INLINE s8  log2floor(uint_t x)
-        {
-            return math::g_ilog2(x);
-        }
+        static D_INLINE u32 bitmap_ffs(u32 x) { return (u32)math::g_findFirstBit(x); }
+        static D_INLINE s8  log2floor(uint_t x) { return math::g_ilog2(x); }
 
         D_INLINE uint_t block_size(const block_t* block) { return block->header & ~BLOCK_BITS; }
         D_INLINE void   block_set_size(block_t* block, uint_t size)
@@ -653,10 +647,10 @@ namespace ncore
     class alloc_tlsf_vmem_t : public nheap::allocator_t
     {
     public:
-        int_t         m_base_size;
-        vmem_arena_t* m_arena;
+        int_t    m_base_size;
+        arena_t* m_arena;
 
-        alloc_tlsf_vmem_t(nheap::context_t* context, vmem_arena_t* arena);
+        alloc_tlsf_vmem_t(nheap::context_t* context, arena_t* arena);
         virtual ~alloc_tlsf_vmem_t();
 
         virtual void* v_resize(u64 size);
@@ -664,17 +658,17 @@ namespace ncore
         DCORE_CLASS_PLACEMENT_NEW_DELETE
     };
 
-    alloc_tlsf_vmem_t::alloc_tlsf_vmem_t(nheap::context_t* context, vmem_arena_t* arena) : nheap::allocator_t(context), m_arena(arena) {}
+    alloc_tlsf_vmem_t::alloc_tlsf_vmem_t(nheap::context_t* context, arena_t* arena) : nheap::allocator_t(context), m_arena(arena) {}
     alloc_tlsf_vmem_t::~alloc_tlsf_vmem_t() {}
 
     void* alloc_tlsf_vmem_t::v_resize(u64 size)
     {
         size += m_base_size;
 
-        if (size > (m_arena->m_reserved_pages << m_arena->m_page_size_shift))
+        if (size > ((u64)m_arena->m_reserved_pages << m_arena->m_page_size_shift))
             return nullptr;
 
-        if (size > (m_arena->m_committed_pages << m_arena->m_page_size_shift))
+        if (size > ((u64)m_arena->m_committed_pages << m_arena->m_page_size_shift))
         {
             // Grow the committed region to the requested size.
             m_arena->committed(size);
@@ -685,19 +679,18 @@ namespace ncore
 
     alloc_t* g_create_heap(int_t initial_size, int_t reserved_size)
     {
-        vmem_arena_t a;
+        arena_t a;
         a.reserved(reserved_size + 4096 + 512);
         a.committed(initial_size + 4096 + 512);
-        vmem_arena_t* arena = (vmem_arena_t*)a.commit_and_zero(sizeof(vmem_arena_t));
-        *arena              = a;
+        arena_t* arena = (arena_t*)a.commit_and_zero(sizeof(arena_t));
+        *arena         = a;
 
         void*              mem1    = arena->commit(sizeof(nheap::context_t));
         nheap::context_t*  context = new (mem1) nheap::context_t();
         void*              mem2    = arena->commit(sizeof(alloc_tlsf_vmem_t));
         alloc_tlsf_vmem_t* alloc   = new (mem2) alloc_tlsf_vmem_t(context, arena);
 
-        alloc->m_base_size = arena->save();
-
+        alloc->m_base_size = arena->save_point();
         return alloc;
     }
 

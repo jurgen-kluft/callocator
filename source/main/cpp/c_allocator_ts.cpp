@@ -41,7 +41,7 @@ namespace ncore
             // for O(N log N) all together.
 
             // sort by end-point (free-time)
-            g_qsort(allocations, num_allocations, sizeof(allocation_t), s_sort_entries);
+            nsort::sort(allocations, num_allocations, sizeof(allocation_t), s_sort_entries);
 
             // Note: we also need to keep buckets sorted by their end-point (free-time)
             bucket_t* buckets     = g_allocate_array_and_clear<bucket_t>(allocator, num_allocations);

@@ -47,14 +47,14 @@ namespace ncore
 
         DCORE_CLASS_PLACEMENT_NEW_DELETE
 
-        s32           m_active_frames[2];  // keeping track of the number of active frames in each lane
-        s32           m_ended_frames[2];   // keeping track of the number of ended frames in each lane
-        s32           m_active_lane;       // Current lane, either 0 or 1, used for switching between two arenas
-        s32           m_max_active_frames; // Maximum number of active frames per lane
-        frame_t*      m_current_frame;     // Current frame, used for allocating memory
-        frame_t*      m_frames[2];         // N frames per lane
-        s64           m_save_points[2];    // Arena save points for each lane
-        vmem_arena_t* m_arena[2];          // Virtual memory arenas
+        s32      m_active_frames[2];  // keeping track of the number of active frames in each lane
+        s32      m_ended_frames[2];   // keeping track of the number of ended frames in each lane
+        s32      m_active_lane;       // Current lane, either 0 or 1, used for switching between two arenas
+        s32      m_max_active_frames; // Maximum number of active frames per lane
+        frame_t* m_current_frame;     // Current frame, used for allocating memory
+        frame_t* m_frames[2];         // N frames per lane
+        s64      m_save_points[2];    // Arena save points for each lane
+        arena_t* m_arena[2];          // Virtual memory arenas
 
     private:
         virtual void* v_allocate(u32 size, u32 alignment) final;

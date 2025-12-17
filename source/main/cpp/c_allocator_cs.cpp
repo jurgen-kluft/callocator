@@ -127,7 +127,7 @@ namespace ncore
     static u32 s_instance_index(object_t const* object, u16 const cp_type_index, void const* cp_ptr)
     {
         component_type_t const& cptype         = object->m_a_component[cp_type_index];
-        u32 const               local_cp_index = (u32)(((u32 const*)cp_ptr - (u32 const*)cptype.m_cp_data) / cptype.m_cp_sizeof);
+        u32 const               local_cp_index = (u32)(((u8 const*)cp_ptr - (u8 const*)cptype.m_cp_data) / cptype.m_cp_sizeof);
         return cptype.m_unmap[local_cp_index];
     }
 
@@ -203,10 +203,11 @@ namespace ncore
 
             // Did we remove the last component or do we now have a gap in the component list?
             index_t const local_cp_index_last = container->m_cp_count - 1;
+            container->m_cp_count--;
+
             if (local_cp_index < local_cp_index_last)
             {
                 // Move the last component to the location of the one we are removing
-                container->m_cp_count--;
                 container->m_map[container->m_unmap[local_cp_index_last]] = local_cp_index;
                 byte* local_cp_data = &container->m_cp_data[local_cp_index * container->m_cp_sizeof];
                 byte* local_cp_data_last = &container->m_cp_data[local_cp_index_last * container->m_cp_sizeof];

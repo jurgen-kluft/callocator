@@ -20,12 +20,12 @@ namespace ncore
     public:
         DCORE_CLASS_PLACEMENT_NEW_DELETE
 
-        stack_allocator_t(vmem_arena_t* arena);
+        stack_allocator_t(arena_t* arena);
         virtual ~stack_allocator_t() {}
 
         void          reset();
 
-        vmem_arena_t* m_arena;
+        arena_t* m_arena;
         int_t         m_base_pos;
         int_t         m_allocation_count;
 
@@ -38,16 +38,16 @@ namespace ncore
         friend class stack_alloc_scope_t;
     };
 
-    stack_allocator_t::stack_allocator_t(vmem_arena_t* arena) : m_arena(arena), m_allocation_count(0) {}
+    stack_allocator_t::stack_allocator_t(arena_t* arena) : m_arena(arena), m_allocation_count(0) {}
 
     void stack_allocator_t::reset()
     {
-        m_arena->restore(m_base_pos);
+        m_arena->restore_point(m_base_pos);
         m_allocation_count = 0;
     }
 
-    void* stack_allocator_t::v_allocate(u32 size, u32 alignment) 
-    { 
+    void* stack_allocator_t::v_allocate(u32 size, u32 alignment)
+    {
         m_allocation_count++;
         return m_arena->commit(size, alignment);
     }
@@ -74,21 +74,21 @@ namespace ncore
         ASSERT(m_allocation_count == *allocation_count);
         const uint_t pos         = g_ptr_diff_in_bytes(m_arena->m_base, point);
         m_allocation_count = *allocation_count;
-        m_arena->restore(pos);
+        m_arena->restore_point(pos);
     }
 
     stack_alloc_t* g_create_stack_allocator(int_t initial_size, int_t reserved_size)
     {
-        vmem_arena_t a;
+        arena_t a;
         a.reserved(reserved_size);
         a.committed(initial_size);
 
-        vmem_arena_t* arena = (vmem_arena_t*)a.commit(sizeof(vmem_arena_t));
+        arena_t* arena = (arena_t*)a.commit(sizeof(arena_t));
         *arena              = a;
 
         void*               mem       = arena->commit_and_zero(sizeof(stack_allocator_t));
         stack_allocator_t* allocator = new (mem) stack_allocator_t(arena);
-        allocator->m_base_pos         = arena->save();
+        allocator->m_base_pos         = arena->save_point();
         return allocator;
     }
 
@@ -98,7 +98,7 @@ namespace ncore
             return;
 
         stack_allocator_t* impl  = static_cast<stack_allocator_t*>(allocator);
-        vmem_arena_t*      arena = impl->m_arena;
+        arena_t*      arena = impl->m_arena;
         arena->release();
     }
 

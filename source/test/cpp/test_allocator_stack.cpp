@@ -11,7 +11,7 @@ UNITTEST_SUITE_BEGIN(stack)
 {
     UNITTEST_FIXTURE(main)
     {
-        UNITTEST_ALLOCATOR;
+        //UNITTEST_ALLOCATOR;
 
         int_t stack_initial_size = 1 * cMB;  // Initial size of the stack allocator
         int_t stack_reserved_size = 64 * cMB;  // Reserved size for the stack allocator

@@ -59,10 +59,13 @@ bool gRunUnitTest(UnitTest::TestReporter& reporter, UnitTest::TestContext& conte
 
     ncore::TestAllocator testAllocator(context.mAllocator);
     ncore::alloc_t*      systemAllocator = tcontext.system_alloc();
+    ncore::alloc_t*      heapAllocator = tcontext.heap_alloc();
     tcontext.set_system_alloc(&testAllocator);
+    tcontext.set_heap_alloc(&testAllocator);
 
     int r = UNITTEST_SUITE_RUN(context, reporter, cUnitTest);
 
+    tcontext.set_heap_alloc(heapAllocator);
     tcontext.set_system_alloc(systemAllocator);
 
     cbase::exit();

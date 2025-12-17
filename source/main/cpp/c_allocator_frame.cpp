@@ -38,7 +38,7 @@ namespace ncore
         {
             m_active_frames[i] = 0;
             m_ended_frames[i]  = 0;
-            m_arena[i]->restore(m_save_points[i]);
+            m_arena[i]->restore_point(m_save_points[i]);
         }
         m_active_lane = 0;
         // m_max_active_frames = ?;
@@ -50,15 +50,15 @@ namespace ncore
         m_max_active_frames = max_active_frames;
         for (s32 i = 0; i < 2; i++)
         {
-            vmem_arena_t a;
-            a.reserved((sizeof(frame_t) * max_active_frames) + sizeof(vmem_arena_t) + max_reserved_size);
-            vmem_arena_t* arena = (vmem_arena_t*)a.commit(sizeof(vmem_arena_t));
+            arena_t a;
+            a.reserved((sizeof(frame_t) * max_active_frames) + sizeof(arena_t) + max_reserved_size);
+            arena_t* arena = (arena_t*)a.commit(sizeof(arena_t));
             a.committed((sizeof(frame_t) * max_active_frames) + average_frame_size * max_active_frames);
             m_frames[i] = (frame_t*)a.commit_and_zero(sizeof(frame_t) * max_active_frames);
 
             *arena = a;
 
-            m_save_points[i] = arena->save();
+            m_save_points[i] = arena->save_point();
             m_arena[i] = arena;
         }
         reset();
@@ -93,7 +93,7 @@ namespace ncore
                 m_ended_frames[new_lane]  = 0;
 
                 m_arena[new_lane]->reset(); // Reset the arena for the new lane
-                m_arena[new_lane]->commit(sizeof(vmem_arena_t));
+                m_arena[new_lane]->commit(sizeof(arena_t));
                 m_frames[new_lane] = (frame_t*)m_arena[new_lane]->commit_and_zero(sizeof(frame_t) * m_max_active_frames);
             }
             else

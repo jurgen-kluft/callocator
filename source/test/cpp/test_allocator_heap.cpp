@@ -68,7 +68,7 @@ UNITTEST_SUITE_BEGIN(heap)
                     uint_t cap      = (uint_t)s_rand() % sizes[i] + 1;
                     uint_t spacelen = sizes[i];
                     {
-                        const u32 maxitems = (u32)(2 * spacelen);
+                        const s32 maxitems = (s32)(2 * spacelen);
 
                         void** pointers = g_allocate_array_and_clear<void*>(Allocator, maxitems);
                         CHECK_NOT_NULL(pointers);
@@ -95,7 +95,7 @@ UNITTEST_SUITE_BEGIN(heap)
                                 if (align)
                                 {
                                     uint_t const aligned = ((uint_t)pointers[p] & (align - 1));
-                                    CHECK_EQUAL(0, aligned);
+                                    CHECK_EQUAL((uint_t)0, aligned);
                                 }
                             }
                             CHECK_NOT_NULL(pointers[p]);

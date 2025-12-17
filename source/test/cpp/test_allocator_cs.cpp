@@ -120,16 +120,16 @@ UNITTEST_SUITE_BEGIN(cs)
             ncs::object_a_t* oa2 = poola.new_instance<ncs::object_a_t>();
             ncs::object_b_t* ob1 = poolb.new_instance<ncs::object_b_t>();
 
-            ncs::component_a_t* oaca = poola.create_component<ncs::object_a_t, ncs::component_a_t>(oa1);
-            ncs::component_b_t* oacb = poola.create_component<ncs::object_a_t, ncs::component_b_t>(oa1);
-            ncs::component_c_t* oacc = poola.create_component<ncs::object_a_t, ncs::component_c_t>(oa1);
+            /*ncs::component_a_t* oaca = */poola.create_component<ncs::object_a_t, ncs::component_a_t>(oa1);
+            /*ncs::component_b_t* oacb = */poola.create_component<ncs::object_a_t, ncs::component_b_t>(oa1);
+            /*ncs::component_c_t* oacc = */poola.create_component<ncs::object_a_t, ncs::component_c_t>(oa1);
 
-            ncs::component_a_t* obca = poolb.create_component<ncs::object_b_t, ncs::component_a_t>(ob1);
-            ncs::component_b_t* obcb = poolb.create_component<ncs::object_b_t, ncs::component_b_t>(ob1);
+            /*ncs::component_a_t* obca = */poolb.create_component<ncs::object_b_t, ncs::component_a_t>(ob1);
+            /*ncs::component_b_t* obcb = */poolb.create_component<ncs::object_b_t, ncs::component_b_t>(ob1);
 
             ncs::object_b_t*    objb   = poolb.new_instance<ncs::object_b_t>();
-            ncs::component_a_t* objbca = poolb.create_component<ncs::object_b_t, ncs::component_a_t>(objb);
-            ncs::component_b_t* objbcb = poolb.create_component<ncs::object_b_t, ncs::component_b_t>(objb);
+            /*ncs::component_a_t* objbca = */poolb.create_component<ncs::object_b_t, ncs::component_a_t>(objb);
+            /*ncs::component_b_t* objbcb = */poolb.create_component<ncs::object_b_t, ncs::component_b_t>(objb);
             poolb.destroy_component<ncs::object_b_t, ncs::component_a_t>(objb);
             poolb.destroy_component<ncs::object_b_t, ncs::component_b_t>(objb);
             poolb.destroy_instance<ncs::object_b_t>(objb);
@@ -147,8 +147,8 @@ UNITTEST_SUITE_BEGIN(cs)
             poola.destroy_component<ncs::object_a_t, ncs::component_b_t>(oa1);
             poola.destroy_component<ncs::object_a_t, ncs::component_c_t>(oa1);
 
-            poolb.destroy_component<ncs::object_b_t, ncs::component_a_t>(ob1);
             poolb.destroy_component<ncs::object_b_t, ncs::component_b_t>(ob1);
+            poolb.destroy_component<ncs::object_b_t, ncs::component_a_t>(ob1);
 
             poola.destroy_instance<ncs::object_a_t>(oa1);
             poola.destroy_instance<ncs::object_a_t>(oa2);
