@@ -674,20 +674,15 @@ namespace ncore
             m_arena->committed(size);
         }
 
-        return m_arena->m_base + m_base_size;
+        return m_arena->address_at_pos(m_base_size);
     }
 
     alloc_t* g_create_heap(int_t initial_size, int_t reserved_size)
     {
-        arena_t a;
-        a.reserved(reserved_size + 4096 + 512);
-        a.committed(initial_size + 4096 + 512);
-        arena_t* arena = (arena_t*)a.commit_and_zero(sizeof(arena_t));
-        *arena         = a;
-
-        void*              mem1    = arena->commit(sizeof(nheap::context_t));
+        arena_t*           arena   = gCreateArena(reserved_size + 4096 + 512, initial_size + 4096 + 512);
+        void*              mem1    = arena->alloc(sizeof(nheap::context_t));
         nheap::context_t*  context = new (mem1) nheap::context_t();
-        void*              mem2    = arena->commit(sizeof(alloc_tlsf_vmem_t));
+        void*              mem2    = arena->alloc(sizeof(alloc_tlsf_vmem_t));
         alloc_tlsf_vmem_t* alloc   = new (mem2) alloc_tlsf_vmem_t(context, arena);
 
         alloc->m_base_size = arena->save_point();

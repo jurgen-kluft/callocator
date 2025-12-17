@@ -50,16 +50,10 @@ namespace ncore
         m_max_active_frames = max_active_frames;
         for (s32 i = 0; i < 2; i++)
         {
-            arena_t a;
-            a.reserved((sizeof(frame_t) * max_active_frames) + sizeof(arena_t) + max_reserved_size);
-            arena_t* arena = (arena_t*)a.commit(sizeof(arena_t));
-            a.committed((sizeof(frame_t) * max_active_frames) + average_frame_size * max_active_frames);
-            m_frames[i] = (frame_t*)a.commit_and_zero(sizeof(frame_t) * max_active_frames);
-
-            *arena = a;
-
+            arena_t* arena   = gCreateArena((sizeof(frame_t) * max_active_frames) + sizeof(arena_t) + max_reserved_size, (sizeof(frame_t) * max_active_frames) + average_frame_size * max_active_frames);
+            m_frames[i]      = (frame_t*)arena->alloc_and_zero(sizeof(frame_t) * max_active_frames);
             m_save_points[i] = arena->save_point();
-            m_arena[i] = arena;
+            m_arena[i]       = arena;
         }
         reset();
     }
@@ -93,8 +87,8 @@ namespace ncore
                 m_ended_frames[new_lane]  = 0;
 
                 m_arena[new_lane]->reset(); // Reset the arena for the new lane
-                m_arena[new_lane]->commit(sizeof(arena_t));
-                m_frames[new_lane] = (frame_t*)m_arena[new_lane]->commit_and_zero(sizeof(frame_t) * m_max_active_frames);
+                m_arena[new_lane]->alloc(sizeof(arena_t));
+                m_frames[new_lane] = (frame_t*)m_arena[new_lane]->alloc_and_zero(sizeof(frame_t) * m_max_active_frames);
             }
             else
             {
@@ -157,7 +151,7 @@ namespace ncore
     {
         ASSERT(m_current_frame != nullptr);
 
-        byte* p = (byte*)m_arena[m_active_lane]->commit(size, alignment);
+        byte* p = (byte*)m_arena[m_active_lane]->alloc(size, alignment);
 
 #ifdef TARGET_DEBUG
         nmem::memset(p, 0xcd, size);
