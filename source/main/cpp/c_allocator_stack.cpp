@@ -26,7 +26,7 @@ namespace ncore
         void reset();
 
         arena_t* m_arena;
-        int_t    m_base_pos;
+        void*    m_save_address;
         int_t    m_allocation_count;
 
     protected:
@@ -42,7 +42,7 @@ namespace ncore
 
     void stack_allocator_t::reset()
     {
-        narena::restore_point(m_arena, m_base_pos);
+        narena::restore_address(m_arena, m_save_address);
         m_allocation_count = 0;
     }
 
@@ -72,9 +72,8 @@ namespace ncore
         // Has the user forgotten to deallocate one or more allocations?
         int_t* allocation_count = (int_t*)point;
         ASSERT(m_allocation_count == *allocation_count);
-        const uint_t pos   = g_ptr_diff_in_bytes(narena::base(m_arena), point);
         m_allocation_count = *allocation_count;
-        narena::restore_point(m_arena, pos);
+        narena::restore_address(m_arena, point);
     }
 
     stack_alloc_t* g_create_stack_allocator(int_t initial_size, int_t reserved_size)
@@ -82,7 +81,7 @@ namespace ncore
         arena_t*           arena     = narena::create(reserved_size, initial_size);
         void*              mem       = narena::alloc(arena, sizeof(stack_allocator_t));
         stack_allocator_t* allocator = new (mem) stack_allocator_t(arena);
-        allocator->m_base_pos        = narena::save_point(arena);
+        allocator->m_save_address    = narena::current_address(arena);
         return allocator;
     }
 

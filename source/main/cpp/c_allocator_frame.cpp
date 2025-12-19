@@ -38,7 +38,7 @@ namespace ncore
         {
             m_active_frames[i] = 0;
             m_ended_frames[i]  = 0;
-            narena::restore_point(m_arena[i], m_save_points[i]);
+            narena::restore_address(m_arena[i], m_save_addresses[i]);
         }
         m_active_lane = 0;
         // m_max_active_frames = ?;
@@ -52,7 +52,7 @@ namespace ncore
         {
             arena_t* arena   = narena::create((sizeof(frame_t) * max_active_frames) + sizeof(arena_t) + max_reserved_size, (sizeof(frame_t) * max_active_frames) + average_frame_size * max_active_frames);
             m_frames[i]      = (frame_t*)narena::alloc_and_zero(arena, sizeof(frame_t) * max_active_frames);
-            m_save_points[i] = narena::save_point(arena);
+            m_save_addresses[i] = narena::current_address(arena);
             m_arena[i]       = arena;
         }
         reset();

@@ -42,14 +42,14 @@ namespace ncore
 
             u32 SizeToBinCeil(u32 size)
             {
-                const s8 bin = (size >= 8) ? math::g_ilog2(size >> TOP_BINS_INDEX_SHIFT) : 0;
+                const s8 bin = (size >= 8) ? math::ilog2(size >> TOP_BINS_INDEX_SHIFT) : 0;
                 size += ((1 << bin) - 1);                             // Round up to next leaf bin
                 return (bin << TOP_BINS_INDEX_SHIFT) + (size >> bin); // Top bin index + leaf bin index
             }
 
             u32 SizeToBinFloor(u32 size)
             {
-                const s8 bin = (size >= 8) ? math::g_ilog2(size >> TOP_BINS_INDEX_SHIFT) : 0;
+                const s8 bin = (size >= 8) ? math::ilog2(size >> TOP_BINS_INDEX_SHIFT) : 0;
                 return (bin << TOP_BINS_INDEX_SHIFT) + (size >> bin); // Top bin index + leaf bin index
             }
 

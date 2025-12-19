@@ -53,7 +53,7 @@ namespace ncore
         s32      m_max_active_frames; // Maximum number of active frames per lane
         frame_t* m_current_frame;     // Current frame, used for allocating memory
         frame_t* m_frames[2];         // N frames per lane
-        s64      m_save_points[2];    // Arena save points for each lane
+        void*    m_save_addresses[2]; // Arena save addresses for each lane
         arena_t* m_arena[2];          // Virtual memory arenas
 
     private:

@@ -30,11 +30,11 @@ namespace ncore
             // note: remove 'count' if we don't need it
             void initialize(alloc_t* allocator, int_t min_size, int_t max_size, int_t total_size)
             {
-                ASSERT(min_size < max_size && math::g_ispo2(min_size) && math::g_ispo2(max_size));
+                ASSERT(min_size < max_size && math::ispo2(min_size) && math::ispo2(max_size));
 
-                const s8 min_size_shift = math::g_ilog2(min_size);
-                const s8 max_size_shift = math::g_ilog2(max_size);
-                const s8 tot_size_shift = math::g_ilog2(total_size);
+                const s8 min_size_shift = math::ilog2(min_size);
+                const s8 max_size_shift = math::ilog2(max_size);
+                const s8 tot_size_shift = math::ilog2(total_size);
                 const s8 num_sizes      = 1 + max_size_shift - min_size_shift;
 
                 // Allocate the count and offsets array's
@@ -67,19 +67,19 @@ namespace ncore
                     m_offsets_2[i] = count2 > 0 ? offset2 : -1;
 
                     level0_size_in_bits += count0;
-                    level0_size_in_bits = math::g_alignUp(level0_size_in_bits, 64);
+                    level0_size_in_bits = math::alignUp(level0_size_in_bits, 64);
 
                     level1_size_in_bits += count1;
-                    level1_size_in_bits = math::g_alignUp(level1_size_in_bits, 64);
+                    level1_size_in_bits = math::alignUp(level1_size_in_bits, 64);
 
                     level2_size_in_bits += count2;
-                    level2_size_in_bits = math::g_alignUp(level2_size_in_bits, 64);
+                    level2_size_in_bits = math::alignUp(level2_size_in_bits, 64);
 
                     i += 1;
                     if (i == num_sizes)
                         break;
 
-                    size_in_bits = math::g_max(size_in_bits >> 1, (s32)1);
+                    size_in_bits = math::max(size_in_bits >> 1, (s32)1);
 
                     offset0 = level0_size_in_bits >> 6;
                     offset1 = level1_size_in_bits >> 6;
@@ -187,16 +187,16 @@ namespace ncore
                 s32 offset = m_offsets_2[size_index];
                 if (offset >= 0)
                 {
-                    bit = math::g_findFirstBit(m_level2[offset]);
+                    bit = math::findFirstBit(m_level2[offset]);
                 }
                 offset = m_offsets_1[size_index];
                 if (offset >= 0)
                 {
-                    bit = math::g_findFirstBit(m_level1[offset + bit]);
+                    bit = math::findFirstBit(m_level1[offset + bit]);
                 }
 
                 offset = m_offsets_0[size_index];
-                return (bit << 6) + math::g_findFirstBit(m_level0[offset + bit]);
+                return (bit << 6) + math::findFirstBit(m_level0[offset + bit]);
             }
 
             s32 find_and_clr_bit(s8 size_index)
@@ -295,9 +295,9 @@ namespace ncore
 
             inline s8 size_to_index(s64 size) const
             {
-                ASSERT(math::g_ispo2(size));
+                ASSERT(math::ispo2(size));
                 ASSERT(size >= ((s64)1 << m_min_size_shift) && size <= ((s64)1 << m_max_size_shift));
-                return math::g_ilog2(size) - m_min_size_shift;
+                return math::ilog2(size) - m_min_size_shift;
             }
 
             bool allocate(s64 size, s64& offset)
@@ -314,7 +314,7 @@ namespace ncore
                 }
 
                 // Which (highest) bit is set in size_free?
-                s8  size_free_index = math::g_findFirstBit(size_free);
+                s8  size_free_index = math::findFirstBit(size_free);
                 s32 bit             = find_bit(size_free_index);
 
                 // Note:
@@ -408,12 +408,12 @@ namespace ncore
         // template <typename T> void segment_node_alloc_t<T>::setup(alloc_t* allocator, u8 node_count_2log, u8 max_span_2log)
         template <typename T> void segment_node_alloc_t<T>::setup(alloc_t* allocator, int_t min_size, int_t max_size, int_t total_size)
         {
-            ASSERT(math::g_ispo2(min_size) && math::g_ispo2(max_size) && math::g_ispo2(total_size));
+            ASSERT(math::ispo2(min_size) && math::ispo2(max_size) && math::ispo2(total_size));
             ASSERT(min_size < max_size && max_size <= total_size);
 
-            const u8 min_size_shift = math::g_ilog2(min_size);
-            const u8 max_size_shift = math::g_ilog2(max_size);
-            const u8 tot_size_shift = math::g_ilog2(total_size);
+            const u8 min_size_shift = math::ilog2(min_size);
+            const u8 max_size_shift = math::ilog2(max_size);
+            const u8 tot_size_shift = math::ilog2(total_size);
 
             m_min_size_shift   = min_size_shift;                  // The minimum size of a segment in log2
             m_max_size_shift   = max_size_shift;                  // The maximum size of a segment in log2
@@ -514,7 +514,7 @@ namespace ncore
 
         template <typename T> bool segment_node_alloc_t<T>::allocate(s64 size, s64& out_ptr)
         {
-            u8 const span = math::g_ilog2(size) - m_min_size_shift;
+            u8 const span = math::ilog2(size) - m_min_size_shift;
 
             node_t node = m_size_lists[span];
             if (node == (node_t)c_null)
@@ -525,7 +525,7 @@ namespace ncore
                 if (occupancy == 0) // There are no free sizes available
                     return false;
 
-                u8 occ = math::g_findFirstBit(occupancy);
+                u8 occ = math::findFirstBit(occupancy);
                 node   = m_size_lists[occ];
                 while (occ > span)
                 {

@@ -120,8 +120,8 @@ namespace ncore
         STATIC_ASSERTS(FL_COUNT == TLSF_FL_COUNT, "invalid level configuration");
         STATIC_ASSERTS(SL_COUNT == TLSF_SL_COUNT, "invalid level configuration");
 
-        static D_INLINE u32 bitmap_ffs(u32 x) { return (u32)math::g_findFirstBit(x); }
-        static D_INLINE s8  log2floor(uint_t x) { return math::g_ilog2(x); }
+        static D_INLINE u32 bitmap_ffs(u32 x) { return (u32)math::findFirstBit(x); }
+        static D_INLINE s8  log2floor(uint_t x) { return math::ilog2(x); }
 
         D_INLINE uint_t block_size(const block_t* block) { return block->header & ~BLOCK_BITS; }
         D_INLINE void   block_set_size(block_t* block, uint_t size)
@@ -638,7 +638,7 @@ namespace ncore
     class alloc_tlsf_vmem_t : public nheap::allocator_t
     {
     public:
-        int_t    m_base_size;
+        void*    m_save_address;
         arena_t* m_arena;
 
         alloc_tlsf_vmem_t(nheap::context_t* context, arena_t* arena);
@@ -654,18 +654,8 @@ namespace ncore
 
     void* alloc_tlsf_vmem_t::v_resize(u64 size)
     {
-        size += m_base_size;
-
-        if (size > ((u64)m_arena->m_reserved_pages << m_arena->m_page_size_shift))
-            return nullptr;
-
-        if (size > ((u64)m_arena->m_committed_pages << m_arena->m_page_size_shift))
-        {
-            // Grow the committed region to the requested size.
-            narena::commit(m_arena, size);
-        }
-
-        return narena::address_at_pos(m_arena, m_base_size);
+        narena::commit_from_address(m_arena, m_save_address, size);
+        return m_save_address;
     }
 
     alloc_t* g_create_heap(int_t initial_size, int_t reserved_size)
@@ -676,7 +666,7 @@ namespace ncore
         void*              mem2    = narena::alloc(arena, sizeof(alloc_tlsf_vmem_t));
         alloc_tlsf_vmem_t* alloc   = new (mem2) alloc_tlsf_vmem_t(context, arena);
 
-        alloc->m_base_size = narena::save_point(arena);
+        alloc->m_save_address = narena::current_address(arena);
         return alloc;
     }
 
