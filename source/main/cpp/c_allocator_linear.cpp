@@ -25,39 +25,39 @@ namespace ncore
 
     linear_alloc_imp_t::~linear_alloc_imp_t()
     {
-        m_arena->release();
+        narena::release(m_arena);
         m_arena = nullptr;
     }
 
     void linear_alloc_imp_t::v_reset()
     {
 #ifdef TARGET_DEBUG
-        s64 const current_pos = m_arena->save_point();
+        s64 const current_pos = narena::save_point(m_arena);
         if (current_pos > m_base_pos)
         {
-            void* mem = m_arena->address_at_pos(m_base_pos);
+            void* mem = narena::address_at_pos(m_arena, m_base_pos);
             nmem::memset(mem, 0xCD, current_pos - m_base_pos);
         }
 #endif
 
-        m_arena->restore_point(m_base_pos);
+        narena::restore_point(m_arena, m_base_pos);
     }
 
     void* linear_alloc_imp_t::v_allocate(u32 size, u32 alignment)
     {
         if (size == 0)
             return nullptr;
-        return m_arena->alloc(size, alignment);
+        return narena::alloc(m_arena, size, alignment);
     }
 
     void linear_alloc_imp_t::v_deallocate(void* ptr) {}
 
     linear_alloc_t* g_create_linear_allocator(int_t initial_size, int_t reserved_size)
     {
-        arena_t*            arena     = gCreateArena(reserved_size, initial_size);
-        void*               mem       = arena->alloc_and_zero(sizeof(linear_alloc_imp_t));
+        arena_t*            arena     = narena::create(reserved_size, initial_size);
+        void*               mem       = narena::alloc(arena, sizeof(linear_alloc_imp_t));
         linear_alloc_imp_t* allocator = new (mem) linear_alloc_imp_t(arena);
-        allocator->m_base_pos         = arena->save_point();
+        allocator->m_base_pos         = narena::save_point(arena);
         return allocator;
     }
 
@@ -68,7 +68,7 @@ namespace ncore
 
         linear_alloc_imp_t* impl  = static_cast<linear_alloc_imp_t*>(allocator);
         arena_t*            arena = impl->m_arena;
-        return arena->save_point() - impl->m_base_pos;
+        return narena::save_point(arena) - impl->m_base_pos;
     }
 
     void g_destroy_allocator(linear_alloc_t* allocator)
@@ -78,7 +78,7 @@ namespace ncore
 
         linear_alloc_imp_t* impl  = static_cast<linear_alloc_imp_t*>(allocator);
         arena_t*            arena = impl->m_arena;
-        arena->release();
+        narena::release(arena);
     }
 
 }; // namespace ncore

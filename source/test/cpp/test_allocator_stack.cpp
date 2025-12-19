@@ -11,21 +11,15 @@ UNITTEST_SUITE_BEGIN(stack)
 {
     UNITTEST_FIXTURE(main)
     {
-        //UNITTEST_ALLOCATOR;
+        // UNITTEST_ALLOCATOR;
 
-        int_t stack_initial_size = 1 * cMB;  // Initial size of the stack allocator
-        int_t stack_reserved_size = 64 * cMB;  // Reserved size for the stack allocator
-        stack_alloc_t* stack_alloc = nullptr;
+        int_t          stack_initial_size  = 1 * cMB;  // Initial size of the stack allocator
+        int_t          stack_reserved_size = 64 * cMB; // Reserved size for the stack allocator
+        stack_alloc_t* stack_alloc         = nullptr;
 
-        UNITTEST_FIXTURE_SETUP()
-        {
-            stack_alloc = g_create_stack_allocator(stack_initial_size, stack_reserved_size);
-        }
+        UNITTEST_FIXTURE_SETUP() { stack_alloc = g_create_stack_allocator(stack_initial_size, stack_reserved_size); }
 
-        UNITTEST_FIXTURE_TEARDOWN()
-        {
-            g_destroy_stack_allocator(stack_alloc);
-        }
+        UNITTEST_FIXTURE_TEARDOWN() { g_destroy_stack_allocator(stack_alloc); }
 
         UNITTEST_TEST(allocN_freeN)
         {
@@ -33,7 +27,7 @@ UNITTEST_SUITE_BEGIN(stack)
 
             for (s32 i = 0; i < 3; ++i)
             {
-                stack_alloc_scope_t scope(stack_alloc);
+                defer_t scope(stack_alloc);
 
                 void* mem1 = stack_alloc->allocate(512, 8);
                 void* mem2 = stack_alloc->allocate(1024, 16);
@@ -50,8 +44,8 @@ UNITTEST_SUITE_BEGIN(stack)
                 mem4 = nullptr;
 
                 {
-                    stack_alloc_scope_t scope2(stack_alloc);
-                    void*               mem6 = stack_alloc->allocate(8, 8);
+                    defer_t scope2(stack_alloc);
+                    void*   mem6 = stack_alloc->allocate(8, 8);
                     CHECK_NOT_NULL(mem6);
                     stack_alloc->deallocate(mem6);
                     mem6 = nullptr;
@@ -98,7 +92,7 @@ UNITTEST_SUITE_BEGIN(stack)
 
             for (s32 i = 0; i < 12; ++i)
             {
-                stack_alloc_scope_t scope(stack_alloc);
+                defer_t scope(stack_alloc);
 
                 struct test_t
                 {

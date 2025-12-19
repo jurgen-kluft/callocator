@@ -42,14 +42,14 @@ namespace ncore
 
     void stack_allocator_t::reset()
     {
-        m_arena->restore_point(m_base_pos);
+        narena::restore_point(m_arena, m_base_pos);
         m_allocation_count = 0;
     }
 
     void* stack_allocator_t::v_allocate(u32 size, u32 alignment)
     {
         m_allocation_count++;
-        return m_arena->alloc(size, alignment);
+        return narena::alloc(m_arena, size, alignment);
     }
 
     void stack_allocator_t::v_deallocate(void* ptr)
@@ -62,7 +62,7 @@ namespace ncore
 
     void* stack_allocator_t::v_save_point()
     {
-        int_t* ptr = (int_t*)m_arena->alloc(sizeof(int_t));
+        int_t* ptr = (int_t*)narena::alloc(m_arena, sizeof(int_t));
         *ptr       = m_allocation_count;
         return ptr;
     }
@@ -72,17 +72,17 @@ namespace ncore
         // Has the user forgotten to deallocate one or more allocations?
         int_t* allocation_count = (int_t*)point;
         ASSERT(m_allocation_count == *allocation_count);
-        const uint_t pos   = g_ptr_diff_in_bytes(m_arena->base(), point);
+        const uint_t pos   = g_ptr_diff_in_bytes(narena::base(m_arena), point);
         m_allocation_count = *allocation_count;
-        m_arena->restore_point(pos);
+        narena::restore_point(m_arena, pos);
     }
 
     stack_alloc_t* g_create_stack_allocator(int_t initial_size, int_t reserved_size)
     {
-        arena_t*           arena     = gCreateArena(reserved_size, initial_size);
-        void*              mem       = arena->alloc_and_zero(sizeof(stack_allocator_t));
+        arena_t*           arena     = narena::create(reserved_size, initial_size);
+        void*              mem       = narena::alloc(arena, sizeof(stack_allocator_t));
         stack_allocator_t* allocator = new (mem) stack_allocator_t(arena);
-        allocator->m_base_pos        = arena->save_point();
+        allocator->m_base_pos        = narena::save_point(arena);
         return allocator;
     }
 
@@ -93,7 +93,7 @@ namespace ncore
 
         stack_allocator_t* impl  = static_cast<stack_allocator_t*>(allocator);
         arena_t*           arena = impl->m_arena;
-        arena->release();
+        narena::release(arena);
     }
 
 }; // namespace ncore

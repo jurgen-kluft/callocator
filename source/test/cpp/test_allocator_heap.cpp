@@ -19,10 +19,6 @@ UNITTEST_SUITE_BEGIN(heap)
         {
             gInitSize  = 32 * 1024 * 1024;  // 32 MB
             gBlockSize = 256 * 1024 * 1024; // 256 MB
-
-            alloc_t* tlsf = g_create_heap(gInitSize, gBlockSize);
-
-            g_release_heap(tlsf);
         }
 
         UNITTEST_FIXTURE_TEARDOWN() {}
@@ -46,7 +42,6 @@ UNITTEST_SUITE_BEGIN(heap)
             g_release_heap(tlsf);
         }
 
-        // static void random_test(alloc_t * t, uint_t spacelen, const uint_t cap)
         static uint_t s_holdrand = 1;
         static void   s_srand(uint_t seed) { s_holdrand = seed; }
         static uint_t s_rand() { return (((s_holdrand = s_holdrand * 214013L + 2531011L) >> 16) & 0x7fffffff); }

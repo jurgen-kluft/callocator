@@ -6,6 +6,7 @@
 #endif
 
 #include "ccore/c_allocator.h"
+#include "ccore/c_defer.h"
 
 namespace ncore
 {
@@ -20,14 +21,14 @@ namespace ncore
         virtual void* v_save_point()               = 0;
     };
 
-    class stack_alloc_scope_t
+    template <> class defer_action_t<stack_alloc_t*>
     {
-        stack_alloc_t* m_allocator;
-        void*          m_point;
-
     public:
-        stack_alloc_scope_t(stack_alloc_t* allocator) : m_allocator(allocator) { m_point = m_allocator->save_point(); }
-        ~stack_alloc_scope_t() { m_allocator->restore_point(m_point); }
+        stack_alloc_t* m_object;
+        void*          m_point;
+        defer_action_t(stack_alloc_t* object) : m_object(object) {}
+        void open() { m_point = m_object->save_point(); }
+        void close() { m_object->restore_point(m_point); }
     };
 
     stack_alloc_t* g_create_stack_allocator(int_t initial_size, int_t reserved_size);

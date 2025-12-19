@@ -5,7 +5,6 @@
 #    pragma once
 #endif
 
-
 namespace ncore
 {
     class alloc_t;

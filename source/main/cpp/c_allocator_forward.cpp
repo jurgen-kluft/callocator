@@ -36,6 +36,9 @@ namespace ncore
     // the previous and next nodes in the chain.
     struct forward_alloc_t::node_t
     {
+        u32 m_next; // relative offsets (forwards)
+        u32 m_prev; // relative offsets (backwards)
+
         inline lnode_t* get_next() { return (m_next == 0) ? nullptr : this + m_next; }
         inline void     set_next(lnode_t* next) { m_next = (next == nullptr) ? 0 : ((u32)(next - this)); }
         inline lnode_t* get_prev() { return (m_prev == 0) ? nullptr : this - m_prev; }
@@ -86,9 +89,6 @@ namespace ncore
             // Check if we can still fulfill the requested allocation size
             return (_alloc_size_requested < _this->m_next);
         }
-
-        u32 m_next; // relative offsets (forwards)
-        u32 m_prev; // relative offsets (backwards)
     };
 
     static inline bool is_pointer_inside(void* ptr, lnode_t* begin, lnode_t* end) { return ptr >= (void*)(begin + 1) && ptr < (void*)(end - 1); }

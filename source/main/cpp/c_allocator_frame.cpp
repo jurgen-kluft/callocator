@@ -28,8 +28,8 @@ namespace ncore
 
     frame_allocator_t::~frame_allocator_t()
     {
-        m_arena[0]->release();
-        m_arena[1]->release();
+        narena::release(m_arena[0]);
+        narena::release(m_arena[1]);
     }
 
     void frame_allocator_t::reset()
@@ -38,7 +38,7 @@ namespace ncore
         {
             m_active_frames[i] = 0;
             m_ended_frames[i]  = 0;
-            m_arena[i]->restore_point(m_save_points[i]);
+            narena::restore_point(m_arena[i], m_save_points[i]);
         }
         m_active_lane = 0;
         // m_max_active_frames = ?;
@@ -50,9 +50,9 @@ namespace ncore
         m_max_active_frames = max_active_frames;
         for (s32 i = 0; i < 2; i++)
         {
-            arena_t* arena   = gCreateArena((sizeof(frame_t) * max_active_frames) + sizeof(arena_t) + max_reserved_size, (sizeof(frame_t) * max_active_frames) + average_frame_size * max_active_frames);
-            m_frames[i]      = (frame_t*)arena->alloc_and_zero(sizeof(frame_t) * max_active_frames);
-            m_save_points[i] = arena->save_point();
+            arena_t* arena   = narena::create((sizeof(frame_t) * max_active_frames) + sizeof(arena_t) + max_reserved_size, (sizeof(frame_t) * max_active_frames) + average_frame_size * max_active_frames);
+            m_frames[i]      = (frame_t*)narena::alloc_and_zero(arena, sizeof(frame_t) * max_active_frames);
+            m_save_points[i] = narena::save_point(arena);
             m_arena[i]       = arena;
         }
         reset();
@@ -86,9 +86,9 @@ namespace ncore
                 m_active_frames[new_lane] = 0;
                 m_ended_frames[new_lane]  = 0;
 
-                m_arena[new_lane]->reset(); // Reset the arena for the new lane
-                m_arena[new_lane]->alloc(sizeof(arena_t));
-                m_frames[new_lane] = (frame_t*)m_arena[new_lane]->alloc_and_zero(sizeof(frame_t) * m_max_active_frames);
+                narena::reset(m_arena[new_lane]); // Reset the arena for the new lane
+                narena::alloc(m_arena[new_lane], sizeof(arena_t));
+                m_frames[new_lane] = (frame_t*)narena::alloc_and_zero(m_arena[new_lane], sizeof(frame_t) * m_max_active_frames);
             }
             else
             {
@@ -151,7 +151,7 @@ namespace ncore
     {
         ASSERT(m_current_frame != nullptr);
 
-        byte* p = (byte*)m_arena[m_active_lane]->alloc(size, alignment);
+        byte* p = (byte*)narena::alloc(m_arena[m_active_lane], (int_t)size, alignment);
 
 #ifdef TARGET_DEBUG
         nmem::memset(p, 0xcd, size);

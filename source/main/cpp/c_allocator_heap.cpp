@@ -12,7 +12,6 @@
 #endif
 
 // A heap allocator implemented according to the TLSF allocator, Two-Level Segregate Fit
-// See license description at the end of this file
 namespace ncore
 {
     namespace nheap
@@ -85,10 +84,6 @@ namespace ncore
             }
         }
 
-#ifndef CC_UNLIKELY
-#    define CC_UNLIKELY(x) __builtin_expect(!!(x), false)
-#endif
-
 // All allocation sizes and addresses are aligned.
 #if CC_PLATFORM_PTR_SIZE == 8
 #    define ALIGN_SHIFT 3
@@ -97,37 +92,33 @@ namespace ncore
 #endif
 #define ALIGN_SIZE ((uint_t)1 << ALIGN_SHIFT)
 
-/* First level (FL) and second level (SL) counts */
+// First level (FL) and second level (SL) counts
 #define SL_SHIFT 4
 #define SL_COUNT (1U << SL_SHIFT)
 #define FL_MAX TLSF_FL_MAX
 #define FL_SHIFT (SL_SHIFT + ALIGN_SHIFT)
 #define FL_COUNT (FL_MAX - FL_SHIFT + 1)
 
-/* Block status bits are stored in the least significant bits (LSB) of the
- * size field.
- */
+// Block status bits are stored in the least significant bits (LSB) of the size field.
 #define BLOCK_BIT_FREE ((uint_t)1)
 #define BLOCK_BIT_PREV_FREE ((uint_t)2)
 #define BLOCK_BITS (BLOCK_BIT_FREE | BLOCK_BIT_PREV_FREE)
 
-/* A free block must be large enough to store its header minus the size of the
- * prev field.
- */
+// A free block must be large enough to store its header minus the size of the* prev field.
 #define BLOCK_OVERHEAD (sizeof(uint_t))
 #define BLOCK_SIZE_MIN (sizeof(block_t) - sizeof(block_t*))
 #define BLOCK_SIZE_MAX ((uint_t)1 << (FL_MAX - 1))
 #define BLOCK_SIZE_SMALL ((uint_t)1 << FL_SHIFT)
 
-        static_assert(sizeof(uint_t) == 4 || sizeof(uint_t) == 8, "uint_t must be 32 or 64 bit");
-        static_assert(sizeof(uint_t) == sizeof(void*), "uint_t must equal pointer size");
-        static_assert(ALIGN_SIZE == BLOCK_SIZE_SMALL / SL_COUNT, "sizes are not properly set");
-        static_assert(BLOCK_SIZE_MIN < BLOCK_SIZE_SMALL, "min allocation size is wrong");
-        static_assert(BLOCK_SIZE_MAX == TLSF_MAX_SIZE + BLOCK_OVERHEAD, "max allocation size is wrong");
-        static_assert(FL_COUNT <= 32, "index too large");
-        static_assert(SL_COUNT <= 32, "index too large");
-        static_assert(FL_COUNT == TLSF_FL_COUNT, "invalid level configuration");
-        static_assert(SL_COUNT == TLSF_SL_COUNT, "invalid level configuration");
+        STATIC_ASSERTS(sizeof(uint_t) == 4 || sizeof(uint_t) == 8, "uint_t must be 32 or 64 bit");
+        STATIC_ASSERTS(sizeof(uint_t) == sizeof(void*), "uint_t must equal pointer size");
+        STATIC_ASSERTS(ALIGN_SIZE == BLOCK_SIZE_SMALL / SL_COUNT, "sizes are not properly set");
+        STATIC_ASSERTS(BLOCK_SIZE_MIN < BLOCK_SIZE_SMALL, "min allocation size is wrong");
+        STATIC_ASSERTS(BLOCK_SIZE_MAX == TLSF_MAX_SIZE + BLOCK_OVERHEAD, "max allocation size is wrong");
+        STATIC_ASSERTS(FL_COUNT <= 32, "index too large");
+        STATIC_ASSERTS(SL_COUNT <= 32, "index too large");
+        STATIC_ASSERTS(FL_COUNT == TLSF_FL_COUNT, "invalid level configuration");
+        STATIC_ASSERTS(SL_COUNT == TLSF_SL_COUNT, "invalid level configuration");
 
         static D_INLINE u32 bitmap_ffs(u32 x) { return (u32)math::g_findFirstBit(x); }
         static D_INLINE s8  log2floor(uint_t x) { return math::g_ilog2(x); }
@@ -671,21 +662,21 @@ namespace ncore
         if (size > ((u64)m_arena->m_committed_pages << m_arena->m_page_size_shift))
         {
             // Grow the committed region to the requested size.
-            m_arena->committed(size);
+            narena::commit(m_arena, size);
         }
 
-        return m_arena->address_at_pos(m_base_size);
+        return narena::address_at_pos(m_arena, m_base_size);
     }
 
     alloc_t* g_create_heap(int_t initial_size, int_t reserved_size)
     {
-        arena_t*           arena   = gCreateArena(reserved_size + 4096 + 512, initial_size + 4096 + 512);
-        void*              mem1    = arena->alloc(sizeof(nheap::context_t));
+        arena_t*           arena   = narena::create(reserved_size + 4096 + 512, initial_size + 4096 + 512);
+        void*              mem1    = narena::alloc(arena, sizeof(nheap::context_t));
         nheap::context_t*  context = new (mem1) nheap::context_t();
-        void*              mem2    = arena->alloc(sizeof(alloc_tlsf_vmem_t));
+        void*              mem2    = narena::alloc(arena, sizeof(alloc_tlsf_vmem_t));
         alloc_tlsf_vmem_t* alloc   = new (mem2) alloc_tlsf_vmem_t(context, arena);
 
-        alloc->m_base_size = arena->save_point();
+        alloc->m_base_size = narena::save_point(arena);
         return alloc;
     }
 
@@ -694,39 +685,8 @@ namespace ncore
         alloc_tlsf_vmem_t* alloc = (alloc_tlsf_vmem_t*)allocator;
         if (alloc->m_arena)
         {
-            alloc->m_arena->release();
+            narena::release(alloc->m_arena);
         }
     }
 
 } // namespace ncore
-
-// BSD 3-Clause License
-//
-// Copyright (c) 2006-2016, Matthew Conte
-// Copyright (c) 2017-2020, Daniel Mendler
-// All rights reserved.
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are met:
-//
-// 1. Redistributions of source code must retain the above copyright notice, this
-//    list of conditions and the following disclaimer.
-//
-// 2. Redistributions in binary form must reproduce the above copyright notice,
-//    this list of conditions and the following disclaimer in the documentation
-//    and/or other materials provided with the distribution.
-//
-// 3. Neither the name of the copyright holder nor the names of its
-//    contributors may be used to endorse or promote products derived from
-//    this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
