@@ -20,6 +20,18 @@ UNITTEST_SUITE_BEGIN(segward)
             nsegward::destroy(allocator);
         }
 
+        // Helper function to write pseudo-random data to allocated memory at random locations
+        static void random_writes(void* ptr, u32 size, u32 num_writes)
+        {
+            u8*  byte_ptr = (u8*)ptr;
+            u32  seed     = (u32)(u64)ptr + 123456789;
+            for (u32 i = 0; i < num_writes; ++i)
+            {
+                seed       = (1103515245 * seed + 12345) & 0x7fffffff;
+                byte_ptr[seed % size] = (u8)(seed & 0xFF);
+            }
+        }
+
         UNITTEST_TEST(alloc_free)
         {
             nsegward::allocator_t* allocator = nsegward::create(64 * 1024, 8 * 1024 * 1024);
@@ -27,6 +39,7 @@ UNITTEST_SUITE_BEGIN(segward)
 
             void* ptr1 = nsegward::allocate(allocator, 1024, 16);
             CHECK_NOT_NULL(ptr1);
+            //random_writes(ptr1, 1024, 64);
             nsegward::deallocate(allocator, ptr1);
 
             nsegward::destroy(allocator);
@@ -66,30 +79,27 @@ UNITTEST_SUITE_BEGIN(segward)
             nsegward::allocator_t* allocator = nsegward::create(kSegSize, 8 * 1024 * 1024);
             CHECK_NOT_NULL(allocator);
 
-            // Allocate 4 * 16KB => roughly within one segment
-            void* p1 = nsegward::allocate(allocator, 14 * 1024, 16);
-            void* p2 = nsegward::allocate(allocator, 16 * 1024, 16);
-            void* p3 = nsegward::allocate(allocator, 16 * 1024, 16);
-            void* p4 = nsegward::allocate(allocator, 16 * 1024, 16);
-
-            CHECK_NOT_NULL(p1);
-            CHECK_NOT_NULL(p2);
-            CHECK_NOT_NULL(p3);
-            CHECK_NOT_NULL(p4);
+            // Allocate 64 * 1KB => roughly within one segment
+            void* p1[64];
+            for (u32 i = 0; i < 64; ++i)
+            {
+                p1[i] = nsegward::allocate(allocator, i == 0 ? 512 : 1024, 16);
+                CHECK_NOT_NULL(p1[i]);
+            }
 
             // Next allocation should move to the next segment and still succeed
-            void* p5 = nsegward::allocate(allocator, 4096, 16);
+            void* p5 = nsegward::allocate(allocator, 1024, 16);
             CHECK_NOT_NULL(p5);
 
             // Free all; segment(s) should retire and be reusable
-            nsegward::deallocate(allocator, p1);
-            nsegward::deallocate(allocator, p2);
-            nsegward::deallocate(allocator, p3);
-            nsegward::deallocate(allocator, p4);
+            for (u32 i = 0; i < 64; ++i)
+            {
+                nsegward::deallocate(allocator, p1[i]);
+            }
             nsegward::deallocate(allocator, p5);
 
             // Reuse after retirement: fresh allocation should succeed
-            void* p6 = nsegward::allocate(allocator, 8 * 1024, 64);
+            void* p6 = nsegward::allocate(allocator, 1024, 16);
             CHECK_NOT_NULL(p6);
             nsegward::deallocate(allocator, p6);
 
@@ -139,7 +149,7 @@ UNITTEST_SUITE_BEGIN(segward)
             }
 
             // Now we should be able to allocate again successfully
-            void* ok = nsegward::allocate(allocator, 2048, 64);
+            void* ok = nsegward::allocate(allocator, 1024, 16);
             CHECK_NOT_NULL(ok);
 
             // Cleanup remaining allocations
@@ -165,29 +175,66 @@ UNITTEST_SUITE_BEGIN(segward)
             CHECK_NOT_NULL(allocator);
 
             // Force multiple segments by allocating near 1/2 segment each
-            void* a1 = nsegward::allocate(allocator, 32 * 1024, 64);
-            void* a2 = nsegward::allocate(allocator, 32 * 1024, 64); // likely completes segment 0
-            void* b1 = nsegward::allocate(allocator, 24 * 1024, 64); // segment 1
-            void* b2 = nsegward::allocate(allocator, 24 * 1024, 64); // segment 1
-            void* c1 = nsegward::allocate(allocator, 8 * 1024, 64);  // possibly segment 1 or 2
 
-            CHECK_NOT_NULL(a1);
-            CHECK_NOT_NULL(a2);
-            CHECK_NOT_NULL(b1);
-            CHECK_NOT_NULL(b2);
-            CHECK_NOT_NULL(c1);
+            // segment 0
+            void* a0[64];
+            for (i32 i = 0; i < 64; ++i)
+            {
+                a0[i] = nsegward::allocate(allocator, i == 0 ? 600 : 1024, 16);
+                CHECK_NOT_NULL(a0[i]);
+            }
+
+            // segment 1
+            void* a1[64];
+            for (i32 i = 0; i < 64; ++i)
+            {
+                a1[i] = nsegward::allocate(allocator, 1024, 16);
+                CHECK_NOT_NULL(a1[i]);
+            }
+
+            // segment 2
+            void* a2[64];
+            for (i32 i = 0; i < 64; ++i)
+            {
+                a2[i] = nsegward::allocate(allocator, 1024, 16);
+                CHECK_NOT_NULL(a2[i]);
+            }
+
+            // segment 3
+            void* a3[64];
+            for (i32 i = 0; i < 64; ++i)
+            {
+                a3[i] = nsegward::allocate(allocator, 1024, 16);
+                CHECK_NOT_NULL(a3[i]);
+            }
 
             // Reverse free order; counters should underflow-check and retire when zero
-            nsegward::deallocate(allocator, c1);
-            nsegward::deallocate(allocator, b2);
-            nsegward::deallocate(allocator, b1);
-            nsegward::deallocate(allocator, a2);
-            nsegward::deallocate(allocator, a1);
+
+            // segment 3
+            for (i32 i = 0; i < 64; i++)
+            {
+                nsegward::deallocate(allocator, a3[i]);
+            }
+            // segment 2
+            for (i32 i = 0; i < 64; i++)
+            {
+                nsegward::deallocate(allocator, a2[i]);
+            }
+            // segment 1
+            for (i32 i = 0; i < 64; i++)
+            {
+                nsegward::deallocate(allocator, a1[i]);
+            }
+            // segment 0
+            for (i32 i = 0; i < 64; i++)
+            {
+                nsegward::deallocate(allocator, a0[i]);
+            }
 
             // After frees, allocator should be able to serve new allocations again
-            void* d1 = nsegward::allocate(allocator, 16 * 1024, 128);
+            void* d1 = nsegward::allocate(allocator, 1024, 16);
             CHECK_NOT_NULL(d1);
-            CHECK_TRUE(((uptr_t)d1 % 128) == 0);
+            CHECK_TRUE(((uptr_t)d1 % 16) == 0);
             nsegward::deallocate(allocator, d1);
 
             nsegward::destroy(allocator);

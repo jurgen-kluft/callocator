@@ -25,6 +25,19 @@ namespace ncore
     //
     // This allocator is blazingly fast in allocating O(1) and deallocating O(1).
     //
+    // Requirements for creating the segmented forward allocator:
+    // - segment constraints:
+    //   - segment size must be a power of two
+    //   - 4KB <= segment size <= 1GB
+    //   - minimum number of segments >= 3
+    //   - minimum segments <= number of segments < 32768
+    //   - allocation sizes must always be <= (segment size / 64)
+    //   - allocation alignment must be kept to a minimum (e.g. 1, 2, 4, 8, 16)
+    // - 0 <= number of allocations per segment < 32768
+    // - total size must be at least 3 times the segment size
+    // - allocation alignment must be a power of two, at least 8 and less than (segment-size / 256)
+    // - configure this allocator so that a segment can hold N allocations (N >= 256 at a minimum)
+
     namespace nsegward
     {
         struct allocator_t;
@@ -32,7 +45,7 @@ namespace ncore
         void         destroy(allocator_t* allocator);
         void*        allocate(allocator_t* a, u32 size, u32 alignment);
         void         deallocate(allocator_t* a, void* ptr);
-    } // namespace nsegward_allocator
+    } // namespace nsegward
 
 }; // namespace ncore
 
