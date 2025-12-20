@@ -32,7 +32,7 @@ namespace ncore
 
             const i32 max_segments = (i32)(total_size / segment_size);
             const i32 min_segments = 3; // Need at least 3 segments to work properly
-            if (max_segments < min_segments || max_segments > 65535)
+            if (max_segments < min_segments || max_segments >= 32768)
                 return nullptr;
 
             arena_t* arena = narena::create(total_size, (min_segments * segment_size));
@@ -68,29 +68,20 @@ namespace ncore
 
         void* allocate(allocator_t* a, u32 size, u32 alignment)
         {
-            // 1. does this still fit in the current segment
-            // 2. if not, find a segment
-            //    - find an EMPTY (COMMITTED or UNCOMMITTED) segment
-            //    - if none found, fail the allocation (out of memory)
-            // 3. allocate:
-            //    - allocate from current segment
-            //    - increment segment counter
-            //    - move alloc cursor forward
-            //    - done and return pointer
             if (a == nullptr || size == 0)
                 return nullptr;
 
-            ASSERT(alignment != 0 && math::ispo2(alignment));      // alignment must be a power of two
-            ASSERT(size <= ((1u << a->m_segment_size_shift) >> 6)); // cannot allocate more than (segment size / 64)
+            ASSERT(alignment != 0 && math::ispo2(alignment));       // requirement: alignment must be a power of two
+            ASSERT(size <= ((1u << a->m_segment_size_shift) >> 6)); // requirement: allocation size <= (segment size / 64)
 
             // Verify alignment to (segment size / 64) (cannot align beyond this in a segment, see requirement)
-            ASSERT(alignment <= ((1u << a->m_segment_size_shift) >> 6));
+            ASSERT(alignment <= ((1u << a->m_segment_size_shift) >> 6)); // requirement: alignment <= (segment size / 64)
 
-            // Check current segment
+            // Check current segment, can it satisfy the request?
             u64 aligned = (a->m_segment_alloc_cursor + ((u64)alignment - 1u)) & ~((u64)alignment - 1u);
             if ((aligned + size) <= ((u64)(a->m_segment + 1) << a->m_segment_size_shift))
             {
-                // Bump cursor and live allocation counter
+                // Yes it can, bump the write cursor and allocation counter
                 a->m_segment_alloc_cursor = aligned + (u64)size;
                 a->m_segment_counters[a->m_segment] += 1;
 
@@ -98,6 +89,7 @@ namespace ncore
                 return (u8*)narena::base(a->m_arena) + aligned;
             }
 
+            // segment cannot satisfy request, search for a new segment and make that the active one
             // linear search through array of segments
             // todo: this can be optimized with bit array ?
             for (u32 i = 0; i < a->m_segment_count; i++)
