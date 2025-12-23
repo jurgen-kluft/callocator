@@ -38,14 +38,14 @@ namespace ncore
             block_t* prev_free; // Only valid if the corresponding block is free.
         };
 
-        struct context_t // size in bytes = 4 + (4) + 128 + 4096 + 8 = 4240
+        struct context_t // size in bytes = 4 + (4) + 128 + 4096 + 8 = 4236
         {
             DCORE_CLASS_PLACEMENT_NEW_DELETE
 
-            u32      fl;                                  // 4 bytes, first level index
-            u32      sl[TLSF_FL_COUNT];                   // 32 * 4 bytes = 128 bytes, second level indices
             block_t* block[TLSF_FL_COUNT][TLSF_SL_COUNT]; // 32 * 16 * 8 bytes = 4096 bytes, pointers to free blocks
+            u32      sl[TLSF_FL_COUNT];                   // 32 * 4 bytes = 128 bytes, second level indices
             u64      size;                                // 8 bytes, total size of the managed memory region
+            u32      fl;                                  // 4 bytes, first level index
         };
 
         class allocator_t : public alloc_t
@@ -675,7 +675,7 @@ namespace ncore
         alloc_tlsf_vmem_t* alloc = (alloc_tlsf_vmem_t*)allocator;
         if (alloc->m_arena)
         {
-            narena::release(alloc->m_arena);
+            narena::destroy(alloc->m_arena);
         }
     }
 
