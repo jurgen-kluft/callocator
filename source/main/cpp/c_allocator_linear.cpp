@@ -1,6 +1,6 @@
 #include "ccore/c_target.h"
 #include "ccore/c_memory.h"
-#include "ccore/c_vmem.h"
+#include "ccore/c_arena.h"
 
 #include "callocator/c_allocator_linear.h"
 
@@ -25,7 +25,7 @@ namespace ncore
 
     linear_alloc_imp_t::~linear_alloc_imp_t()
     {
-        narena::release(m_arena);
+        narena::destroy(m_arena);
         m_arena = nullptr;
     }
 
@@ -53,7 +53,7 @@ namespace ncore
 
     linear_alloc_t* g_create_linear_allocator(int_t initial_size, int_t reserved_size)
     {
-        arena_t*            arena     = narena::create(reserved_size, initial_size);
+        arena_t*            arena     = narena::new_arena(reserved_size, initial_size);
         void*               mem       = narena::alloc(arena, sizeof(linear_alloc_imp_t));
         linear_alloc_imp_t* allocator = new (mem) linear_alloc_imp_t(arena);
         allocator->m_save_address     = narena::current_address(arena);
@@ -77,7 +77,7 @@ namespace ncore
 
         linear_alloc_imp_t* impl  = static_cast<linear_alloc_imp_t*>(allocator);
         arena_t*            arena = impl->m_arena;
-        narena::release(arena);
+        narena::destroy(arena);
     }
 
 }; // namespace ncore

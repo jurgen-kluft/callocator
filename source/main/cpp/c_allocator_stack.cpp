@@ -2,7 +2,7 @@
 #include "ccore/c_allocator.h"
 #include "ccore/c_memory.h"
 #include "ccore/c_math.h"
-#include "ccore/c_vmem.h"
+#include "ccore/c_arena.h"
 #include "cbase/c_context.h"
 
 #include "callocator/c_allocator_stack.h"
@@ -78,7 +78,7 @@ namespace ncore
 
     stack_alloc_t* g_create_stack_allocator(int_t initial_size, int_t reserved_size)
     {
-        arena_t*           arena     = narena::create(reserved_size, initial_size);
+        arena_t*           arena     = narena::new_arena(reserved_size, initial_size);
         void*              mem       = narena::alloc(arena, sizeof(stack_allocator_t));
         stack_allocator_t* allocator = new (mem) stack_allocator_t(arena);
         allocator->m_save_address    = narena::current_address(arena);
@@ -92,7 +92,7 @@ namespace ncore
 
         stack_allocator_t* impl  = static_cast<stack_allocator_t*>(allocator);
         arena_t*           arena = impl->m_arena;
-        narena::release(arena);
+        narena::destroy(arena);
     }
 
 }; // namespace ncore

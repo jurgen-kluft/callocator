@@ -1,5 +1,5 @@
 #include "ccore/c_allocator.h"
-#include "ccore/c_vmem.h"
+#include "ccore/c_arena.h"
 
 #include "callocator/c_allocator_stack.h"
 

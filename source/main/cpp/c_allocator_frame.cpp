@@ -2,7 +2,7 @@
 #include "ccore/c_allocator.h"
 #include "ccore/c_memory.h"
 #include "ccore/c_math.h"
-#include "ccore/c_vmem.h"
+#include "ccore/c_arena.h"
 
 #include "callocator/c_allocator_frame.h"
 
@@ -28,8 +28,8 @@ namespace ncore
 
     frame_allocator_t::~frame_allocator_t()
     {
-        narena::release(m_arena[0]);
-        narena::release(m_arena[1]);
+        narena::destroy(m_arena[0]);
+        narena::destroy(m_arena[1]);
     }
 
     void frame_allocator_t::reset()
@@ -50,7 +50,7 @@ namespace ncore
         m_max_active_frames = max_active_frames;
         for (s32 i = 0; i < 2; i++)
         {
-            arena_t* arena   = narena::create((sizeof(frame_t) * max_active_frames) + sizeof(arena_t) + max_reserved_size, (sizeof(frame_t) * max_active_frames) + average_frame_size * max_active_frames);
+            arena_t* arena   = narena::new_arena((sizeof(frame_t) * max_active_frames) + sizeof(arena_t) + max_reserved_size, (sizeof(frame_t) * max_active_frames) + average_frame_size * max_active_frames);
             m_frames[i]      = (frame_t*)narena::alloc_and_zero(arena, sizeof(frame_t) * max_active_frames);
             m_save_addresses[i] = narena::current_address(arena);
             m_arena[i]       = arena;

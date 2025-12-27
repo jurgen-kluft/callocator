@@ -3,7 +3,7 @@
 #include "ccore/c_debug.h"
 #include "ccore/c_math.h"
 #include "ccore/c_memory.h"
-#include "ccore/c_vmem.h"
+#include "ccore/c_arena.h"
 
 #include "callocator/c_allocator_heap.h"
 
@@ -654,13 +654,13 @@ namespace ncore
 
     void* alloc_tlsf_vmem_t::v_resize(u64 size)
     {
-        narena::commit_from_address(m_arena, m_save_address, size);
+        narena::commit(m_arena, size);
         return m_save_address;
     }
 
     alloc_t* g_create_heap(int_t initial_size, int_t reserved_size)
     {
-        arena_t*           arena   = narena::create(reserved_size + 4096 + 512, initial_size + 4096 + 512);
+        arena_t*           arena   = narena::new_arena(reserved_size + 4096 + 512, initial_size + 4096 + 512);
         void*              mem1    = narena::alloc(arena, sizeof(nheap::context_t));
         nheap::context_t*  context = new (mem1) nheap::context_t();
         void*              mem2    = narena::alloc(arena, sizeof(alloc_tlsf_vmem_t));

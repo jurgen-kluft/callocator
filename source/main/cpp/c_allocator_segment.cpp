@@ -3,7 +3,7 @@
 #include "ccore/c_math.h"
 #include "ccore/c_memory.h"
 #include "ccore/c_limits.h"
-#include "ccore/c_vmem.h"
+#include "ccore/c_arena.h"
 
 #include "callocator/c_allocator_segment.h"
 

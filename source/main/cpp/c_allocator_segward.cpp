@@ -1,7 +1,7 @@
 #include "ccore/c_target.h"
 #include "ccore/c_math.h"
 #include "ccore/c_memory.h"
-#include "ccore/c_vmem.h"
+#include "ccore/c_arena.h"
 
 #include "callocator/c_allocator_segward.h"
 
@@ -35,7 +35,7 @@ namespace ncore
             if (max_segments < min_segments || max_segments >= 32768)
                 return nullptr;
 
-            arena_t* arena = narena::create(total_size, (min_segments * segment_size));
+            arena_t* arena = narena::new_arena(total_size, (min_segments * segment_size));
 
             allocator_t* allocator          = narena::allocate_and_clear<allocator_t>(arena);
             allocator->m_arena              = arena;
@@ -63,7 +63,7 @@ namespace ncore
         {
             // release underlying arena
             // - we don't have to do anything special here, as all memory is part of the arena
-            narena::release(allocator->m_arena);
+            narena::destroy(allocator->m_arena);
         }
 
         void* allocate(allocator_t* a, u32 size, u32 alignment)
