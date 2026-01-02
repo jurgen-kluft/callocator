@@ -16,7 +16,6 @@ namespace ncore
             i16*     m_segment_counters;     // allocation counter per segment (< 32768 allocations per segment, < 0 means uncommitted)
             u16      m_segment;              // current segment index being allocated from
             u16      m_segment_count;        // total number of segments
-            u16      m_segment0_headersize;  // base address of where segments start
             u16      m_segment_size_shift;   // size (1 << m_segment_size_shift) of each segment (power of two)
         };
 
@@ -35,7 +34,7 @@ namespace ncore
             if (max_segments < min_segments || max_segments >= 32768)
                 return nullptr;
 
-            arena_t* arena = narena::new_arena(total_size, (min_segments * segment_size));
+            arena_t* arena = narena::new_arena(total_size + (int_t)(4 * cKB), (int_t)(4 * cKB) + (min_segments * segment_size));
 
             allocator_t* allocator          = narena::allocate_and_clear<allocator_t>(arena);
             allocator->m_arena              = arena;
@@ -43,13 +42,16 @@ namespace ncore
             allocator->m_segment_count      = max_segments;
             allocator->m_segment_size_shift = (s8)math::ilog2(segment_size);
 
-            // segment 0 is special, it needs to start after our header
-            const byte* save_address         = (const byte*)narena::current_address(arena);
-            allocator->m_segment0_headersize = (u32)(save_address - (const byte*)arena);
+            // make sure the arena allocations start at 4 KB boundary
+            narena::alloc(arena, (int_t)(4 * cKB) - (int_t)((const byte*)narena::current_address(arena) - (const byte*)narena::base(arena)));
 
             // start with first segment, and mark first segment as active
             allocator->m_segment              = 0;
-            allocator->m_segment_alloc_cursor = allocator->m_segment0_headersize;
+            allocator->m_segment_alloc_cursor = 0;
+
+            // commit first segment
+            const int_t committed_size_in_bytes = (1 << allocator->m_segment_size_shift) + ((int_t)1 << allocator->m_arena->m_page_size_shift);
+            DVERIFY(narena::commit(allocator->m_arena, committed_size_in_bytes), true);
 
             for (i16 i = 0; i < min_segments; i++)
                 allocator->m_segment_counters[i] = 0;
@@ -63,7 +65,8 @@ namespace ncore
         {
             // release underlying arena
             // - we don't have to do anything special here, as all memory is part of the arena
-            narena::destroy(allocator->m_arena);
+            arena_t* arena = allocator->m_arena;
+            narena::destroy(arena);
         }
 
         void* allocate(allocator_t* a, u32 size, u32 alignment)
@@ -86,7 +89,7 @@ namespace ncore
                 a->m_segment_counters[a->m_segment] += 1;
 
                 // return the absolute address: base + segment_offset + aligned
-                return (u8*)narena::base(a->m_arena) + aligned;
+                return (u8*)narena::base(a->m_arena) + ((int_t)1 << a->m_arena->m_page_size_shift) + aligned;
             }
 
             // segment cannot satisfy request, search for a new segment and make that the active one
@@ -100,11 +103,11 @@ namespace ncore
 
                 if (count < 0)
                 { // Extend the committed region to include this segment
-                    const int_t committed_size_in_bytes = (i + 1) << a->m_segment_size_shift;
+                    const int_t committed_size_in_bytes = ((i + 1) << a->m_segment_size_shift) + ((int_t)1 << a->m_arena->m_page_size_shift);
                     DVERIFY(narena::commit(a->m_arena, committed_size_in_bytes), true);
                 }
 
-                aligned = (i == 0) ? (u64)a->m_segment0_headersize : (u64)i << a->m_segment_size_shift;
+                aligned = (i == 0) ? ((u64)1 << a->m_arena->m_page_size_shift) : (u64)i << a->m_segment_size_shift;
                 aligned = (aligned + ((u64)alignment - 1u)) & ~((u64)alignment - 1u);
 
                 // Verify: aligned allocation must fit (should always be true)
@@ -117,7 +120,7 @@ namespace ncore
                 a->m_segment_counters[a->m_segment] = 1;
 
                 // return the absolute address: base + aligned cursor
-                return (u8*)narena::base(a->m_arena) + aligned;
+                return (u8*)narena::base(a->m_arena) + ((int_t)1 << a->m_arena->m_page_size_shift) + aligned;
             }
 
             // No new segment found, out of memory
@@ -130,10 +133,10 @@ namespace ncore
             ASSERT(a != nullptr && ptr != nullptr);
 
             // Check if pointer is outside of the arena
-            ASSERT(((const u8*)ptr >= ((const u8*)narena::base(a->m_arena) + a->m_segment0_headersize)) && narena::within_committed(a->m_arena, ptr));
+            ASSERT(((const u8*)ptr >= ((const u8*)narena::base(a->m_arena) + ((int_t)1 << a->m_arena->m_page_size_shift))) && narena::within_committed(a->m_arena, ptr));
 
             // Which segment is this coming from and is it valid?
-            const u32 segment = (u32)(((const u8*)ptr - (const u8*)narena::base(a->m_arena)) >> a->m_segment_size_shift);
+            const u32 segment = (u32)(((const u8*)ptr - ((const u8*)narena::base(a->m_arena) + ((int_t)1 << a->m_arena->m_page_size_shift))) >> a->m_segment_size_shift);
             ASSERT(segment < a->m_segment_count); // invalid segment index
 
             // Decrement the segment counter

@@ -675,7 +675,8 @@ namespace ncore
         alloc_tlsf_vmem_t* alloc = (alloc_tlsf_vmem_t*)allocator;
         if (alloc->m_arena)
         {
-            narena::destroy(alloc->m_arena);
+            arena_t* arena = alloc->m_arena;
+            narena::destroy(arena);
         }
     }
 
