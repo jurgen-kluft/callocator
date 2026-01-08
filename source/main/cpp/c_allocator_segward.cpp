@@ -36,9 +36,9 @@ namespace ncore
 
             arena_t* arena = narena::new_arena(total_size + (int_t)(4 * cKB), (int_t)(4 * cKB) + (min_segments * segment_size));
 
-            allocator_t* allocator          = narena::allocate_and_clear<allocator_t>(arena);
+            allocator_t* allocator          = g_allocate_and_clear<allocator_t>(arena);
             allocator->m_arena              = arena;
-            allocator->m_segment_counters   = narena::allocate_array_and_clear<i16>(arena, max_segments);
+            allocator->m_segment_counters   = g_allocate_array_and_clear<i16>(arena, max_segments);
             allocator->m_segment_count      = max_segments;
             allocator->m_segment_size_shift = (s8)math::ilog2(segment_size);
 
