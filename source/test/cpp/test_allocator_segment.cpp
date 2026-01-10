@@ -19,16 +19,16 @@ UNITTEST_SUITE_BEGIN(segmented)
         UNITTEST_FIXTURE_SETUP() {}
         UNITTEST_FIXTURE_TEARDOWN() {}
 
-        const u8 s_min_size_shift = 16;
-        const u8 s_max_size_shift = 21;
-        const u8 s_tot_size_shift = 31;
-
-        const int_t s_min_size   = (int_t)1 << s_min_size_shift;
-        const int_t s_max_size   = (int_t)1 << s_max_size_shift;
-        const int_t s_total_size = (int_t)1 << s_tot_size_shift;
-
         UNITTEST_TEST(allocate)
         {
+            const u8 s_min_size_shift = 16;
+            const u8 s_max_size_shift = 21;
+            const u8 s_tot_size_shift = 31; // 256 GB
+
+            const int_t s_min_size   = (int_t)1 << s_min_size_shift;
+            const int_t s_max_size   = (int_t)1 << s_max_size_shift;
+            const int_t s_total_size = (int_t)1 << s_tot_size_shift;
+
             segment_alloc_t range;
             nsegment::initialize(&range, Allocator, s_min_size, s_max_size, s_total_size);
 
@@ -77,6 +77,14 @@ UNITTEST_SUITE_BEGIN(segmented)
         // Allocate and deallocate randomly many different sizes and lifetimes
         UNITTEST_TEST(stress_test)
         {
+            const u8 s_min_size_shift = 16;
+            const u8 s_max_size_shift = 21;
+            const u8 s_tot_size_shift = 31; // 256 GB
+
+            const int_t s_min_size   = (int_t)1 << s_min_size_shift;
+            const int_t s_max_size   = (int_t)1 << s_max_size_shift;
+            const int_t s_total_size = (int_t)1 << s_tot_size_shift;
+
             segment_alloc_t range;
             nsegment::initialize(&range, Allocator, s_min_size, s_max_size, s_total_size);
 
@@ -92,6 +100,63 @@ UNITTEST_SUITE_BEGIN(segmented)
                 // Random size between min_size and max_size
                 s32 random_shift = g_random_u32_max(&rng, s_max_size_shift - s_min_size_shift + 1);
                 sizes[i]         = ((s64)1 << (s_min_size_shift + random_shift));
+                ptrs[i]          = -1;
+            }
+
+            // Allocate all
+            for (i32 i = 0; i < num_allocs; ++i)
+            {
+                CHECK_TRUE(nsegment::allocate(&range, sizes[i], ptrs[i]));
+            }
+
+            // Shuffle
+            i32 random_indices[num_allocs];
+            for (i32 i = 0; i < num_allocs; ++i)
+            {
+                random_indices[i] = i;
+            }
+            for (i32 i = 0; i < num_allocs; ++i)
+            {
+                i32 idx1             = (i32)(rng.rand32() % num_allocs);
+                i32 tmp              = random_indices[i];
+                random_indices[i]    = random_indices[idx1];
+                random_indices[idx1] = tmp;
+            }
+
+            // Deallocate in random order
+            for (i32 i = 0; i < num_allocs; ++i)
+            {
+                i32 idx = random_indices[i];
+                CHECK_TRUE(nsegment::deallocate(&range, ptrs[idx], sizes[idx]));
+            }
+
+            // All free again
+            CHECK_EQUAL((u32)(1 << (range.m_num_sizes - 1)), range.m_size_free);
+
+            nsegment::teardown(&range, Allocator);
+        }
+
+        UNITTEST_TEST(stress_test2)
+        {
+            const u64       c_total_address_space = 256 * cGB;
+            static const s8 s_section_size_min    = 26; // 64 MB
+            static const s8 s_section_size_max    = 30;
+
+            segment_alloc_t range;
+            nsegment::initialize(&range, Allocator, (1 << s_section_size_min), (1 << s_section_size_max), c_total_address_space);
+
+            const int_t num_allocs = 500;
+            s64         ptrs[num_allocs];
+            s64         sizes[num_allocs];
+
+            ncore::xor_random_t rng;
+            rng.reset(12345);
+
+            for (i32 i = 0; i < num_allocs; ++i)
+            {
+                // Random size between min_size and max_size
+                s32 random_shift = g_random_u32_max(&rng, s_section_size_max - s_section_size_min + 1);
+                sizes[i]         = ((s64)1 << (s_section_size_min + random_shift));
                 ptrs[i]          = -1;
             }
 
