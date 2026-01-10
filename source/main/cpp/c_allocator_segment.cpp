@@ -230,6 +230,27 @@ namespace ncore
             return true;
         }
 
+        static inline u64* create_level(alloc_t* allocator, s32 size_in_bits, bool is_max_level)
+        {
+            if (size_in_bits == 0)
+                return nullptr;
+            const s32 size_in_bits_aligned = math::alignUp(size_in_bits, 64);
+            const s32 size_in_u64s         = size_in_bits_aligned >> 6;
+            u64*      bin                  = g_allocate_array_and_memset<u64>(allocator, size_in_u64s, is_max_level ? 0xFFFFFFFF : 0);
+            if (is_max_level)
+            {
+                // Make sure we don't have bits set beyond number_of_bits
+                const s32 excess_bits = (size_in_bits_aligned - size_in_bits);
+                if (excess_bits > 0)
+                {
+                    const s32 excess_u64_index = size_in_u64s - 1;
+                    const u64 mask             = (~((u64)0)) >> excess_bits;
+                    bin[excess_u64_index] &= mask;
+                }
+            }
+            return bin;
+        }
+
         void initialize(segment_alloc_t* sa, alloc_t* allocator, int_t min_size, int_t max_size, int_t total_size)
         {
             ASSERT(math::ispo2(min_size) && math::ispo2(max_size) && math::ispo2(total_size));
@@ -249,79 +270,13 @@ namespace ncore
             while (i < num_sizes)
             {
                 segment_alloc_t::level_t& level = sa->m_levels[i++];
-                level.m_count                   = 0;
-                level.m_size                    = size_in_bits;
 
                 const bool is_max_level = (i == num_sizes);
 
-                const s32 level0_size_in_bits = size_in_bits;
-                if (level0_size_in_bits > 0)
-                {
-                    const s32 level0_size_in_bits_aligned = math::alignUp(level0_size_in_bits, 64);
-                    const s32 level0_size_in_u64s         = level0_size_in_bits_aligned >> 6;
-                    if (is_max_level)
-                    {
-                        level.m_bin0 = g_allocate_array_and_memset<u64>(allocator, level0_size_in_u64s, 0xFFFFFFFF);
-                        // Make sure we don't have bits set beyond number_of_bits
-                        const s32 excess_bits = (level0_size_in_bits_aligned - level0_size_in_bits);
-                        if (excess_bits > 0)
-                        {
-                            const s32 excess_u64_index = level0_size_in_u64s - 1;
-                            const u64 mask             = (~((u64)0)) >> excess_bits;
-                            level.m_bin0[excess_u64_index] &= mask;
-                        }
-                    }
-                    else
-                    {
-                        level.m_bin0 = g_allocate_array_and_clear<u64>(allocator, level0_size_in_u64s);
-                    }
-                }
-
-                const s32 level1_size_in_bits = size_in_bits >> 6;
-                if (level1_size_in_bits > 0)
-                {
-                    const s32 level1_size_in_bits_aligned = math::alignUp(level1_size_in_bits, 64);
-                    const s32 level1_size_in_u64s         = level1_size_in_bits_aligned >> 6;
-                    if (is_max_level)
-                    {
-                        level.m_bin1 = g_allocate_array_and_memset<u64>(allocator, level1_size_in_u64s, 0xFFFFFFFF);
-                        // Make sure we don't have bits set beyond number_of_bits
-                        const s32 excess_bits = (level1_size_in_bits_aligned - level1_size_in_bits);
-                        if (excess_bits > 0)
-                        {
-                            const s32 excess_u64_index = level1_size_in_u64s - 1;
-                            const u64 mask             = (~((u64)0)) >> excess_bits;
-                            level.m_bin1[excess_u64_index] &= mask;
-                        }
-                    }
-                    else
-                    {
-                        level.m_bin1 = g_allocate_array_and_clear<u64>(allocator, level1_size_in_u64s);
-                    }
-                }
-
-                const s32 level2_size_in_bits = size_in_bits >> 12;
-                if (level2_size_in_bits > 0)
-                {
-                    const s32 level2_size_in_bits_aligned = math::alignUp(level2_size_in_bits, 64);
-                    const s32 level2_size_in_u64s         = level2_size_in_bits_aligned >> 6;
-                    if (is_max_level)
-                    {
-                        level.m_bin2 = g_allocate_array_and_memset<u64>(allocator, level2_size_in_u64s, 0xFFFFFFFF);
-                        // Make sure we don't have bits set beyond number_of_bits
-                        const s32 excess_bits = (level2_size_in_bits_aligned - level2_size_in_bits);
-                        if (excess_bits > 0)
-                        {
-                            const s32 excess_u64_index = level2_size_in_u64s - 1;
-                            const u64 mask             = (~((u64)0)) >> excess_bits;
-                            level.m_bin2[excess_u64_index] &= mask;
-                        }
-                    }
-                    else
-                    {
-                        level.m_bin2 = g_allocate_array_and_clear<u64>(allocator, level2_size_in_u64s);
-                    }
-                }
+                level.m_size = size_in_bits;
+                level.m_bin0 = create_level(allocator, size_in_bits, is_max_level);
+                level.m_bin1 = create_level(allocator, size_in_bits >> 6, is_max_level);
+                level.m_bin2 = create_level(allocator, size_in_bits >> 12, is_max_level);
                 size_in_bits = math::max(size_in_bits >> 1, (s32)1);
             }
 
