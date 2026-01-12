@@ -26,4 +26,7 @@ tags
 !*.png
 !*.md
 
+!*.yml
+
 #except the following folders
+!.github/
