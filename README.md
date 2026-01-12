@@ -3,8 +3,8 @@
 A library containing some  allocators using the allocator interface from ccore:
 
 ```c++
-virtual void* allocate(u32 size, u32 align) = 0;  ///< Allocate memory with alignment
-virtual void void deallocate(void* p) = 0;         ///< Deallocate/Free memory
+virtual void* allocate(u32 size, u32 align) = 0;  // Allocate memory with alignment
+virtual void deallocate(void* p) = 0;             // Deallocate/Free memory
 ```
 
 This package contains:
@@ -36,11 +36,11 @@ This allocator is designed to be used as a per-frame allocator. It is useful for
 
 ## Linear Allocator
 
-This allocator is allocating forward and merges free memory, it is bounded and very fast, it is not multithread safe. It is useful for allocating memory that is only needed for a short period of time and can be deallocated all at once. This can be useful for things like loading assets, parsing data, or other tasks where you need to allocate a bunch of memory and then free it all at once.
+This allocator is allocating forward and merges free memory, it is bounded and very fast, it is not multithread safe. It is useful for allocating memory that is only needed for a short period of time and can be deallocated all at once. This can be useful for things like loading assets, parsing data, or other tasks where you need to allocate a bunch of memory and then free it all in one go.
 
 ## Object Component Allocator
 
-The idea behind this allocator is that we can have objects that have components. This enables associating components (data) with objects in a dynamic way which means that you can add and remove components from objects at runtime. This is useful for example in game development where you have entities that have components like position, velocity, etc. But also for other things like a graph with node and edges where you want the graph to use to optimize different data sets, you can now create a GraphEdge as an object and decorate it with components that are part of your data-set.
+The idea behind this allocator is that we can have N objects that have M components. This enables associating components (data) with objects in a dynamic way which means that you can add and remove components from objects at runtime. This is useful for example in game development where you have entities that have components like position, velocity, etc. But also for other things like a graph with node and edges where you want the graph to use to optimize different data sets, you can now create a GraphEdge as an object and decorate it with components that are part of your data-set.
 
 ## Offset Allocator
 
@@ -62,4 +62,7 @@ This is an implementation of the TLSF allocator, Two-Level Segregate Fit, which 
 
 ## Segmented Allocator
 
-If you need to allocate sizes with power of 2 [2^N, 2^M] out of a memory range with size 2^O, then this allocator can do that.
+If you need to allocate sizes with power of 2 [2^N, 2^M] out of a memory range with size 2^O, then this allocator can do that. This allocator uses binmaps
+at each power-of-two level to track free blocks. There is a 32-bit integer that tracks if a level has any free blocks.
+When allocating a block, the allocator first determines the appropriate level based on the requested size. It then checks the binmap for that level to see if there are any free blocks available. If a free block is found, it is allocated and marked as used in the binmap. If no free blocks are available at that level, the allocator searches higher levels for larger blocks that can be split to satisfy the allocation request.
+When freeing a block, the allocator marks the block as free in the binmap and checks if adjacent blocks can be coalesced to form larger free blocks. This helps to reduce fragmentation and improve memory utilization.
