@@ -7,10 +7,25 @@
 
 namespace ncore
 {
-    class alloc_t;
+    struct heap_t;
 
-    alloc_t* g_create_heap(int_t initial_size, int_t reserved_size);
-    void     g_release_heap(alloc_t* allocator);
+    namespace nheap
+    {
+        typedef void* (*resize_fn)(heap_t* h, int_t new_size);
+
+        struct context_t;
+    } // namespace nheap
+
+    struct heap_t
+    {
+        arena_t*          m_arena;
+        void*             m_save_point;
+        nheap::context_t* m_context;
+        nheap::resize_fn  m_resize_fn;
+    };
+
+    heap_t* g_create_heap(int_t initial_size, int_t reserved_size);
+    void    g_release_heap(heap_t* allocator);
 
 }; // namespace ncore
 

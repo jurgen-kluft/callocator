@@ -48,29 +48,12 @@ namespace ncore
             u32      fl;                                  // 4 bytes, first level index
         };
 
-        class allocator_t : public alloc_t
-        {
-        public:
-            allocator_t(context_t* context);
-            virtual ~allocator_t();
-
-            virtual void* v_allocate(u32 size, u32 alignment) final;
-            virtual void  v_deallocate(void* ptr) final;
-
-            virtual bool  v_check(const char*& error_description) const;
-            virtual void* v_resize(u64 size) = 0;
-
-            DCORE_CLASS_PLACEMENT_NEW_DELETE
-
-            context_t* m_context;
-        };
-
 #define TLSF_MAX_SIZE (((uint_t)1 << (TLSF_FL_MAX - 1)) - sizeof(uint_t))
 
-        static void* g_aalloc(allocator_t* a, context_t* t, uint_t, uint_t);
-        static void* g_malloc(allocator_t* a, context_t* t, uint_t size);
-        static void* g_realloc(allocator_t* a, context_t* t, void*, uint_t);
-        static void  g_free(allocator_t* a, context_t* t, void*);
+        static void* g_aalloc(heap_t* heap, context_t* t, uint_t, uint_t);
+        static void* g_malloc(heap_t* heap, context_t* t, uint_t size);
+        static void* g_realloc(heap_t* heap, context_t* t, void*, uint_t);
+        static void  g_free(heap_t* heap, context_t* t, void*);
 
         static void g_setup(context_t* t)
         {
@@ -405,10 +388,10 @@ namespace ncore
             ASSERTS(!block_is_free(block), "sentinel block should not be free");
         }
 
-        static bool arena_grow(allocator_t* allocator, context_t* t, uint_t size)
+        static bool arena_grow(heap_t* heap, context_t* t, uint_t size)
         {
             uint_t req_size = (t->size ? t->size + BLOCK_OVERHEAD : 2 * BLOCK_OVERHEAD) + size;
-            void*  addr     = allocator->v_resize(req_size);
+            void*  addr     = heap->m_resize_fn(heap, req_size);
             if (!addr)
                 return false;
             ASSERTS((uint_t)addr % ALIGN_SIZE == 0, "wrong heap alignment address");
@@ -426,7 +409,7 @@ namespace ncore
             return true;
         }
 
-        static void arena_shrink(allocator_t* allocator, context_t* t, block_t* block)
+        static void arena_shrink(heap_t* heap, context_t* t, block_t* block)
         {
             check_sentinel(block_next(block));
             uint_t size = block_size(block);
@@ -434,7 +417,7 @@ namespace ncore
             t->size = t->size - size - BLOCK_OVERHEAD;
             if (t->size == BLOCK_OVERHEAD)
                 t->size = 0;
-            allocator->v_resize(t->size);
+            heap->m_resize_fn(heap, t->size);
             if (t->size)
             {
                 block->header = 0;
@@ -442,7 +425,7 @@ namespace ncore
             }
         }
 
-        D_INLINE block_t* block_find_free(allocator_t* allocator, context_t* t, uint_t size)
+        D_INLINE block_t* block_find_free(heap_t* heap, context_t* t, uint_t size)
         {
             uint_t rounded = round_block_size(size);
             u32    fl, sl;
@@ -450,7 +433,7 @@ namespace ncore
             block_t* block = block_find_suitable(t, &fl, &sl);
             if (CC_UNLIKELY(!block))
             {
-                if (!arena_grow(allocator, t, rounded))
+                if (!arena_grow(heap, t, rounded))
                     return NULL;
                 block = block_find_suitable(t, &fl, &sl);
                 ASSERTS(block, "no block found");
@@ -460,18 +443,18 @@ namespace ncore
             return block;
         }
 
-        void* g_malloc(allocator_t* allocator, context_t* t, uint_t size)
+        void* g_malloc(heap_t* heap, context_t* t, uint_t size)
         {
             size = adjust_size(size, ALIGN_SIZE);
             if (CC_UNLIKELY(size > TLSF_MAX_SIZE))
                 return NULL;
-            block_t* block = block_find_free(allocator, t, size);
+            block_t* block = block_find_free(heap, t, size);
             if (CC_UNLIKELY(!block))
                 return NULL;
             return block_use(t, block, size);
         }
 
-        void* g_aalloc(allocator_t* allocator, context_t* t, uint_t align, uint_t size)
+        void* g_aalloc(heap_t* heap, context_t* t, uint_t align, uint_t size)
         {
             uint_t adjust = adjust_size(size, ALIGN_SIZE);
 
@@ -479,10 +462,10 @@ namespace ncore
                 return NULL;
 
             if (align <= ALIGN_SIZE)
-                return g_malloc(allocator, t, size);
+                return g_malloc(heap, t, size);
 
             uint_t   asize = adjust_size(adjust + align - 1 + sizeof(block_t), align);
-            block_t* block = block_find_free(allocator, t, asize);
+            block_t* block = block_find_free(heap, t, asize);
             if (CC_UNLIKELY(!block))
                 return NULL;
 
@@ -491,7 +474,7 @@ namespace ncore
             return block_use(t, block, adjust);
         }
 
-        void g_free(allocator_t* allocator, context_t* t, void* mem)
+        void g_free(heap_t* heap, context_t* t, void* mem)
         {
             if (CC_UNLIKELY(!mem))
                 return;
@@ -504,23 +487,23 @@ namespace ncore
             block = block_merge_next(t, block);
 
             if (CC_UNLIKELY(!block_size(block_next(block))))
-                arena_shrink(allocator, t, block);
+                arena_shrink(heap, t, block);
             else
                 block_insert(t, block);
         }
 
-        void* g_realloc(allocator_t* allocator, context_t* t, void* mem, uint_t size)
+        void* g_realloc(heap_t* heap, context_t* t, void* mem, uint_t size)
         {
             // Zero-size requests are treated as free.
             if (CC_UNLIKELY(mem && !size))
             {
-                g_free(allocator, t, mem);
+                g_free(heap, t, mem);
                 return NULL;
             }
 
             // Null-pointer requests are treated as malloc.
             if (CC_UNLIKELY(!mem))
-                return g_malloc(allocator, t, size);
+                return g_malloc(heap, t, size);
 
             block_t* block = block_from_payload(mem);
             uint_t   avail = block_size(block);
@@ -537,11 +520,11 @@ namespace ncore
                 block_t* next = block_next(block);
                 if (!block_is_free(next) || size > avail + block_size(next) + BLOCK_OVERHEAD)
                 {
-                    void* dst = g_malloc(allocator, t, size);
+                    void* dst = g_malloc(heap, t, size);
                     if (dst)
                     {
                         nmem::memcpy(dst, mem, avail);
-                        g_free(allocator, t, mem);
+                        g_free(heap, t, mem);
                     }
                     return dst;
                 }
@@ -606,73 +589,31 @@ namespace ncore
             }
         }
 #endif
-
-        allocator_t::allocator_t(context_t* ctx) : m_context(ctx) { g_setup(ctx); }
-        allocator_t::~allocator_t() {}
-
-        void* allocator_t::v_allocate(u32 size, u32 alignment)
-        {
-            if (alignment <= ALIGN_SIZE)
-                return g_malloc(this, m_context, size);
-            return g_aalloc(this, m_context, alignment, size);
-        }
-
-        void allocator_t::v_deallocate(void* ptr) { g_free(this, m_context, ptr); }
-
-        bool allocator_t::v_check(const char*& error_description) const
-        {
-#ifdef TLSF_ENABLE_CHECK
-            error_description = g_check(m_context);
-            return !error_description;
-#else
-            error_description = nullptr;
-            return true;
-#endif
-        }
     } // namespace nheap
 
-    // ----------------------------------------------------------------------------
-    // alloc_tlsf_vmem_t
-    // ----------------------------------------------------------------------------
-
-    class alloc_tlsf_vmem_t : public nheap::allocator_t
+    void* heap_resize(heap_t* heap, int_t size)
     {
-    public:
-        void*    m_save_address;
-        arena_t* m_arena;
-
-        alloc_tlsf_vmem_t(nheap::context_t* context, arena_t* arena);
-        virtual ~alloc_tlsf_vmem_t();
-
-        virtual void* v_resize(u64 size);
-
-        DCORE_CLASS_PLACEMENT_NEW_DELETE
-    };
-
-    alloc_tlsf_vmem_t::alloc_tlsf_vmem_t(nheap::context_t* context, arena_t* arena) : nheap::allocator_t(context), m_arena(arena) {}
-    alloc_tlsf_vmem_t::~alloc_tlsf_vmem_t() {}
-
-    void* alloc_tlsf_vmem_t::v_resize(u64 size)
-    {
-        narena::commit(m_arena, size);
-        return m_save_address;
+        narena::commit(heap->m_arena, size);
+        return heap->m_save_point;
     }
 
-    alloc_t* g_create_heap(int_t initial_size, int_t reserved_size)
+    heap_t* g_create_heap(int_t initial_size, int_t reserved_size)
     {
-        arena_t*           arena   = narena::new_arena(reserved_size + 4096 + 512, initial_size + 4096 + 512);
-        void*              mem1    = narena::alloc(arena, sizeof(nheap::context_t));
-        nheap::context_t*  context = new (mem1) nheap::context_t();
-        void*              mem2    = narena::alloc(arena, sizeof(alloc_tlsf_vmem_t));
-        alloc_tlsf_vmem_t* alloc   = new (mem2) alloc_tlsf_vmem_t(context, arena);
-
-        alloc->m_save_address = narena::current_address(arena);
-        return alloc;
+        arena_t*          arena   = narena::new_arena(reserved_size + 4096 + 512, initial_size + 4096 + 512);
+        void*             mem1    = narena::alloc(arena, sizeof(nheap::context_t));
+        nheap::context_t* context = new (mem1) nheap::context_t();
+        void*             mem2    = narena::alloc(arena, sizeof(heap_t));
+        heap_t*           heap    = (heap_t*)mem2;
+        heap->m_context           = context;
+        heap->m_save_point        = narena::current_address(arena);
+        heap->m_arena             = arena;
+        heap->m_resize_fn         = heap_resize;
+        nheap::g_setup(context);
+        return heap;
     }
 
-    void g_release_heap(alloc_t* allocator)
+    void g_release_heap(heap_t* alloc)
     {
-        alloc_tlsf_vmem_t* alloc = (alloc_tlsf_vmem_t*)allocator;
         if (alloc->m_arena)
         {
             arena_t* arena = alloc->m_arena;
