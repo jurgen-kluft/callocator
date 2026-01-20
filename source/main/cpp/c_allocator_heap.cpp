@@ -597,22 +597,31 @@ namespace ncore
         return heap->m_save_point;
     }
 
-    heap_t* g_create_heap(int_t initial_size, int_t reserved_size)
+    heap_t* g_heap_create(int_t initial_size, int_t reserved_size)
     {
-        arena_t*          arena   = narena::new_arena(reserved_size + 4096 + 512, initial_size + 4096 + 512);
-        void*             mem1    = narena::alloc(arena, sizeof(nheap::context_t));
-        nheap::context_t* context = new (mem1) nheap::context_t();
-        void*             mem2    = narena::alloc(arena, sizeof(heap_t));
-        heap_t*           heap    = (heap_t*)mem2;
-        heap->m_context           = context;
-        heap->m_save_point        = narena::current_address(arena);
-        heap->m_arena             = arena;
-        heap->m_resize_fn         = heap_resize;
-        nheap::g_setup(context);
+        arena_t* arena     = narena::new_arena(reserved_size + 4096 + 512, initial_size + 4096 + 512);
+        heap_t*  heap      = g_allocate<heap_t>(arena);
+        heap->m_context    = g_allocate<nheap::context_t>(arena);
+        heap->m_resize_fn  = heap_resize;
+        heap->m_arena      = arena;
+        heap->m_save_point = narena::current_address(arena);
+        nheap::g_setup(heap->m_context);
         return heap;
     }
 
-    void g_release_heap(heap_t* alloc)
+    void* g_heap_alloc(heap_t* allocator, u32 size) { return nheap::g_malloc(allocator, allocator->m_context, (uint_t)size); }
+    void g_heap_dealloc(heap_t* allocator, void* ptr) { nheap::g_free(allocator, allocator->m_context, ptr); }
+
+    void* g_heap_alloc_fill(heap_t* allocator, u32 size, u32 fill)
+    {
+        void* ptr = nheap::g_malloc(allocator, allocator->m_context, (uint_t)size);
+        if (ptr)
+            g_memory_fill(ptr, fill, size);
+        return ptr;
+    }
+
+
+    void g_heap_release(heap_t* alloc)
     {
         if (alloc->m_arena)
         {
