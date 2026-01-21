@@ -17,3 +17,7 @@ What are the functionalities that we are looking for:
     - Process incoming email to trigger actions in other services
 - pushover-service
     - Send notifications using the Pushover service
+- calendar-service
+    - Manage a calendar of events and reminders that exists as a git repository
+    - Events and reminders are stored in local JSON files
+    - Support for recurring events and reminders
