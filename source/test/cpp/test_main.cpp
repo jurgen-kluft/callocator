@@ -45,11 +45,11 @@ bool gRunUnitTest(UnitTest::TestReporter& reporter, UnitTest::TestContext& conte
 {
     cbase::init();
 
-    ncore::context_t tcontext = ncore::g_current_context();
+    ncore::context_t* tcontext = ncore::g_current_context();
 
 #ifdef TARGET_DEBUG
     ncore::UnitTestAssertHandler assertHandler;
-    tcontext.set_assert_handler(&assertHandler);
+    tcontext->set_assert_handler(&assertHandler);
     ncore::gSetAssertHandler(&assertHandler);
 #endif
     ncore::console->write("Configuration: ");
@@ -58,15 +58,15 @@ bool gRunUnitTest(UnitTest::TestReporter& reporter, UnitTest::TestContext& conte
     ncore::console->setColor(ncore::console_t::NORMAL);
 
     ncore::TestAllocator testAllocator(context.mAllocator);
-    ncore::alloc_t*      systemAllocator = tcontext.system_alloc();
-    ncore::alloc_t*      heapAllocator = tcontext.heap_alloc();
-    tcontext.set_system_alloc(&testAllocator);
-    tcontext.set_heap_alloc(&testAllocator);
+    ncore::alloc_t*      systemAllocator = tcontext->system_alloc();
+    ncore::alloc_t*      heapAllocator = tcontext->heap_alloc();
+    tcontext->set_system_alloc(&testAllocator);
+    tcontext->set_heap_alloc(&testAllocator);
 
     int r = UNITTEST_SUITE_RUN(context, reporter, cUnitTest);
 
-    tcontext.set_heap_alloc(heapAllocator);
-    tcontext.set_system_alloc(systemAllocator);
+    tcontext->set_heap_alloc(heapAllocator);
+    tcontext->set_system_alloc(systemAllocator);
 
     cbase::exit();
     return r == 0;

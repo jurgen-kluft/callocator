@@ -25,21 +25,21 @@ UNITTEST_SUITE_BEGIN(heap)
 
         UNITTEST_TEST(alloc3_free3)
         {
-            alloc_t* tlsf = g_create_heap(gInitSize, gBlockSize);
+            heap_t* tlsf = g_heap_create(gInitSize, gBlockSize);
 
-            void* mem1 = tlsf->allocate(512, 8);
-            void* mem2 = tlsf->allocate(1024, 16);
-            void* mem3 = tlsf->allocate(256, 32);
+            void* mem1 = g_heap_alloc(tlsf, 512);
+            void* mem2 = g_heap_alloc(tlsf, 1024);
+            void* mem3 = g_heap_alloc(tlsf, 256);
 
             CHECK_NOT_NULL(mem1);
             CHECK_NOT_NULL(mem2);
             CHECK_NOT_NULL(mem3);
 
-            tlsf->deallocate(mem2);
-            tlsf->deallocate(mem1);
-            tlsf->deallocate(mem3);
+            g_heap_dealloc(tlsf, mem2);
+            g_heap_dealloc(tlsf, mem1);
+            g_heap_dealloc(tlsf, mem3);
 
-            g_release_heap(tlsf);
+            g_heap_release(tlsf);
         }
 
         static uint_t s_holdrand = 1;
@@ -50,7 +50,7 @@ UNITTEST_SUITE_BEGIN(heap)
         {
             const uint_t sizes[] = {16, 32, 64, 128, 256, 512, 1024};
 
-            alloc_t* tlsf = g_create_heap(gInitSize, gBlockSize);
+            heap_t* tlsf = g_heap_create(gInitSize, gBlockSize);
 
             for (u32 i = 0; i < g_array_size(sizes); i++)
             {
@@ -77,7 +77,7 @@ UNITTEST_SUITE_BEGIN(heap)
                             uint_t len = ((uint_t)s_rand() % cap) + 1;
                             if (s_rand() % 2 == 0)
                             {
-                                pointers[p] = tlsf->allocate((u32)(len));
+                                pointers[p] = g_heap_alloc(tlsf, (u32)(len));
                             }
                             else
                             {
@@ -86,7 +86,7 @@ UNITTEST_SUITE_BEGIN(heap)
                                     align = 0;
                                 else
                                     len = align * (((uint_t)s_rand() % (cap / align)) + 1);
-                                pointers[p] = !align || !len ? tlsf->allocate((u32)len) : tlsf->allocate((u32)(len), align);
+                                pointers[p] = !align || !len ? g_heap_alloc(tlsf, (u32)len) : g_heap_alloc(tlsf, (u32)(len), align);
                                 if (align)
                                 {
                                     uint_t const aligned = ((uint_t)pointers[p] & (align - 1));
@@ -99,7 +99,7 @@ UNITTEST_SUITE_BEGIN(heap)
                             if (s_rand() % 10 == 0)
                             {
                                 uint_t newlen = ((uint_t)s_rand() % cap) + 1;
-                                pointers[p]   = g_reallocate(tlsf, pointers[p], (u32)len, (u32)newlen);
+                                pointers[p]   = g_heap_realloc(tlsf, pointers[p], (u32)len, (u32)newlen);
                                 CHECK_NOT_NULL(pointers[p]);
                                 len = newlen;
                             }
@@ -127,7 +127,7 @@ UNITTEST_SUITE_BEGIN(heap)
                                 continue;
                             u8* data = (u8*)pointers[target];
                             CHECK_TRUE(data[0] == 0xa5);
-                            tlsf->deallocate(pointers[target]);
+                            g_heap_dealloc(tlsf, pointers[target]);
                             pointers[target] = nullptr;
                             r--;
                             // tlsf_check(t);
@@ -138,7 +138,7 @@ UNITTEST_SUITE_BEGIN(heap)
                 }
             }
 
-            g_release_heap(tlsf);
+            g_heap_release(tlsf);
         }
     }
 }

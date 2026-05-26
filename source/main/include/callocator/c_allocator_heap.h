@@ -1,5 +1,5 @@
-#ifndef __C_HEAP_ALLOCATOR_H__
-#define __C_HEAP_ALLOCATOR_H__
+#ifndef __CALLOCATOR_HEAP_ALLOCATOR_H__
+#define __CALLOCATOR_HEAP_ALLOCATOR_H__
 #include "ccore/c_target.h"
 #ifdef USE_PRAGMA_ONCE
 #    pragma once
@@ -25,7 +25,9 @@ namespace ncore
 
     heap_t* g_heap_create(int_t initial_size, int_t reserved_size);
     void*   g_heap_alloc(heap_t* allocator, u32 size);
+    void*   g_heap_alloc(heap_t* allocator, u32 size, u32 align);
     void*   g_heap_alloc_fill(heap_t* allocator, u32 size, u32 fill);
+    void*   g_heap_realloc(heap_t* allocator, void* ptr, u32 old_size, u32 new_size);
     void    g_heap_dealloc(heap_t* allocator, void* ptr);
     void    g_heap_release(heap_t* allocator);
 
@@ -39,4 +41,4 @@ namespace ncore
 
 }; // namespace ncore
 
-#endif /// __C_HEAP_ALLOCATOR_H__
+#endif /// __CALLOCATOR_HEAP_ALLOCATOR_H__

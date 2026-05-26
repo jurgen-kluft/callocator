@@ -610,7 +610,9 @@ namespace ncore
     }
 
     void* g_heap_alloc(heap_t* allocator, u32 size) { return nheap::g_malloc(allocator, allocator->m_context, (uint_t)size); }
-    void g_heap_dealloc(heap_t* allocator, void* ptr) { nheap::g_free(allocator, allocator->m_context, ptr); }
+    void*   g_heap_alloc(heap_t* allocator, u32 size, u32 align) { return nheap::g_aalloc(allocator, allocator->m_context, (uint_t)align, (uint_t)size); }
+
+    void  g_heap_dealloc(heap_t* allocator, void* ptr) { nheap::g_free(allocator, allocator->m_context, ptr); }
 
     void* g_heap_alloc_fill(heap_t* allocator, u32 size, u32 fill)
     {
@@ -620,6 +622,11 @@ namespace ncore
         return ptr;
     }
 
+    void* g_heap_realloc(heap_t* allocator, void* ptr, u32 old_size, u32 new_size)
+    {
+        (void)old_size;
+        return nheap::g_realloc(allocator, allocator->m_context, ptr, (uint_t)new_size);
+    }
 
     void g_heap_release(heap_t* alloc)
     {

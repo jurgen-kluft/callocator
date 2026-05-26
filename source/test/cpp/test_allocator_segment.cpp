@@ -172,13 +172,13 @@ UNITTEST_SUITE_BEGIN(segmented)
             {
                 random_indices[i] = i;
             }
-            // for (i32 i = 0; i < num_allocs; ++i)
-            // {
-            //     i32 idx1             = (i32)(rng.rand32() % num_allocs);
-            //     i32 tmp              = random_indices[i];
-            //     random_indices[i]    = random_indices[idx1];
-            //     random_indices[idx1] = tmp;
-            // }
+            for (i32 i = 0; i < num_allocs; ++i)
+            {
+                i32 idx1             = (i32)(rng.rand32() % num_allocs);
+                i32 tmp              = random_indices[i];
+                random_indices[i]    = random_indices[idx1];
+                random_indices[idx1] = tmp;
+            }
 
             // Deallocate in random order
             for (i32 i = 0; i < num_allocs; ++i)

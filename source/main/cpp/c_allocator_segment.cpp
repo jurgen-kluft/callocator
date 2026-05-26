@@ -80,7 +80,7 @@ namespace ncore
         u64&      l0 = level.m_bin0[(bit >> 6)];
         const u32 bi = (bit & (64 - 1));
         u64       lc = l0;
-        l0           = l0 | ((u64)1 << bi);
+        l0           = l0 | ((u64)1u << bi);
         return lc;
     }
 
@@ -88,7 +88,7 @@ namespace ncore
     {
         u64       l0 = level.m_bin0[(bit >> 6)];
         const u32 bi = (bit & (64 - 1));
-        return (l0 & ((u64)1 << bi)) != 0;
+        return (l0 & ((u64)1u << bi)) != 0;
     }
 
     inline u64 set_level0_pair(segment_alloc_t::level_t& level, s32 bit)
@@ -101,17 +101,22 @@ namespace ncore
         return lc;
     }
 
-    // returns 0 bits where cleared
-    // returns 1 bits where set
+    // returns 0 when bits where cleared
+    // returns 1 when bits where set
     s8 set_bit(segment_alloc_t* sa, s8 size_index, s32 bit)
     {
         ASSERT(size_index >= 0 && size_index < sa->m_num_sizes);
         segment_alloc_t::level_t& level = sa->m_levels[size_index];
         ASSERT(get_level0_bit(level, bit) == false);
-        if (get_level0_bit(level, bit ^ 1))
+
+        // if this is the top-level, we should skip merge behaviour
+        if (size_index < (sa->m_num_sizes - 1))
         {
-            clr_bit(sa, size_index, bit ^ 1);
-            return 0;
+            if (get_level0_bit(level, bit ^ 1)) //
+            {
+                clr_bit(sa, size_index, bit ^ 1);
+                return 0;
+            }
         }
 
         level.m_count++;
@@ -164,7 +169,7 @@ namespace ncore
             const s8 size_index = size_to_index(sa, size);
 
             // We can detect bits set in m_size_free directly
-            const u32 size_free = (sa->m_size_free & (0xffffffff << size_index));
+            const u32 size_free = (sa->m_size_free & (0xffffffffu << size_index));
             if (size_free == 0)
             {
                 // Fragmented / OOM ?
@@ -186,18 +191,18 @@ namespace ncore
             while (size_free_index > size_index)
             {
                 if (clr_bit(sa, size_free_index, bit) == 0)
-                    sa->m_size_free &= ~(1 << size_free_index);
+                    sa->m_size_free &= ~(1u << size_free_index);
 
                 size_free_index--;
 
                 bit = (bit << 1);
                 set_2bits(sa, size_free_index, bit);
-                sa->m_size_free |= (1 << size_free_index);
+                sa->m_size_free |= (1u << size_free_index);
             }
 
             // Clear the bit in the bitmap at size_index
             if (clr_bit(sa, size_index, bit) == 0)
-                sa->m_size_free &= ~(1 << size_index);
+                sa->m_size_free &= ~(1u << size_index);
 
             // Return the actual allocated offset
             offset = ((s64)bit << (sa->m_min_size_shift + size_index));
@@ -206,7 +211,15 @@ namespace ncore
 
         bool deallocate(segment_alloc_t* sa, s64 ptr, s64 size)
         {
-            if (ptr < 0 || size <= 0 || ptr >= ((s64)1 << sa->m_total_size_shift) || size > ((s64)1 << sa->m_max_size_shift))
+            const s64 min_size   = ((s64)1 << sa->m_min_size_shift);
+            const s64 max_size   = ((s64)1 << sa->m_max_size_shift);
+            const s64 total_size = ((s64)1 << sa->m_total_size_shift);
+
+            if (ptr < 0 || size <= 0 || ptr >= total_size)
+                return false; // Invalid pointer or size
+            if (!math::ispo2(size) || size < min_size || size > max_size)
+                return false; // Size is out of range or not power-of-two
+            if ((ptr & (size - 1)) != 0)
                 return false; // Invalid pointer or size
 
             s8  size_index = size_to_index(sa, size);                           // get the size index from the size
@@ -216,11 +229,11 @@ namespace ncore
                 if (set_bit(sa, size_index, bit) == 0)
                 {
                     if (sa->m_levels[size_index].m_count == 0)
-                        sa->m_size_free &= ~(1 << size_index);
+                        sa->m_size_free &= ~(1u << size_index);
                 }
                 else
                 {
-                    sa->m_size_free |= (1 << size_index);
+                    sa->m_size_free |= (1u << size_index);
                     break;
                 }
 
@@ -230,20 +243,20 @@ namespace ncore
             return true;
         }
 
-        static inline u64* create_level(alloc_t* allocator, s32 size_in_bits, bool is_max_level)
+        static inline u64* create_level(alloc_t* allocator, u32 size_in_bits, bool is_max_level)
         {
             if (size_in_bits == 0)
                 return nullptr;
-            const s32 size_in_bits_aligned = math::alignUp(size_in_bits, 64);
-            const s32 size_in_u64s         = size_in_bits_aligned >> 6;
+            const u32 size_in_bits_aligned = math::alignUp(size_in_bits, 64);
+            const u32 size_in_u64s         = size_in_bits_aligned >> 6;
             u64*      bin                  = g_allocate_array_and_memset<u64>(allocator, size_in_u64s, is_max_level ? 0xFFFFFFFF : 0);
             if (is_max_level)
             {
                 // Make sure we don't have bits set beyond number_of_bits
-                const s32 excess_bits = (size_in_bits_aligned - size_in_bits);
+                const u32 excess_bits = (size_in_bits_aligned - size_in_bits);
                 if (excess_bits > 0)
                 {
-                    const s32 excess_u64_index = size_in_u64s - 1;
+                    const u32 excess_u64_index = size_in_u64s - 1;
                     const u64 mask             = (~((u64)0)) >> excess_bits;
                     bin[excess_u64_index] &= mask;
                 }
@@ -259,12 +272,13 @@ namespace ncore
             const s8 max_size_shift = math::ilog2(max_size);
             const s8 tot_size_shift = math::ilog2(total_size);
             const s8 num_sizes      = 1 + max_size_shift - min_size_shift;
+            ASSERT(num_sizes > 0 && num_sizes <= 32);
 
             // Allocate the count and offsets array's
             sa->m_levels = g_allocate_array_and_clear<segment_alloc_t::level_t>(allocator, num_sizes);
 
-            s32 size_in_bits = 1 << (tot_size_shift - min_size_shift);
-            ASSERT(size_in_bits <= (1 << 3 * 6));
+            u64 size_in_bits = ((u64)1u << (tot_size_shift - min_size_shift));
+            ASSERT(size_in_bits <= (1u << 3 * 6));
 
             s32 i = 0;
             while (i < num_sizes)
@@ -277,7 +291,7 @@ namespace ncore
                 level.m_bin0 = create_level(allocator, size_in_bits, is_max_level);
                 level.m_bin1 = create_level(allocator, size_in_bits >> 6, is_max_level);
                 level.m_bin2 = create_level(allocator, size_in_bits >> 12, is_max_level);
-                size_in_bits = math::max(size_in_bits >> 1, (s32)1);
+                size_in_bits = math::max(size_in_bits >> 1, (u64)1);
             }
 
             sa->m_min_size_shift   = min_size_shift;
@@ -289,7 +303,7 @@ namespace ncore
             sa->m_levels[sa->m_num_sizes - 1].m_count = sa->m_levels[sa->m_num_sizes - 1].m_size;
 
             // Initialize the size_free bitmap and the highest size bitmap
-            sa->m_size_free = (1 << (sa->m_num_sizes - 1));
+            sa->m_size_free = (1u << (sa->m_num_sizes - 1));
         }
 
         void teardown(segment_alloc_t* sa, alloc_t* allocator)
