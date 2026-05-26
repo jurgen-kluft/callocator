@@ -43,7 +43,7 @@ namespace ncore
             allocator->m_segment_size_shift = (s8)math::ilog2(segment_size);
 
             // make sure the arena allocations start at 4 KB boundary
-            narena::alloc(arena, (int_t)(4 * cKB) - (int_t)((const byte*)narena::current_address(arena) - (const byte*)narena::base(arena)));
+            narena::alloc(arena, (int_t)(4 * cKB) - (int_t)((const byte*)narena::current_address(arena) - (const byte*)narena::base_ptr(arena)));
 
             // start with first segment, and mark first segment as active
             allocator->m_segment              = 0;
@@ -89,7 +89,7 @@ namespace ncore
                 a->m_segment_counters[a->m_segment] += 1;
 
                 // return the absolute address: base + segment_offset + aligned
-                return (u8*)narena::base(a->m_arena) + ((int_t)1 << a->m_arena->m_page_size_shift) + aligned;
+                return (u8*)narena::base_ptr(a->m_arena) + ((int_t)1 << a->m_arena->m_page_size_shift) + aligned;
             }
 
             // segment cannot satisfy request, search for a new segment and make that the active one
@@ -120,7 +120,7 @@ namespace ncore
                 a->m_segment_counters[a->m_segment] = 1;
 
                 // return the absolute address: base + aligned cursor
-                return (u8*)narena::base(a->m_arena) + ((int_t)1 << a->m_arena->m_page_size_shift) + aligned;
+                return (u8*)narena::base_ptr(a->m_arena) + ((int_t)1 << a->m_arena->m_page_size_shift) + aligned;
             }
 
             // No new segment found, out of memory
@@ -133,10 +133,10 @@ namespace ncore
             ASSERT(a != nullptr && ptr != nullptr);
 
             // Check if pointer is outside of the arena
-            ASSERT(((const u8*)ptr >= ((const u8*)narena::base(a->m_arena) + ((int_t)1 << a->m_arena->m_page_size_shift))) && narena::within_committed(a->m_arena, ptr));
+            ASSERT(((const u8*)ptr >= ((const u8*)narena::base_ptr(a->m_arena) + ((int_t)1 << a->m_arena->m_page_size_shift))) && narena::within_committed(a->m_arena, ptr));
 
             // Which segment is this coming from and is it valid?
-            const u32 segment = (u32)(((const u8*)ptr - ((const u8*)narena::base(a->m_arena) + ((int_t)1 << a->m_arena->m_page_size_shift))) >> a->m_segment_size_shift);
+            const u32 segment = (u32)(((const u8*)ptr - ((const u8*)narena::base_ptr(a->m_arena) + ((int_t)1 << a->m_arena->m_page_size_shift))) >> a->m_segment_size_shift);
             ASSERT(segment < a->m_segment_count); // invalid segment index
 
             // Decrement the segment counter

@@ -9,7 +9,7 @@
 
 namespace ncore
 {
-    class alloc_t;
+    struct arena_t;
 
     namespace noffset
     {
@@ -24,7 +24,7 @@ namespace ncore
             static constexpr u32 NO_SPACE = 0xffffffff;
 
             u32 offset   = NO_SPACE;
-            u32 metadata = NO_SPACE;  // internal: node index
+            u32 metadata = NO_SPACE; // internal: node index
         };
 
         struct storage_report_t
@@ -44,50 +44,12 @@ namespace ncore
             region_t freeRegions[NUM_LEAF_BINS];
         };
 
-        class allocator_t
+        struct node_t;
+        struct neighbor_t;
+
+        struct allocator_t
         {
-        public:
-            allocator_t(alloc_t* allocator, u32 size, u32 maxAllocs = 128 * 1024);
-            allocator_t(allocator_t&& other);
-            ~allocator_t();
-
-            void setup();
-            void teardown();
-            void reset();
-
-            allocation_t          allocate(u32 size);
-            void                  free(allocation_t allocation);
-            u32                   allocationSize(allocation_t allocation) const;
-            storage_report_t      storageReport() const;
-            full_storage_report_t storageReportFull() const;
-
-            DCORE_CLASS_PLACEMENT_NEW_DELETE
-
-        private:
-            u32  insertNodeIntoBin(u32 size, u32 dataOffset);
-            void removeNodeFromBin(u32 nodeIndex);
-
-            inline bool isNodeUsed(u32 index) const { return (m_nodeUsed[index >> 5] & (1 << (index & 31))) != 0; }
-            inline void setNodeUsed(u32 index) { m_nodeUsed[index >> 5] |= (1 << (index & 31)); }
-            inline void setNodeUnused(u32 index) { m_nodeUsed[index >> 5] &= ~(1 << (index & 31)); }
-
-            struct node_t
-            {
-                static constexpr u32 NIL = 0xffffffff;
-
-                u32 dataOffset  = 0;
-                u32 dataSize    = 0;
-                u32 binListPrev = NIL;
-                u32 binListNext = NIL;
-            };
-
-            struct neighbor_t
-            {
-                u32 prev;
-                u32 next;
-            };
-
-            alloc_t*    m_allocator;
+            arena_t*    m_allocator;
             u32         m_size;
             u32         m_maxAllocs;
             u32         m_freeStorage;
@@ -101,7 +63,18 @@ namespace ncore
             u32         m_freeListHead;
             u32         m_freeOffset;
         };
-    }  // namespace ngfx
-}  // namespace ncore
 
-#endif  // __C_GFX_COMMON_OFFSET_ALLOCATOR_H__
+        allocator_t* create(u32 size, u32 maxAllocs = 128 * 1024);
+        void         teardown(allocator_t* allocator);
+        void         reset(allocator_t* allocator);
+
+        allocation_t          allocate(allocator_t* allocator, u32 size);
+        void                  free(allocator_t* allocator, allocation_t allocation);
+        u32                   allocationSize(allocator_t* allocator, allocation_t allocation);
+        storage_report_t      storageReport(allocator_t* allocator);
+        full_storage_report_t storageReportFull(allocator_t* allocator);
+
+    } // namespace noffset
+} // namespace ncore
+
+#endif // __C_GFX_COMMON_OFFSET_ALLOCATOR_H__

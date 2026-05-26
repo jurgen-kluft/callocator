@@ -192,5 +192,96 @@ UNITTEST_SUITE_BEGIN(segmented)
 
             nsegment::teardown(&range, Allocator);
         }
+
+        UNITTEST_TEST(maximum_24bit_binmap)
+        {
+            // total_size / min_size = 2^24, which exercises the 4th binmap level.
+            const s8 s_min_size_shift = 16;
+            const s8 s_max_size_shift = 21;
+            const s8 s_tot_size_shift = s_min_size_shift + 24;
+
+            const int_t s_min_size   = ((int_t)1 << s_min_size_shift);
+            const int_t s_max_size   = ((int_t)1 << s_max_size_shift);
+            const int_t s_total_size = ((int_t)1 << s_tot_size_shift);
+
+            segment_alloc_t range;
+            nsegment::initialize(&range, Allocator, s_min_size, s_max_size, s_total_size);
+
+            CHECK_TRUE(range.m_levels[0].m_bin3 != nullptr);
+
+            s64 ptr = -1;
+            CHECK_TRUE(nsegment::allocate(&range, s_min_size, ptr));
+            CHECK_EQUAL(0, ptr);
+            CHECK_TRUE(nsegment::deallocate(&range, ptr, s_min_size));
+
+            CHECK_EQUAL((u32)(1 << (range.m_num_sizes - 1)), range.m_size_free);
+
+            nsegment::teardown(&range, Allocator);
+        }
+
+        UNITTEST_TEST(deterministic_random_churn)
+        {
+            const u64       c_total_address_space = 256 * cGB; // = 2^38 = 256 GB
+            static const s8 s_section_size_min    = 16;        // 64 KB
+            static const s8 s_section_size_max    = 30;        // 1 GB
+
+            segment_alloc_t range;
+            nsegment::initialize(&range, Allocator, (1 << s_section_size_min), (1 << s_section_size_max), c_total_address_space);
+
+            ncore::xor_random_t rng;
+            rng.reset(0x12345678); // fixed seed => deterministic
+
+            const int_t max_live_allocs = 4096;
+            const int_t num_operations  = 25000;
+
+            s64 live_ptrs[max_live_allocs];
+            s64 live_sizes[max_live_allocs];
+            i32 live_count = 0;
+
+            for (i32 op = 0; op < num_operations; ++op)
+            {
+                const bool try_allocate = (live_count == 0) || (live_count < max_live_allocs && ((rng.rand32() % 100) < 60));
+
+                if (try_allocate)
+                {
+                    s32 random_shift = g_random_u32_max(&rng, s_section_size_max - s_section_size_min + 1);
+                    s64 size         = ((s64)1 << (s_section_size_min + random_shift));
+                    s64 ptr          = -1;
+
+                    if (nsegment::allocate(&range, size, ptr))
+                    {
+                        live_ptrs[live_count]  = ptr;
+                        live_sizes[live_count] = size;
+                        live_count++;
+                    }
+                    else if (live_count > 0)
+                    {
+                        // deterministic recovery on allocation failure
+                        i32 idx = (i32)(rng.rand32() % live_count);
+                        CHECK_TRUE(nsegment::deallocate(&range, live_ptrs[idx], live_sizes[idx]));
+                        live_count--;
+                        live_ptrs[idx]  = live_ptrs[live_count];
+                        live_sizes[idx] = live_sizes[live_count];
+                    }
+                }
+                else
+                {
+                    i32 idx = (i32)(rng.rand32() % live_count);
+                    CHECK_TRUE(nsegment::deallocate(&range, live_ptrs[idx], live_sizes[idx]));
+                    live_count--;
+                    live_ptrs[idx]  = live_ptrs[live_count];
+                    live_sizes[idx] = live_sizes[live_count];
+                }
+            }
+
+            while (live_count > 0)
+            {
+                live_count--;
+                CHECK_TRUE(nsegment::deallocate(&range, live_ptrs[live_count], live_sizes[live_count]));
+            }
+
+            CHECK_EQUAL((u32)(1 << (range.m_num_sizes - 1)), range.m_size_free);
+            nsegment::teardown(&range, Allocator);
+        }
     }
 }

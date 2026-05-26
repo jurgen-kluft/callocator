@@ -16,6 +16,7 @@ namespace ncore
             u64* m_bin0;  // The binmap, level 0
             u64* m_bin1;  //
             u64* m_bin2;  //
+            u64* m_bin3;  //
             s32  m_count; // Number of bits set in this level
             s32  m_size;  // Total number of bits in this level
         };

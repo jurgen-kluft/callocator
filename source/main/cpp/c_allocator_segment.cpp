@@ -13,9 +13,9 @@ namespace ncore
     // Can manage segments of sizes between min_size and max_size, where both sizes are a power of 2.
     // The difference between min_size_shift and max_size_shift can at most be 32 but such difference
     // should be avoided since it would require a lot of memory for the binmaps.
-    // Also this specific implementation can only handle 3 level (u64) binmaps, meaning that the maximum
-    // number of bits for the full level is 64 * 64 * 64 = 262144 bits = 256 K bits.
-    // So (total_size / min_size) must be <= (256*1024).
+    // Also this specific implementation can only handle 4 level (u64) binmaps, meaning that the maximum
+    // number of bits for the full level is 64 * 64 * 64 * 64 = 16777216 bits = 16 M bits.
+    // So (total_size / min_size) must be <= (16*1024*1024).
 
     static inline u64 s_set_level_bit(s32 bit, u64* level)
     {
@@ -50,6 +50,11 @@ namespace ncore
             {
                 bit   = bit >> 6; // To level 2
                 state = s_clr_level_bit(bit, level.m_bin2);
+                if (level.m_bin3 != nullptr && state == 0)
+                {
+                    bit = bit >> 6; // To level 3
+                    s_clr_level_bit(bit, level.m_bin3);
+                }
             }
         }
         return level.m_count == 0 ? 0 : 1;
@@ -63,9 +68,13 @@ namespace ncore
             return -1;
 
         s32 bit = 0;
+        if (level.m_bin3 != nullptr)
+        {
+            bit = math::findFirstBit(level.m_bin3[0]);
+        }
         if (level.m_bin2 != nullptr)
         {
-            bit = math::findFirstBit(level.m_bin2[0]);
+            bit = (bit << 6) + math::findFirstBit(level.m_bin2[bit]);
         }
         if (level.m_bin1 != nullptr)
         {
@@ -127,8 +136,13 @@ namespace ncore
             const u64 bits1 = s_set_level_bit(bit, level.m_bin1);
             if (level.m_bin2 != nullptr && bits1 == 0)
             {
-                bit = bit >> 6; // To level 2
-                s_set_level_bit(bit, level.m_bin2);
+                bit             = bit >> 6; // To level 2
+                const u64 bits2 = s_set_level_bit(bit, level.m_bin2);
+                if (level.m_bin3 != nullptr && bits2 == 0)
+                {
+                    bit = bit >> 6; // To level 3
+                    s_set_level_bit(bit, level.m_bin3);
+                }
             }
         }
         return 1;
@@ -149,8 +163,13 @@ namespace ncore
             const u64 bits1 = s_set_level_bit(bit, level.m_bin1);
             if (level.m_bin2 != nullptr && bits1 == 0)
             {
-                bit = bit >> 6;
-                s_set_level_bit(bit, level.m_bin2);
+                bit             = bit >> 6;
+                const u64 bits2 = s_set_level_bit(bit, level.m_bin2);
+                if (level.m_bin3 != nullptr && bits2 == 0)
+                {
+                    bit = bit >> 6;
+                    s_set_level_bit(bit, level.m_bin3);
+                }
             }
         }
     }
@@ -278,7 +297,7 @@ namespace ncore
             sa->m_levels = g_allocate_array_and_clear<segment_alloc_t::level_t>(allocator, num_sizes);
 
             u64 size_in_bits = ((u64)1u << (tot_size_shift - min_size_shift));
-            ASSERT(size_in_bits <= (1u << 3 * 6));
+            ASSERT(size_in_bits <= (((u64)1u) << (4 * 6)));
 
             s32 i = 0;
             while (i < num_sizes)
@@ -291,6 +310,7 @@ namespace ncore
                 level.m_bin0 = create_level(allocator, size_in_bits, is_max_level);
                 level.m_bin1 = create_level(allocator, size_in_bits >> 6, is_max_level);
                 level.m_bin2 = create_level(allocator, size_in_bits >> 12, is_max_level);
+                level.m_bin3 = create_level(allocator, size_in_bits >> 18, is_max_level);
                 size_in_bits = math::max(size_in_bits >> 1, (u64)1);
             }
 
@@ -317,6 +337,8 @@ namespace ncore
                     g_deallocate_array(allocator, level.m_bin1);
                 if (level.m_bin2 != nullptr)
                     g_deallocate_array(allocator, level.m_bin2);
+                if (level.m_bin3 != nullptr)
+                    g_deallocate_array(allocator, level.m_bin3);
             }
             g_deallocate_array(allocator, sa->m_levels);
         }

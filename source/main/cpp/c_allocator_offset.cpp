@@ -1,4 +1,4 @@
-#include "ccore/c_allocator.h"
+#include "ccore/c_arena.h"
 #include "ccore/c_math.h"
 #include "ccore/c_memory.h"
 
@@ -143,86 +143,90 @@ namespace ncore
             return tzcnt_nonzero(bitsAfter);
         }
 
-        allocator_t::allocator_t(alloc_t* allocator, u32 size, u32 maxAllocs)
-            : m_allocator(allocator), m_size(size), m_maxAllocs(maxAllocs), m_freeStorage(0), m_usedBinsTop(0), m_nodes(nullptr), m_neighbors(nullptr), m_nodeUsed(nullptr), m_freeIndex(0), m_freeListHead(node_t::NIL), m_freeOffset(maxAllocs - 1)
+        struct node_t
         {
-            ASSERT(m_size < 0x80000000); // Size must be less than 2^31
+            static constexpr u32 NIL = 0xffffffff;
+
+            u32 dataOffset  = 0;
+            u32 dataSize    = 0;
+            u32 binListPrev = NIL;
+            u32 binListNext = NIL;
+        };
+
+        struct neighbor_t
+        {
+            u32 prev;
+            u32 next;
+        };
+
+        static u32  insertNodeIntoBin(allocator_t* allocator, u32 size, u32 dataOffset);
+        static void removeNodeFromBin(allocator_t* allocator, u32 nodeIndex);
+
+        inline static bool isNodeUsed(allocator_t* allocator, u32 index) { return (allocator->m_nodeUsed[index >> 5] & (1 << (index & 31))) != 0; }
+        inline static void setNodeUsed(allocator_t* allocator, u32 index) { allocator->m_nodeUsed[index >> 5] |= (1 << (index & 31)); }
+        inline static void setNodeUnused(allocator_t* allocator, u32 index) { allocator->m_nodeUsed[index >> 5] &= ~(1 << (index & 31)); }
+
+        allocator_t* create(u32 size, u32 maxAllocs)
+        {
+            ASSERT(size < 0x80000000); // Size must be less than 2^31
+
+            uint_t total_size = sizeof(allocator_t);
+            total_size += sizeof(node_t) * maxAllocs;
+            total_size += sizeof(neighbor_t) * maxAllocs;
+            total_size += sizeof(u32) * ((maxAllocs + 31) >> 5);
+
+            arena_t* a = narena::new_arena(total_size, total_size);
+
+            allocator_t* allocator = g_allocate<allocator_t>(a);
+
+            allocator->m_size         = size;
+            allocator->m_maxAllocs    = maxAllocs;
+            allocator->m_freeStorage  = 0;
+            allocator->m_usedBinsTop  = 0;
+            allocator->m_nodes        = nullptr;
+            allocator->m_neighbors    = nullptr;
+            allocator->m_nodeUsed     = nullptr;
+            allocator->m_freeIndex    = 0;
+            allocator->m_freeListHead = node_t::NIL;
+            allocator->m_freeOffset   = maxAllocs - 1;
+
+            allocator->m_nodes     = g_allocate_array<node_t>(a, maxAllocs);
+            allocator->m_neighbors = g_allocate_array<neighbor_t>(a, maxAllocs);
+            allocator->m_nodeUsed  = g_allocate_array<u32>(a, ((maxAllocs + 31) >> 5));
+
+            reset(allocator);
+            return allocator;
         }
 
-        allocator_t::allocator_t(allocator_t&& other)
-            : m_allocator(other.m_allocator), m_size(other.m_size), m_maxAllocs(other.m_maxAllocs), m_freeStorage(other.m_freeStorage), m_usedBinsTop(other.m_usedBinsTop), m_nodes(other.m_nodes), m_neighbors(other.m_neighbors),
-              m_nodeUsed(other.m_nodeUsed), m_freeIndex(other.m_freeIndex), m_freeListHead(other.m_freeListHead), m_freeOffset(other.m_freeOffset)
+        void teardown(allocator_t* allocator)
         {
-            nmem::memcpy(m_usedBins, other.m_usedBins, sizeof(u8) * NUM_TOP_BINS);
-            nmem::memcpy(m_binIndices, other.m_binIndices, sizeof(u32) * NUM_LEAF_BINS);
-
-            other.m_allocator    = nullptr;
-            other.m_nodes        = nullptr;
-            other.m_neighbors    = nullptr;
-            other.m_nodeUsed     = nullptr;
-            other.m_freeIndex    = 0;
-            other.m_freeListHead = node_t::NIL;
-            other.m_freeOffset   = 0;
-            other.m_maxAllocs    = 0;
-            other.m_usedBinsTop  = 0;
+            narena::destroy(allocator->m_allocator);
         }
 
-        void allocator_t::setup()
+        void reset(allocator_t* allocator)
         {
-            m_nodes     = g_allocate_array<node_t>(m_allocator, m_maxAllocs);
-            m_neighbors = g_allocate_array<neighbor_t>(m_allocator, m_maxAllocs);
-            m_nodeUsed  = g_allocate_array<u32>(m_allocator, (m_maxAllocs >> 5));
-
-            reset();
-        }
-
-        void allocator_t::teardown()
-        {
-            g_deallocate_array<node_t>(m_allocator, m_nodes);
-            g_deallocate_array<neighbor_t>(m_allocator, m_neighbors);
-            g_deallocate_array<u32>(m_allocator, m_nodeUsed);
-
-            m_freeStorage  = 0;
-            m_usedBinsTop  = 0;
-            m_freeOffset   = m_maxAllocs - 1;
-            m_nodes        = nullptr;
-            m_neighbors    = nullptr;
-            m_nodeUsed     = nullptr;
-            m_freeIndex    = 0;
-            m_freeListHead = node_t::NIL;
-        }
-
-        void allocator_t::reset()
-        {
-            m_freeStorage = 0;
-            m_usedBinsTop = 0;
-            m_freeOffset  = m_maxAllocs - 1;
+            allocator->m_freeStorage = 0;
+            allocator->m_usedBinsTop = 0;
+            allocator->m_freeOffset  = allocator->m_maxAllocs - 1;
 
             for (u32 i = 0; i < NUM_TOP_BINS; i++)
-                m_usedBins[i] = 0;
+                allocator->m_usedBins[i] = 0;
 
             for (u32 i = 0; i < NUM_LEAF_BINS; i++)
-                m_binIndices[i] = node_t::NIL;
+                allocator->m_binIndices[i] = node_t::NIL;
 
-            m_freeIndex    = 0;
-            m_freeListHead = node_t::NIL;
+            allocator->m_freeIndex    = 0;
+            allocator->m_freeListHead = node_t::NIL;
 
             // Start state: Whole storage as one big node
             // Algorithm will split remainders and push them back as smaller nodes
-            insertNodeIntoBin(m_size, 0);
+            insertNodeIntoBin(allocator, allocator->m_size, 0);
         }
 
-        allocator_t::~allocator_t()
-        {
-            g_deallocate_array<node_t>(m_allocator, m_nodes);
-            g_deallocate_array<neighbor_t>(m_allocator, m_neighbors);
-            g_deallocate_array<u32>(m_allocator, m_nodeUsed);
-        }
-
-        allocation_t allocator_t::allocate(u32 size)
+        allocation_t allocate(allocator_t* allocator, u32 size)
         {
             // Out of allocations?
-            if (m_freeOffset == 0)
+            if (allocator->m_freeOffset == 0)
             {
                 allocation_t a;
                 a.offset   = allocation_t::NO_SPACE;
@@ -241,15 +245,15 @@ namespace ncore
             u32 leafBinIndex = allocation_t::NO_SPACE;
 
             // If top bin exists, scan its leaf bin. This can fail (NO_SPACE).
-            if (m_usedBinsTop & (1 << topBinIndex))
+            if (allocator->m_usedBinsTop & (1 << topBinIndex))
             {
-                leafBinIndex = s_findLowestSetBitAfter(m_usedBins[topBinIndex], minLeafBinIndex);
+                leafBinIndex = s_findLowestSetBitAfter(allocator->m_usedBins[topBinIndex], minLeafBinIndex);
             }
 
             // If we didn't find space in top bin, we search top bin from +1
             if (leafBinIndex == allocation_t::NO_SPACE)
             {
-                topBinIndex = s_findLowestSetBitAfter(m_usedBinsTop, minTopBinIndex + 1);
+                topBinIndex = s_findLowestSetBitAfter(allocator->m_usedBinsTop, minTopBinIndex + 1);
 
                 // Out of space?
                 if (topBinIndex == allocation_t::NO_SPACE)
@@ -263,20 +267,20 @@ namespace ncore
 
                 // All leaf bins here fit the alloc, since the top bin was rounded up. Start leaf search from bit 0.
                 // NOTE: This search can't fail since at least one leaf bit was set because the top bit was set.
-                leafBinIndex = tzcnt_nonzero(m_usedBins[topBinIndex]);
+                leafBinIndex = tzcnt_nonzero(allocator->m_usedBins[topBinIndex]);
             }
 
             const u32 binIndex = (topBinIndex << TOP_BINS_INDEX_SHIFT) | leafBinIndex;
 
             // Pop the top node of the bin. Bin top = node.next.
-            const u32 nodeIndex     = m_binIndices[binIndex];
-            node_t&   node          = m_nodes[nodeIndex];
+            const u32 nodeIndex     = allocator->m_binIndices[binIndex];
+            node_t&   node          = allocator->m_nodes[nodeIndex];
             const u32 nodeTotalSize = node.dataSize;
             node.dataSize           = size;
-            setNodeUsed(nodeIndex);
-            m_binIndices[binIndex] = node.binListNext;
+            setNodeUsed(allocator, nodeIndex);
+            allocator->m_binIndices[binIndex] = node.binListNext;
             if (node.binListNext != node_t::NIL)
-                m_nodes[node.binListNext].binListPrev = node_t::NIL;
+                allocator->m_nodes[node.binListNext].binListPrev = node_t::NIL;
 
             // Are 'node.binListNext' and 'node.binListPrev' still used after this?
             // Could we re-use them as neighbor next and prev?
@@ -284,20 +288,20 @@ namespace ncore
             node.binListNext = 0xCDCDCDCD; // Clear bin list next
             node.binListPrev = 0xCDCDCDCD; // Clear bin list prev
 
-            m_freeStorage -= nodeTotalSize;
+            allocator->m_freeStorage -= nodeTotalSize;
 #ifdef DEBUG_VERBOSE
-            printf("Free storage: %u (-%u) (allocate)\n", m_freeStorage, nodeTotalSize);
+            printf("Free storage: %u (-%u) (allocate)\n", allocator->m_freeStorage, nodeTotalSize);
 #endif
 
             // Bin empty?
-            if (m_binIndices[binIndex] == node_t::NIL)
+            if (allocator->m_binIndices[binIndex] == node_t::NIL)
             {
-                m_usedBins[topBinIndex] &= ~(1 << leafBinIndex); // Remove a leaf bin mask bit
+                allocator->m_usedBins[topBinIndex] &= ~(1 << leafBinIndex); // Remove a leaf bin mask bit
 
                 // All leaf bins empty?
-                if (m_usedBins[topBinIndex] == 0)
+                if (allocator->m_usedBins[topBinIndex] == 0)
                 {
-                    m_usedBinsTop &= ~(1 << topBinIndex); // Remove a top bin mask bit
+                    allocator->m_usedBinsTop &= ~(1 << topBinIndex); // Remove a top bin mask bit
                 }
             }
 
@@ -305,17 +309,17 @@ namespace ncore
             const u32 remainderSize = nodeTotalSize - size;
             if (remainderSize > 0)
             {
-                const u32 newNodeIndex = insertNodeIntoBin(remainderSize, node.dataOffset + size);
+                const u32 newNodeIndex = insertNodeIntoBin(allocator, remainderSize, node.dataOffset + size);
 
-                neighbor_t& neighbor = m_neighbors[nodeIndex];
+                neighbor_t& neighbor = allocator->m_neighbors[nodeIndex];
 
                 // Link new node after the current node so that we can merge them later if both are free
                 // And update the old next neighbor to point to the new node (in middle)
                 if (neighbor.next != node_t::NIL)
-                    m_neighbors[neighbor.next].prev = newNodeIndex;
-                m_neighbors[newNodeIndex].prev = nodeIndex;
-                m_neighbors[newNodeIndex].next = neighbor.next;
-                neighbor.next                  = newNodeIndex;
+                    allocator->m_neighbors[neighbor.next].prev = newNodeIndex;
+                allocator->m_neighbors[newNodeIndex].prev = nodeIndex;
+                allocator->m_neighbors[newNodeIndex].next = neighbor.next;
+                neighbor.next                             = newNodeIndex;
             }
 
             allocation_t a;
@@ -324,47 +328,47 @@ namespace ncore
             return a;
         }
 
-        void allocator_t::free(allocation_t allocation)
+        void free(allocator_t* allocator, allocation_t allocation)
         {
             ASSERT(allocation.metadata != allocation_t::NO_SPACE);
-            if (!m_nodes)
+            if (!allocator->m_nodes)
                 return;
 
             const u32   nodeIndex = allocation.metadata;
-            node_t&     node      = m_nodes[nodeIndex];
-            neighbor_t& neighbor  = m_neighbors[nodeIndex];
+            node_t&     node      = allocator->m_nodes[nodeIndex];
+            neighbor_t& neighbor  = allocator->m_neighbors[nodeIndex];
 
             // Double delete check
-            ASSERT(isNodeUsed(nodeIndex));
+            ASSERT(isNodeUsed(allocator, nodeIndex));
 
             // Merge with neighbors...
             u32 offset = node.dataOffset;
             u32 size   = node.dataSize;
 
-            if ((neighbor.prev != node_t::NIL) && (isNodeUsed(neighbor.prev) == false))
+            if ((neighbor.prev != node_t::NIL) && (isNodeUsed(allocator, neighbor.prev) == false))
             {
                 // Previous (contiguous) free node: Change offset to previous node offset. Sum sizes
-                node_t&     prevNode     = m_nodes[neighbor.prev];
-                neighbor_t& prevNeighbor = m_neighbors[neighbor.prev];
+                node_t&     prevNode     = allocator->m_nodes[neighbor.prev];
+                neighbor_t& prevNeighbor = allocator->m_neighbors[neighbor.prev];
                 offset                   = prevNode.dataOffset;
                 size += prevNode.dataSize;
 
                 // Remove node from the bin linked list and put it in the freelist
-                removeNodeFromBin(neighbor.prev);
+                removeNodeFromBin(allocator, neighbor.prev);
 
                 ASSERT(prevNeighbor.next == nodeIndex);
                 neighbor.prev = prevNeighbor.prev;
             }
 
-            if ((neighbor.next != node_t::NIL) && (isNodeUsed(neighbor.next) == false))
+            if ((neighbor.next != node_t::NIL) && (isNodeUsed(allocator, neighbor.next) == false))
             {
                 // Next (contiguous) free node: Offset remains the same. Sum sizes.
-                neighbor_t& nextNeighbor = m_neighbors[neighbor.next];
-                node_t&     nextNode     = m_nodes[neighbor.next];
+                neighbor_t& nextNeighbor = allocator->m_neighbors[neighbor.next];
+                node_t&     nextNode     = allocator->m_nodes[neighbor.next];
                 size += nextNode.dataSize;
 
                 // Remove node from the bin linked list and put it in the freelist
-                removeNodeFromBin(neighbor.next);
+                removeNodeFromBin(allocator, neighbor.next);
 
                 ASSERT(nextNeighbor.prev == nodeIndex);
                 neighbor.next = (nextNeighbor.next);
@@ -375,40 +379,40 @@ namespace ncore
 
             // Insert the removed node to freelist
 #ifdef DEBUG_VERBOSE
-            printf("Putting node %u into freelist[%u] (free)\n", nodeIndex, m_freeOffset + 1);
+            printf("Putting node %u into freelist[%u] (free)\n", nodeIndex, allocator->m_freeOffset + 1);
 #endif
             // m_freeListHead is the head of the freelist. node.binListNext is the next node in the bin.
-            if (m_freeListHead == node_t::NIL)
+            if (allocator->m_freeListHead == node_t::NIL)
             {
-                node.binListPrev = node_t::NIL;
-                node.binListNext = node_t::NIL;
-                m_freeListHead   = nodeIndex;
+                node.binListPrev          = node_t::NIL;
+                node.binListNext          = node_t::NIL;
+                allocator->m_freeListHead = nodeIndex;
             }
             else
             {
-                node.binListPrev                    = node_t::NIL;
-                node.binListNext                    = m_freeListHead;
-                m_nodes[m_freeListHead].binListPrev = nodeIndex;
-                m_freeListHead                      = nodeIndex;
+                node.binListPrev                                          = node_t::NIL;
+                node.binListNext                                          = allocator->m_freeListHead;
+                allocator->m_nodes[allocator->m_freeListHead].binListPrev = nodeIndex;
+                allocator->m_freeListHead                                 = nodeIndex;
             }
 
             // Insert the (combined) free node to bin
-            const u32 combinedNodeIndex = insertNodeIntoBin(size, offset);
+            const u32 combinedNodeIndex = insertNodeIntoBin(allocator, size, offset);
 
             // Connect neighbors with the new combined node
             if (nodeNext != node_t::NIL)
             {
-                m_neighbors[combinedNodeIndex].next = (nodeNext);
-                m_neighbors[nodeNext].prev          = combinedNodeIndex;
+                allocator->m_neighbors[combinedNodeIndex].next = (nodeNext);
+                allocator->m_neighbors[nodeNext].prev          = combinedNodeIndex;
             }
             if (nodePrev != node_t::NIL)
             {
-                m_neighbors[combinedNodeIndex].prev = nodePrev;
-                m_neighbors[nodePrev].next          = (combinedNodeIndex);
+                allocator->m_neighbors[combinedNodeIndex].prev = nodePrev;
+                allocator->m_neighbors[nodePrev].next          = (combinedNodeIndex);
             }
         }
 
-        u32 allocator_t::insertNodeIntoBin(u32 size, u32 dataOffset)
+        u32 insertNodeIntoBin(allocator_t* allocator, u32 size, u32 dataOffset)
         {
             // Round down to bin index to ensure that bin >= alloc
             u32 binIndex = nfloat::U32ToF32RoundDown(size);
@@ -417,26 +421,26 @@ namespace ncore
             u32 leafBinIndex = binIndex & LEAF_BINS_INDEX_MASK;
 
             // Bin was empty before?
-            if (m_binIndices[binIndex] == node_t::NIL)
+            if (allocator->m_binIndices[binIndex] == node_t::NIL)
             {
                 // Set bin mask bits
-                m_usedBins[topBinIndex] |= 1 << leafBinIndex;
-                m_usedBinsTop |= 1 << topBinIndex;
+                allocator->m_usedBins[topBinIndex] |= 1 << leafBinIndex;
+                allocator->m_usedBinsTop |= 1 << topBinIndex;
             }
 
             // Take a freelist node and insert on top of the bin linked list (next = old top)
-            const u32 topNodeIndex = m_binIndices[binIndex];
+            const u32 topNodeIndex = allocator->m_binIndices[binIndex];
             u32       nodeIndex    = node_t::NIL;
-            if (m_freeListHead != node_t::NIL)
+            if (allocator->m_freeListHead != node_t::NIL)
             {
-                nodeIndex      = m_freeListHead;
-                m_freeListHead = m_nodes[nodeIndex].binListNext;
-                if (m_freeListHead != node_t::NIL)
-                    m_nodes[m_freeListHead].binListPrev = node_t::NIL;
+                nodeIndex                 = allocator->m_freeListHead;
+                allocator->m_freeListHead = allocator->m_nodes[nodeIndex].binListNext;
+                if (allocator->m_freeListHead != node_t::NIL)
+                    allocator->m_nodes[allocator->m_freeListHead].binListPrev = node_t::NIL;
             }
-            else if (m_freeIndex < m_maxAllocs)
+            else if (allocator->m_freeIndex < allocator->m_maxAllocs)
             {
-                nodeIndex = m_freeIndex++;
+                nodeIndex = allocator->m_freeIndex++;
             }
             else
             {
@@ -445,39 +449,39 @@ namespace ncore
             }
 
 #ifdef DEBUG_VERBOSE
-            printf("Getting node %u from freelist[%u]\n", nodeIndex, m_freeOffset + 1);
+            printf("Getting node %u from freelist[%u]\n", nodeIndex, allocator->m_freeOffset + 1);
 #endif
-            m_nodes[nodeIndex].dataOffset  = dataOffset;
-            m_nodes[nodeIndex].dataSize    = size;
-            m_nodes[nodeIndex].binListNext = topNodeIndex;
-            m_nodes[nodeIndex].binListPrev = node_t::NIL;
+            allocator->m_nodes[nodeIndex].dataOffset  = dataOffset;
+            allocator->m_nodes[nodeIndex].dataSize    = size;
+            allocator->m_nodes[nodeIndex].binListNext = topNodeIndex;
+            allocator->m_nodes[nodeIndex].binListPrev = node_t::NIL;
 
-            m_neighbors[nodeIndex].prev = node_t::NIL;
-            m_neighbors[nodeIndex].next = node_t::NIL;
-            setNodeUnused(nodeIndex);
+            allocator->m_neighbors[nodeIndex].prev = node_t::NIL;
+            allocator->m_neighbors[nodeIndex].next = node_t::NIL;
+            setNodeUnused(allocator, nodeIndex);
 
             if (topNodeIndex != node_t::NIL)
-                m_nodes[topNodeIndex].binListPrev = nodeIndex;
-            m_binIndices[binIndex] = nodeIndex;
+                allocator->m_nodes[topNodeIndex].binListPrev = nodeIndex;
+            allocator->m_binIndices[binIndex] = nodeIndex;
 
-            m_freeStorage += size;
+            allocator->m_freeStorage += size;
 #ifdef DEBUG_VERBOSE
-            printf("Free storage: %u (+%u) (insertNodeIntoBin)\n", m_freeStorage, size);
+            printf("Free storage: %u (+%u) (insertNodeIntoBin)\n", allocator->m_freeStorage, size);
 #endif
 
             return nodeIndex;
         }
 
-        void allocator_t::removeNodeFromBin(u32 nodeIndex)
+        void removeNodeFromBin(allocator_t* allocator, u32 nodeIndex)
         {
-            node_t& node = m_nodes[nodeIndex];
+            node_t& node = allocator->m_nodes[nodeIndex];
 
             if (node.binListPrev != node_t::NIL)
             {
                 // Easy case: We have previous node. Just remove this node from the middle of the list.
-                m_nodes[node.binListPrev].binListNext = node.binListNext;
+                allocator->m_nodes[node.binListPrev].binListNext = node.binListNext;
                 if (node.binListNext != node_t::NIL)
-                    m_nodes[node.binListNext].binListPrev = node.binListPrev;
+                    allocator->m_nodes[node.binListNext].binListPrev = node.binListPrev;
             }
             else
             {
@@ -488,70 +492,70 @@ namespace ncore
                 const u32 topBinIndex  = binIndex >> TOP_BINS_INDEX_SHIFT;
                 const u32 leafBinIndex = binIndex & LEAF_BINS_INDEX_MASK;
 
-                m_binIndices[binIndex] = node.binListNext;
+                allocator->m_binIndices[binIndex] = node.binListNext;
                 if (node.binListNext != node_t::NIL)
-                    m_nodes[node.binListNext].binListPrev = node_t::NIL;
+                    allocator->m_nodes[node.binListNext].binListPrev = node_t::NIL;
 
                 // Bin empty?
-                if (m_binIndices[binIndex] == node_t::NIL)
+                if (allocator->m_binIndices[binIndex] == node_t::NIL)
                 {
                     // Remove a leaf bin mask bit
-                    m_usedBins[topBinIndex] &= ~(1 << leafBinIndex);
+                    allocator->m_usedBins[topBinIndex] &= ~(1 << leafBinIndex);
 
                     // All leaf bins empty?
-                    if (m_usedBins[topBinIndex] == 0)
+                    if (allocator->m_usedBins[topBinIndex] == 0)
                     {
                         // Remove a top bin mask bit
-                        m_usedBinsTop &= ~(1 << topBinIndex);
+                        allocator->m_usedBinsTop &= ~(1 << topBinIndex);
                     }
                 }
             }
 
             // Insert the node to freelist
 #ifdef DEBUG_VERBOSE
-            printf("Putting node %u into freelist[%u] (removeNodeFromBin)\n", nodeIndex, m_freeOffset + 1);
+            printf("Putting node %u into freelist[%u] (removeNodeFromBin)\n", nodeIndex, allocator->m_freeOffset + 1);
 #endif
-            if (m_freeListHead == node_t::NIL)
+            if (allocator->m_freeListHead == node_t::NIL)
             {
-                node.binListPrev = node_t::NIL;
-                node.binListNext = node_t::NIL;
-                m_freeListHead   = nodeIndex;
+                node.binListPrev          = node_t::NIL;
+                node.binListNext          = node_t::NIL;
+                allocator->m_freeListHead = nodeIndex;
             }
             else
             {
-                node.binListPrev                    = node_t::NIL;
-                node.binListNext                    = m_freeListHead;
-                m_nodes[m_freeListHead].binListPrev = nodeIndex;
-                m_freeListHead                      = nodeIndex;
+                node.binListPrev                                          = node_t::NIL;
+                node.binListNext                                          = allocator->m_freeListHead;
+                allocator->m_nodes[allocator->m_freeListHead].binListPrev = nodeIndex;
+                allocator->m_freeListHead                                 = nodeIndex;
             }
 
-            m_freeStorage -= node.dataSize;
+            allocator->m_freeStorage -= node.dataSize;
 #ifdef DEBUG_VERBOSE
-            printf("Free storage: %u (-%u) (removeNodeFromBin)\n", m_freeStorage, node.getDataSize());
+            printf("Free storage: %u (-%u) (removeNodeFromBin)\n", allocator->m_freeStorage, node.getDataSize());
 #endif
         }
 
-        u32 allocator_t::allocationSize(allocation_t allocation) const
+        u32 allocationSize(allocator_t* allocator, allocation_t allocation)
         {
-            if (allocation.metadata == allocation_t::NO_SPACE || !m_nodes)
+            if (allocation.metadata == allocation_t::NO_SPACE || !allocator->m_nodes)
                 return 0;
 
-            return m_nodes[allocation.metadata].dataSize;
+            return allocator->m_nodes[allocation.metadata].dataSize;
         }
 
-        storage_report_t allocator_t::storageReport() const
+        storage_report_t storageReport(allocator_t* allocator)
         {
             u32 largestFreeRegion = 0;
             u32 freeStorage       = 0;
 
             // Out of allocations? -> Zero free space
-            if (m_freeOffset > 0)
+            if (allocator->m_freeOffset > 0)
             {
-                freeStorage = m_freeStorage;
-                if (m_usedBinsTop)
+                freeStorage = allocator->m_freeStorage;
+                if (allocator->m_usedBinsTop)
                 {
-                    u32 topBinIndex   = 31 - lzcnt_nonzero(m_usedBinsTop);
-                    u32 leafBinIndex  = 31 - lzcnt_nonzero(m_usedBins[topBinIndex]);
+                    u32 topBinIndex   = 31 - lzcnt_nonzero(allocator->m_usedBinsTop);
+                    u32 leafBinIndex  = 31 - lzcnt_nonzero(allocator->m_usedBins[topBinIndex]);
                     largestFreeRegion = nfloat::F32ToU32((topBinIndex << TOP_BINS_INDEX_SHIFT) | leafBinIndex);
                     ASSERT(freeStorage >= largestFreeRegion);
                 }
@@ -563,16 +567,16 @@ namespace ncore
             return report;
         }
 
-        full_storage_report_t allocator_t::storageReportFull() const
+        full_storage_report_t storageReportFull(allocator_t* allocator)
         {
             full_storage_report_t report;
             for (u32 i = 0; i < NUM_LEAF_BINS; i++)
             {
                 u32 count     = 0;
-                u32 nodeIndex = m_binIndices[i];
+                u32 nodeIndex = allocator->m_binIndices[i];
                 while (nodeIndex != node_t::NIL)
                 {
-                    nodeIndex = m_nodes[nodeIndex].binListNext;
+                    nodeIndex = allocator->m_nodes[nodeIndex].binListNext;
                     count++;
                 }
                 report.freeRegions[i].size  = nfloat::F32ToU32(i);
