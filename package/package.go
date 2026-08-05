@@ -3,7 +3,7 @@ package callocator
 import (
 	cbase "github.com/jurgen-kluft/cbase/package"
 	cunittest "github.com/jurgen-kluft/cunittest/package"
-	"github.com/jurgen-kluft/gide/denv"
+	"github.com/jurgen-kluft/go-ide/denv"
 )
 
 const (
